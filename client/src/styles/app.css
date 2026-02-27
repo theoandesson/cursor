@@ -1,0 +1,73 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: #0a0d13;
+  color: #f5f7ff;
+}
+
+#app-shell {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: 100%;
+}
+
+#top-bar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid #1d2230;
+  background: linear-gradient(90deg, #0e1220, #12192c);
+}
+
+#top-bar h1 {
+  margin: 0;
+  font-size: 1rem;
+  letter-spacing: 0.03em;
+}
+
+#map-status {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #9ac2ff;
+}
+
+#map-root {
+  position: relative;
+}
+
+#map-root .maplibregl-canvas {
+  outline: none;
+}
+
+#lod-badge {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  z-index: 5;
+  padding: 0.45rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: #0f1628dd;
+  border: 1px solid #2a3653;
+}
+
+#lod-badge[data-profile="moving"] {
+  color: #ffca87;
+}
+
+#lod-badge[data-profile="settled"] {
+  color: #96f8c1;
+}

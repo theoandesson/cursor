@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="sv">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sverige 3D-karta | Hög precision</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"
+    />
+    <link rel="stylesheet" href="/src/styles/app.css" />
+  </head>
+  <body>
+    <div id="app-shell">
+      <header id="top-bar">
+        <h1>Sverige 3D-karta</h1>
+        <p id="map-status">Initierar högdetaljerat läge…</p>
+      </header>
+      <main id="map-root" aria-label="3D-karta över Sverige"></main>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
