@@ -24,7 +24,6 @@ export const initSwedenMap = ({
     fadeDuration: 0,
     hash: SWEDEN_MAP_CONFIG.hash,
     maxTileCacheSize: 200,
-    maxTileCacheZoomLevels: 5,
     collectResourceTiming: false,
     crossSourceCollisions: false,
     trackResize: true,

@@ -29,8 +29,11 @@ export const SWEDEN_DATA_SOURCES = Object.freeze({
   ]
 });
 
+export const TERRAIN_CONFIG = Object.freeze({
+  source: "sweden-dem",
+  exaggeration: 1.05
+});
+
 export const LOD_CONFIG = Object.freeze({
-  idleDelayMs: 400,
-  settledTerrainSource: "sweden-dem",
-  settledTerrainExaggeration: 1.05
+  idleDelayMs: 350
 });

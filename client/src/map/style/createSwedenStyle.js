@@ -1,4 +1,4 @@
-import { LOD_CONFIG, SWEDEN_DATA_SOURCES } from "../../config/swedenMapConfig.js";
+import { TERRAIN_CONFIG, SWEDEN_DATA_SOURCES } from "../../config/swedenMapConfig.js";
 import { createLayers } from "./createLayers.js";
 import { SWEDEN_MAP_PALETTE } from "./palette/swedenPalette.js";
 import { createSources } from "./createSources.js";
@@ -10,8 +10,8 @@ export const createSwedenStyle = () => ({
   sources: createSources(),
   layers: createLayers(),
   terrain: {
-    source: LOD_CONFIG.settledTerrainSource,
-    exaggeration: LOD_CONFIG.settledTerrainExaggeration
+    source: TERRAIN_CONFIG.source,
+    exaggeration: TERRAIN_CONFIG.exaggeration
   },
   sky: {
     "sky-color": SWEDEN_MAP_PALETTE.skyColor,

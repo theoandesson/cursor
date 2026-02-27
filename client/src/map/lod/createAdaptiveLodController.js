@@ -9,21 +9,12 @@ export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) 
     if (currentProfile === profileName) return;
     currentProfile = profileName;
 
-    if (profileName === "moving") {
-      map.setTerrain(null);
-
-      if (map.getLayer(BUILDING_LAYER_ID)) {
-        map.setLayoutProperty(BUILDING_LAYER_ID, "visibility", "none");
-      }
-    } else {
-      map.setTerrain({
-        source: lodConfig.settledTerrainSource,
-        exaggeration: lodConfig.settledTerrainExaggeration
-      });
-
-      if (map.getLayer(BUILDING_LAYER_ID)) {
-        map.setLayoutProperty(BUILDING_LAYER_ID, "visibility", "visible");
-      }
+    if (map.getLayer(BUILDING_LAYER_ID)) {
+      map.setLayoutProperty(
+        BUILDING_LAYER_ID,
+        "visibility",
+        profileName === "moving" ? "none" : "visible"
+      );
     }
 
     onStatusChange?.({
