@@ -18,6 +18,8 @@ export default [
         Float32Array: 'readonly',
         performance: 'readonly',
         AbortSignal: 'readonly',
+        ResizeObserver: 'readonly',
+        cancelAnimationFrame: 'readonly',
       },
     },
     rules: {

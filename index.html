@@ -11,12 +11,19 @@
 <body>
   <div id="app">
     <header id="header">
-      <h1>Sverige Klimatdata</h1>
-      <p class="subtitle">Realtidsdata från SMHI</p>
+      <div class="header-left">
+        <h1>Sverige Klimatdata</h1>
+        <p class="subtitle">Realtidsdata från SMHI</p>
+      </div>
+      <div class="view-toggle" id="view-toggle">
+        <button class="toggle-btn active" data-view="2d">2D</button>
+        <button class="toggle-btn" data-view="3d">3D Terräng</button>
+      </div>
     </header>
     <main id="main">
       <aside id="dashboard"></aside>
-      <section id="map-container"></section>
+      <section id="map-container" class="view-panel active"></section>
+      <section id="terrain-container" class="view-panel"></section>
     </main>
     <footer id="legend"></footer>
     <div id="tooltip"></div>
