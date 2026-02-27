@@ -215,7 +215,6 @@ export const createLayers = () => [
     "source-layer": "building",
     type: "fill-extrusion",
     minzoom: 11.5,
-    filter: swedenOnlyFilter,
     layout: {
       visibility: "none"
     },
@@ -233,7 +232,6 @@ export const createLayers = () => [
     "source-layer": "building",
     type: "fill-extrusion",
     minzoom: 11.5,
-    filter: swedenOnlyFilter,
     paint: {
       "fill-extrusion-color": [
         "interpolate",
