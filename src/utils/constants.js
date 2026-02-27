@@ -1,6 +1,6 @@
 export const EARTH_RADIUS = 5;
-export const MARKER_BASE_SIZE = 0.04;
-export const MARKER_HEIGHT_SCALE = 0.15;
+export const MARKER_BASE_SIZE = 0.07;
+export const MARKER_HEIGHT_SCALE = 0.2;
 export const ATMOSPHERE_SCALE = 1.15;
 export const CAMERA_DISTANCE = 14;
 export const REFRESH_INTERVAL = 10 * 60 * 1000;

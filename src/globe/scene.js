@@ -15,11 +15,24 @@ export function initScene() {
     CAMERA_DISTANCE * 0.6
   );
 
-  const renderer = new THREE.WebGLRenderer({
-    canvas,
-    antialias: true,
-    alpha: true,
-  });
+  let renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      alpha: true,
+      powerPreference: 'low-power',
+      failIfMajorPerformanceCaveat: false,
+    });
+  } catch (_e) {
+    renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: false,
+      alpha: true,
+      powerPreference: 'default',
+      failIfMajorPerformanceCaveat: false,
+    });
+  }
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -87,11 +100,11 @@ function addStarfield(scene) {
 }
 
 export function startAnimationLoop(scene, camera, renderer, controls, earth, onTick) {
-  const clock = new THREE.Clock();
+  let startTime = performance.now();
 
   function loop() {
     requestAnimationFrame(loop);
-    const elapsed = clock.getElapsedTime();
+    const elapsed = (performance.now() - startTime) / 1000;
     controls.update();
     earth.rotation.y += 0.0008;
     if (onTick) onTick(elapsed);

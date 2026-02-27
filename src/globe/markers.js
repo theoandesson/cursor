@@ -30,7 +30,7 @@ export function createMarkers(scene, stations, existingMarkers = []) {
     const pos = latLonToVector3(station.latitude, station.longitude, EARTH_RADIUS + 0.02);
     const normal = surfaceNormal(station.latitude, station.longitude);
     const color = temperatureToColor(station.temperature);
-    const height = MARKER_BASE_SIZE + Math.abs(station.temperature) * MARKER_HEIGHT_SCALE * 0.05;
+    const height = MARKER_BASE_SIZE * 2 + Math.abs(station.temperature) * MARKER_HEIGHT_SCALE * 0.04;
 
     const pillarGeo = new THREE.CylinderGeometry(
       MARKER_BASE_SIZE * 0.4, MARKER_BASE_SIZE * 0.6, height, 8
@@ -59,11 +59,11 @@ export function createMarkers(scene, stations, existingMarkers = []) {
       updated: station.updated,
     };
 
-    const glowGeo = new THREE.SphereGeometry(MARKER_BASE_SIZE * 1.2, 12, 12);
+    const glowGeo = new THREE.SphereGeometry(MARKER_BASE_SIZE * 1.6, 12, 12);
     const glowMat = new THREE.MeshBasicMaterial({
       color: color.hex,
       transparent: true,
-      opacity: 0.35,
+      opacity: 0.5,
     });
     const glow = new THREE.Mesh(glowGeo, glowMat);
     glow.position.copy(pos);

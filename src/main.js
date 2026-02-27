@@ -18,7 +18,16 @@ let markers = [];
 async function init() {
   await initGeoEngine();
 
-  const setup = initScene();
+  let setup;
+  try {
+    setup = initScene();
+  } catch (err) {
+    console.error('WebGL initialization failed:', err);
+    hideLoadingScreen();
+    showFallbackUI();
+    return;
+  }
+
   scene = setup.scene;
   camera = setup.camera;
   renderer = setup.renderer;
@@ -41,6 +50,23 @@ async function init() {
   });
 
   setInterval(loadClimateData, REFRESH_INTERVAL);
+}
+
+function showFallbackUI() {
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div style="background:#06080f;color:#e8edf5;min-height:100vh;font-family:Inter,sans-serif;
+                display:flex;align-items:center;justify-content:center;flex-direction:column;padding:2rem;text-align:center">
+      <h1 style="color:#00bfff;margin-bottom:1rem">Sverige Klimatglob</h1>
+      <p style="color:#8a9bbd;max-width:500px;margin-bottom:2rem">
+        WebGL stöds inte i denna webbläsare/miljö. Applikationen kräver WebGL för 3D-rendering.
+        Testa att öppna sidan i Chrome eller Firefox med GPU-stöd.
+      </p>
+      <div id="dashboard" style="width:100%;max-width:400px"></div>
+    </div>
+  `;
+  createDashboard();
+  loadClimateData();
 }
 
 async function loadClimateData() {

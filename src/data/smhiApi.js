@@ -57,15 +57,19 @@ async function fetchStationTemperature(stationId, stationMeta) {
 export async function fetchSeaLevelData() {
   try {
     const res = await fetch(
-      `${SMHI_ENDPOINTS.ocobs}/parameter/1.json`,
+      `${SMHI_ENDPOINTS.ocobs}/parameter/6.json`,
       { signal: AbortSignal.timeout(10000) }
     );
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 
-    const stations = (data.station || []).slice(0, 15);
+    const stations = (data.station || [])
+      .filter((s) => s.active !== false)
+      .slice(0, 15);
     const results = await Promise.allSettled(
-      stations.map((station) => fetchStationSeaLevel(station.id, station))
+      stations.map((station) =>
+        fetchStationSeaLevel(station.key || station.id, station)
+      )
     );
 
     return results
@@ -79,7 +83,7 @@ export async function fetchSeaLevelData() {
 
 async function fetchStationSeaLevel(stationId, stationMeta) {
   const res = await fetch(
-    `${SMHI_ENDPOINTS.ocobs}/parameter/1/station/${stationId}/period/latest-hour/data.json`,
+    `${SMHI_ENDPOINTS.ocobs}/parameter/6/station/${stationId}/period/latest-day/data.json`,
     { signal: AbortSignal.timeout(8000) }
   );
   if (!res.ok) return null;
