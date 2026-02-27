@@ -19,29 +19,29 @@ export const initSwedenMap = ({
     maxBounds: SWEDEN_MAP_CONFIG.maxBounds,
     pitch: SWEDEN_MAP_CONFIG.pitch,
     bearing: SWEDEN_MAP_CONFIG.bearing,
-    antialias: SWEDEN_MAP_CONFIG.antialias,
+    antialias: false,
     renderWorldCopies: false,
-    fadeDuration: 200,
-    hash: SWEDEN_MAP_CONFIG.hash
+    fadeDuration: 0,
+    hash: SWEDEN_MAP_CONFIG.hash,
+    maxTileCacheSize: 200,
+    maxTileCacheZoomLevels: 5,
+    collectResourceTiming: false,
+    crossSourceCollisions: false,
+    trackResize: true,
+    preserveDrawingBuffer: false,
+    refreshExpiredTiles: false,
+    pixelRatio: Math.min(devicePixelRatio, 2)
   });
 
   map.addControl(new maplibregl.NavigationControl({ showZoom: true }), "top-right");
   map.addControl(new maplibregl.ScaleControl({ maxWidth: 180, unit: "metric" }));
-  map.addControl(new maplibregl.TerrainControl({ source: "sweden-dem-high" }));
 
   if (loadingOverlay) {
-    createInitialLoadUxController({
-      map,
-      loadingOverlay
-    });
+    createInitialLoadUxController({ map, loadingOverlay });
   }
 
   map.on("load", () => {
-    createAdaptiveLodController({
-      map,
-      lodConfig: LOD_CONFIG,
-      onStatusChange
-    });
+    createAdaptiveLodController({ map, lodConfig: LOD_CONFIG, onStatusChange });
   });
 
   return map;

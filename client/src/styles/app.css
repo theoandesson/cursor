@@ -59,10 +59,17 @@ body {
 #map-root {
   position: relative;
   overflow: hidden;
+  contain: strict;
+  will-change: contents;
+}
+
+#map-root .maplibregl-canvas-container {
+  will-change: transform;
 }
 
 #map-root .maplibregl-canvas {
   outline: none;
+  image-rendering: auto;
 }
 
 #loading-overlay {
@@ -126,6 +133,7 @@ body {
   border: 1px solid #b7d3ea;
   color: #2b465f;
   box-shadow: 0 1px 8px #6f97ba33;
+  transition: color 0.15s;
 }
 
 #lod-badge[data-profile="moving"] {

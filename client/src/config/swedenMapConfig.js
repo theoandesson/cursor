@@ -15,10 +15,9 @@ export const SWEDEN_MAP_CONFIG = Object.freeze({
   zoom: 5.3,
   minZoom: 4.2,
   maxZoom: 17.5,
-  pitch: 64,
+  pitch: 55,
   bearing: 0,
   maxBounds: SWEDEN_VIEW_BOUNDS,
-  antialias: true,
   hash: true
 });
 
@@ -31,9 +30,7 @@ export const SWEDEN_DATA_SOURCES = Object.freeze({
 });
 
 export const LOD_CONFIG = Object.freeze({
-  idleDelayMs: 550,
-  movingTerrainSource: "sweden-dem-low",
-  settledTerrainSource: "sweden-dem-high",
-  movingTerrainExaggeration: 1,
-  settledTerrainExaggeration: 1.08
+  idleDelayMs: 400,
+  settledTerrainSource: "sweden-dem",
+  settledTerrainExaggeration: 1.05
 });

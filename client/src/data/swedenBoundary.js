@@ -99,4 +99,3 @@ export const SWEDEN_BOUNDARY_FEATURE = {
   }
 };
 
-export const SWEDEN_BOUNDARY_GEOMETRY = SWEDEN_BOUNDARY_FEATURE.geometry;

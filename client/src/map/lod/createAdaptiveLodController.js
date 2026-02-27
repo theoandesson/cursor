@@ -1,60 +1,38 @@
 import { createDebouncedAction } from "./createDebouncedAction.js";
 
-const LOD_PROFILES = Object.freeze({
-  moving: {
-    terrainVisibility: "low",
-    label: "Rör sig: låg polygonupplösning för bättre flyt."
-  },
-  settled: {
-    terrainVisibility: "high",
-    label: "Stilla: hög polygonupplösning för maximal detalj."
-  }
-});
-
-const safelySetLayerVisibility = (map, layerId, visibility) => {
-  if (!map.getLayer(layerId)) {
-    return;
-  }
-  map.setLayoutProperty(layerId, "visibility", visibility);
-};
-
-const safelySetTerrain = (map, source, exaggeration) => {
-  map.setTerrain({
-    source,
-    exaggeration
-  });
-};
+const BUILDING_LAYER_ID = "sweden-buildings";
 
 export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) => {
   let currentProfile = "settled";
+  let interactionCount = 0;
 
   const applyProfile = (profileName) => {
-    if (currentProfile === profileName) {
-      return;
-    }
-
+    if (currentProfile === profileName) return;
     currentProfile = profileName;
+
     if (profileName === "moving") {
-      safelySetTerrain(
-        map,
-        lodConfig.movingTerrainSource,
-        lodConfig.movingTerrainExaggeration
-      );
-      safelySetLayerVisibility(map, "sweden-buildings-low", "visible");
-      safelySetLayerVisibility(map, "sweden-buildings-high", "none");
+      map.setTerrain(null);
+
+      if (map.getLayer(BUILDING_LAYER_ID)) {
+        map.setLayoutProperty(BUILDING_LAYER_ID, "visibility", "none");
+      }
     } else {
-      safelySetTerrain(
-        map,
-        lodConfig.settledTerrainSource,
-        lodConfig.settledTerrainExaggeration
-      );
-      safelySetLayerVisibility(map, "sweden-buildings-low", "none");
-      safelySetLayerVisibility(map, "sweden-buildings-high", "visible");
+      map.setTerrain({
+        source: lodConfig.settledTerrainSource,
+        exaggeration: lodConfig.settledTerrainExaggeration
+      });
+
+      if (map.getLayer(BUILDING_LAYER_ID)) {
+        map.setLayoutProperty(BUILDING_LAYER_ID, "visibility", "visible");
+      }
     }
 
     onStatusChange?.({
       profile: profileName,
-      message: LOD_PROFILES[profileName].label
+      message:
+        profileName === "moving"
+          ? "Rörelse: snabb rendering."
+          : "Stilla: full detalj med terräng."
     });
   };
 
@@ -64,36 +42,30 @@ export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) 
   );
 
   const enterMovingMode = () => {
+    interactionCount++;
     scheduleSettled.cancel();
     applyProfile("moving");
   };
 
   const queueSettledMode = () => {
-    scheduleSettled();
+    interactionCount--;
+    if (interactionCount <= 0) {
+      interactionCount = 0;
+      scheduleSettled();
+    }
   };
 
-  const movingEvents = [
-    "movestart",
-    "zoomstart",
-    "pitchstart",
-    "rotatestart",
-    "dragstart"
-  ];
-  const settledEvents = ["moveend", "zoomend", "pitchend", "rotateend", "dragend"];
-
-  movingEvents.forEach((eventName) => map.on(eventName, enterMovingMode));
-  settledEvents.forEach((eventName) => map.on(eventName, queueSettledMode));
-  map.on("idle", queueSettledMode);
+  map.on("movestart", enterMovingMode);
+  map.on("moveend", queueSettledMode);
 
   onStatusChange?.({
     profile: "settled",
-    message: LOD_PROFILES.settled.label
+    message: "Stilla: full detalj med terräng."
   });
 
   return () => {
     scheduleSettled.cancel();
-    movingEvents.forEach((eventName) => map.off(eventName, enterMovingMode));
-    settledEvents.forEach((eventName) => map.off(eventName, queueSettledMode));
-    map.off("idle", queueSettledMode);
+    map.off("movestart", enterMovingMode);
+    map.off("moveend", queueSettledMode);
   };
 };
