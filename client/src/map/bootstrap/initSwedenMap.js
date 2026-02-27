@@ -1,8 +1,14 @@
 import { LOD_CONFIG, SWEDEN_MAP_CONFIG } from "../../config/swedenMapConfig.js";
 import { createAdaptiveLodController } from "../lod/createAdaptiveLodController.js";
+import { createInitialLoadUxController } from "../loading/createInitialLoadUxController.js";
 import { createSwedenStyle } from "../style/createSwedenStyle.js";
 
-export const initSwedenMap = ({ maplibregl, container, onStatusChange }) => {
+export const initSwedenMap = ({
+  maplibregl,
+  container,
+  onStatusChange,
+  loadingOverlay
+}) => {
   const map = new maplibregl.Map({
     container,
     style: createSwedenStyle(),
@@ -15,12 +21,20 @@ export const initSwedenMap = ({ maplibregl, container, onStatusChange }) => {
     bearing: SWEDEN_MAP_CONFIG.bearing,
     antialias: SWEDEN_MAP_CONFIG.antialias,
     renderWorldCopies: false,
+    fadeDuration: 200,
     hash: SWEDEN_MAP_CONFIG.hash
   });
 
   map.addControl(new maplibregl.NavigationControl({ showZoom: true }), "top-right");
   map.addControl(new maplibregl.ScaleControl({ maxWidth: 180, unit: "metric" }));
   map.addControl(new maplibregl.TerrainControl({ source: "sweden-dem-high" }));
+
+  if (loadingOverlay) {
+    createInitialLoadUxController({
+      map,
+      loadingOverlay
+    });
+  }
 
   map.on("load", () => {
     createAdaptiveLodController({

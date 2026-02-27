@@ -1,6 +1,7 @@
 import { registerTileCacheServiceWorker } from "../cache/registerTileCacheServiceWorker.js";
 import { initSwedenMap } from "../map/bootstrap/initSwedenMap.js";
 import { createCacheStatusPresenter } from "../ui/createCacheStatusPresenter.js";
+import { createLoadingOverlayPresenter } from "../ui/createLoadingOverlayPresenter.js";
 import { createMapStatusPresenter } from "../ui/createMapStatusPresenter.js";
 
 const MAP_ROOT_ID = "map-root";
@@ -13,6 +14,7 @@ export const bootstrapSwedenMapApp = ({ maplibregl }) => {
 
   const setStatus = createMapStatusPresenter({ mapRootElement });
   const setCacheStatus = createCacheStatusPresenter();
+  const loadingOverlay = createLoadingOverlayPresenter({ mapRootElement });
 
   setStatus({
     profile: "settled",
@@ -27,6 +29,7 @@ export const bootstrapSwedenMapApp = ({ maplibregl }) => {
   initSwedenMap({
     maplibregl,
     container: mapRootElement,
-    onStatusChange: setStatus
+    onStatusChange: setStatus,
+    loadingOverlay
   });
 };

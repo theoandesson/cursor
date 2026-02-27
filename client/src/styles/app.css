@@ -58,10 +58,59 @@ body {
 
 #map-root {
   position: relative;
+  overflow: hidden;
 }
 
 #map-root .maplibregl-canvas {
   outline: none;
+}
+
+#loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 0.65rem;
+  padding: 1rem;
+  background: linear-gradient(180deg, #f4fbffec, #e6f2ffef);
+  transition: opacity 0.24s ease;
+}
+
+#loading-overlay[data-state="ready"] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.loading-overlay__title {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: #2a5272;
+}
+
+.loading-overlay__message {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #5d7f9b;
+}
+
+.loading-overlay__track {
+  width: min(460px, 88vw);
+  height: 0.45rem;
+  border-radius: 999px;
+  background: #d8e8f7;
+  overflow: hidden;
+}
+
+.loading-overlay__fill {
+  width: 100%;
+  height: 100%;
+  transform-origin: left center;
+  transform: scaleX(0.06);
+  background: linear-gradient(90deg, #77b5ff, #57d9bf);
+  transition: transform 0.18s ease-out;
 }
 
 #lod-badge {

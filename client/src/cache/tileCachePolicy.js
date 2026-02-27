@@ -1,4 +1,5 @@
 export const TILE_CACHE_PREFIX = "sweden-map-tiles";
+export const TILE_CACHE_RETENTION_VERSIONS = 2;
 
 const OPEN_FREE_MAP_HOST = "tiles.openfreemap.org";
 const TERRAIN_HOST = "s3.amazonaws.com";
@@ -8,6 +9,11 @@ export const getDailyCacheVersion = (date = new Date()) =>
 
 export const buildTileCacheName = (date = new Date()) =>
   `${TILE_CACHE_PREFIX}-${getDailyCacheVersion(date)}`;
+
+export const extractVersionFromCacheName = (cacheName) =>
+  cacheName.startsWith(`${TILE_CACHE_PREFIX}-`)
+    ? cacheName.slice(`${TILE_CACHE_PREFIX}-`.length)
+    : null;
 
 const isOpenFreeMapTile = (url) =>
   url.hostname === OPEN_FREE_MAP_HOST &&
