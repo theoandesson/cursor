@@ -27,10 +27,12 @@ const baseBuildingMinHeightExpression = [
   ["to-number", rawBuildingMinHeightExpression, 0]
 ];
 
+const visualBuildingHeightExpression = ["*", 1.8, baseBuildingHeightExpression];
+
 const roundedMovingHeightExpression = [
   "*",
   4,
-  ["round", ["/", baseBuildingHeightExpression, 4]]
+  ["round", ["/", visualBuildingHeightExpression, 4]]
 ];
 
 const roundedMovingMinHeightExpression = [
@@ -221,8 +223,8 @@ export const createLayers = () => [
       "fill-extrusion-color": SWEDEN_MAP_PALETTE.buildingsLow,
       "fill-extrusion-height": roundedMovingHeightExpression,
       "fill-extrusion-base": roundedMovingMinHeightExpression,
-      "fill-extrusion-opacity": 0.55,
-      "fill-extrusion-vertical-gradient": false
+      "fill-extrusion-opacity": 0.74,
+      "fill-extrusion-vertical-gradient": true
     }
   },
   {
@@ -244,9 +246,9 @@ export const createLayers = () => [
         180,
         SWEDEN_MAP_PALETTE.buildingsHighTall
       ],
-      "fill-extrusion-height": baseBuildingHeightExpression,
+      "fill-extrusion-height": visualBuildingHeightExpression,
       "fill-extrusion-base": baseBuildingMinHeightExpression,
-      "fill-extrusion-opacity": 0.82,
+      "fill-extrusion-opacity": 0.93,
       "fill-extrusion-vertical-gradient": true
     }
   }
