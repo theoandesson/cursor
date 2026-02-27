@@ -4,7 +4,6 @@ const BUILDING_LAYER_ID = "sweden-buildings";
 
 export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) => {
   let currentProfile = "settled";
-  let interactionCount = 0;
 
   const applyProfile = (profileName) => {
     if (currentProfile === profileName) return;
@@ -42,21 +41,17 @@ export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) 
   );
 
   const enterMovingMode = () => {
-    interactionCount++;
     scheduleSettled.cancel();
     applyProfile("moving");
   };
 
   const queueSettledMode = () => {
-    interactionCount--;
-    if (interactionCount <= 0) {
-      interactionCount = 0;
-      scheduleSettled();
-    }
+    scheduleSettled();
   };
 
   map.on("movestart", enterMovingMode);
   map.on("moveend", queueSettledMode);
+  map.on("idle", queueSettledMode);
 
   onStatusChange?.({
     profile: "settled",
@@ -67,5 +62,6 @@ export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) 
     scheduleSettled.cancel();
     map.off("movestart", enterMovingMode);
     map.off("moveend", queueSettledMode);
+    map.off("idle", queueSettledMode);
   };
 };
