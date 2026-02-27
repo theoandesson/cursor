@@ -5,6 +5,7 @@ Högupplöst 3D-karta över Sverige med adaptiv detaljnivå:
 - **Rörelse-läge**: lägre polygonupplösning för terräng + förenklade byggnader.
 - **Idle-läge**: högre polygonupplösning för terräng + full byggnadsdetalj.
 - **Sverige-only-läge**: rendering och tile-laddning begränsas till svensk geometri/område.
+- **Daglig tilecache**: hus/infrastruktur/terräng cachelagras lokalt och rullas till ny version varje dag.
 
 ## Målbild
 
@@ -16,6 +17,7 @@ Projektet är uppsatt för att kunna nå myndighetsnära noggrannhet genom:
 - strikt fokus på Sverige (bbox + kamerabegränsning)
 - Sverige-geojson + `within`-filter för att rita enbart svenska features
 - modulär LOD-kontroll för effektiv rendering
+- service worker-baserad tilecache (OpenFreeMap + terrarium) med daglig cacheversion
 
 ## Start
 

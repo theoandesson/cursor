@@ -38,6 +38,11 @@ const run = async () => {
       throw new Error(`/src/main.js svarade ${mainScriptResponse.status}`);
     }
 
+    const serviceWorkerResponse = await fetch(`http://${host}:${port}/sw.js`);
+    if (!serviceWorkerResponse.ok) {
+      throw new Error(`/sw.js svarade ${serviceWorkerResponse.status}`);
+    }
+
     console.log("Smoke-test klar: server + klientfiler fungerar.");
   } finally {
     await new Promise((resolve, reject) => {
