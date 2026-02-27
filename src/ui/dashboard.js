@@ -9,11 +9,7 @@ export function createDashboard() {
   legendEl = document.getElementById('legend');
 
   dashboardEl.innerHTML = `
-    <div class="panel panel-header">
-      <h1>Sverige Klimatglob</h1>
-      <p class="subtitle">Realtidsdata från SMHI</p>
-    </div>
-    <div class="panel panel-temp" id="panel-temp">
+    <div class="panel panel-temp">
       <div class="panel-icon">🌡️</div>
       <div class="panel-content">
         <h3>Temperatur</h3>
@@ -25,15 +21,15 @@ export function createDashboard() {
         <div class="stat-meta" id="stat-station-count">-- stationer</div>
       </div>
     </div>
-    <div class="panel panel-co2" id="panel-co2">
+    <div class="panel panel-co2">
       <div class="panel-icon">💨</div>
       <div class="panel-content">
         <h3>CO₂ (globalt)</h3>
-        <div class="stat-value" id="stat-co2">~424 ppm</div>
+        <div class="stat-value" id="stat-co2">--</div>
         <div class="stat-meta">Baserat på global trend</div>
       </div>
     </div>
-    <div class="panel panel-sea" id="panel-sea">
+    <div class="panel panel-sea">
       <div class="panel-icon">🌊</div>
       <div class="panel-content">
         <h3>Havsnivå</h3>
@@ -42,7 +38,7 @@ export function createDashboard() {
       </div>
     </div>
     <div class="panel panel-info" id="panel-station-info">
-      <p class="hint">Hovra över en markör för detaljer</p>
+      <p class="hint">Hovra över en station för detaljer</p>
     </div>
   `;
 
@@ -61,8 +57,8 @@ export function updateDashboard(stations) {
   setText('stat-station-count', `${stats.stationCount} stationer`);
 
   if (stats.avgTemp != null) {
-    const tempEl = document.getElementById('stat-avg-temp');
-    if (tempEl) tempEl.style.color = temperatureToCss(stats.avgTemp);
+    const el = document.getElementById('stat-avg-temp');
+    if (el) el.style.color = temperatureToCss(stats.avgTemp);
   }
 
   setText('stat-sea-level', stats.avgSeaLevel != null
@@ -75,29 +71,23 @@ export function updateDashboard(stations) {
 
 function estimateCO2() {
   const now = new Date();
-  const baseYear = 2024;
   const basePpm = 422;
   const yearlyIncrease = 2.5;
-  const yearDiff = now.getFullYear() - baseYear +
-    (now.getMonth() / 12);
-  const seasonalVariation = Math.sin(
-    (now.getMonth() - 4) * Math.PI / 6
-  ) * 3;
-  const estimated = basePpm + yearDiff * yearlyIncrease + seasonalVariation;
+  const yearDiff = now.getFullYear() - 2024 + now.getMonth() / 12;
+  const seasonal = Math.sin((now.getMonth() - 4) * Math.PI / 6) * 3;
+  const estimated = basePpm + yearDiff * yearlyIncrease + seasonal;
   setText('stat-co2', `~${estimated.toFixed(0)} ppm`);
 }
 
 function renderLegend() {
   if (!legendEl) return;
   legendEl.innerHTML = `
-    <div class="legend-title">Temperatur (°C)</div>
-    <div class="legend-bar"></div>
-    <div class="legend-labels">
-      <span>-30</span>
-      <span>-10</span>
-      <span>0</span>
-      <span>15</span>
-      <span>35</span>
+    <div class="legend-content">
+      <span class="legend-title">Temperatur (°C)</span>
+      <div class="legend-bar"></div>
+      <div class="legend-labels">
+        <span>-30</span><span>-10</span><span>0</span><span>15</span><span>35</span>
+      </div>
     </div>
   `;
 }
@@ -107,7 +97,7 @@ export function showStationInfo(data) {
   if (!panel) return;
 
   if (!data) {
-    panel.innerHTML = '<p class="hint">Hovra över en markör för detaljer</p>';
+    panel.innerHTML = '<p class="hint">Hovra över en station för detaljer</p>';
     return;
   }
 

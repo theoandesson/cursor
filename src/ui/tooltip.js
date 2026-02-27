@@ -1,68 +1,33 @@
-import * as THREE from 'three';
-import { getInteractiveObjects } from '../globe/markers.js';
-import { showStationInfo } from './dashboard.js';
+let tooltipEl = null;
 
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-let tooltipEl;
-let hoveredObject = null;
-
-export function initTooltip(camera, scene, renderer) {
-  tooltipEl = document.getElementById('tooltip');
-
-  renderer.domElement.addEventListener('mousemove', (event) => {
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-    raycaster.setFromCamera(mouse, camera);
-    const objects = getInteractiveObjects();
-    const intersects = raycaster.intersectObjects(objects, false);
-
-    if (intersects.length > 0) {
-      const hit = intersects[0].object;
-      if (hit !== hoveredObject) {
-        hoveredObject = hit;
-        const data = hit.userData;
-        showTooltip(event.clientX, event.clientY, data);
-        showStationInfo(data);
-        renderer.domElement.style.cursor = 'pointer';
-      } else {
-        moveTooltip(event.clientX, event.clientY);
-      }
-    } else {
-      if (hoveredObject) {
-        hoveredObject = null;
-        hideTooltip();
-        showStationInfo(null);
-        renderer.domElement.style.cursor = 'grab';
-      }
-    }
-  });
-
-  renderer.domElement.addEventListener('mouseleave', () => {
-    hoveredObject = null;
-    hideTooltip();
-    showStationInfo(null);
-  });
+function getTooltip() {
+  if (!tooltipEl) {
+    tooltipEl = document.getElementById('tooltip');
+  }
+  return tooltipEl;
 }
 
-function showTooltip(x, y, data) {
-  if (!tooltipEl) return;
-  tooltipEl.innerHTML = `
-    <strong>${data.name}</strong>
-    ${data.temperature != null ? `<br>${data.temperature.toFixed(1)}°C` : ''}
-    ${data.seaLevel != null ? `<br>Havsnivå: ${data.seaLevel.toFixed(1)} cm` : ''}
-  `;
-  tooltipEl.style.display = 'block';
-  moveTooltip(x, y);
+export function showTooltip(event, station) {
+  const el = getTooltip();
+  if (!el) return;
+
+  let html = `<strong>${station.name}</strong>`;
+  if (station.temperature != null) {
+    html += `<br>${station.temperature.toFixed(1)}°C`;
+  }
+  if (station.seaLevel != null) {
+    html += `<br>Havsnivå: ${station.seaLevel.toFixed(1)} cm`;
+  }
+  el.innerHTML = html;
+  el.style.display = 'block';
+
+  const x = event.clientX + 16;
+  const y = event.clientY - 10;
+  el.style.left = `${x}px`;
+  el.style.top = `${y}px`;
 }
 
-function moveTooltip(x, y) {
-  if (!tooltipEl) return;
-  tooltipEl.style.left = `${x + 16}px`;
-  tooltipEl.style.top = `${y - 10}px`;
-}
-
-function hideTooltip() {
-  if (tooltipEl) tooltipEl.style.display = 'none';
+export function hideTooltip() {
+  const el = getTooltip();
+  if (el) el.style.display = 'none';
 }
