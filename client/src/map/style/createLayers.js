@@ -29,7 +29,17 @@ export const createLayers = () => [
     id: "bg",
     type: "background",
     paint: {
-      "background-color": "#0d1423"
+      "background-color": "#1b2435"
+    }
+  },
+  {
+    id: "raster-base",
+    source: "sweden_raster",
+    type: "raster",
+    paint: {
+      "raster-opacity": 0.95,
+      "raster-saturation": -0.18,
+      "raster-contrast": 0.2
     }
   },
   {
@@ -42,12 +52,12 @@ export const createLayers = () => [
         "match",
         ["get", "class"],
         ["wood", "forest"],
-        "#213628",
+        "#264431",
         ["grass", "park"],
-        "#2a3f2d",
-        "#1a2335"
+        "#335236",
+        "#24384a"
       ],
-      "fill-opacity": 0.7
+      "fill-opacity": 0.22
     }
   },
   {
@@ -56,7 +66,8 @@ export const createLayers = () => [
     "source-layer": "water",
     type: "fill",
     paint: {
-      "fill-color": "#17416c"
+      "fill-color": "#2d5f91",
+      "fill-opacity": 0.3
     }
   },
   {
