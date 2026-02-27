@@ -8,7 +8,7 @@ export const SWEDEN_MAP_CONFIG = Object.freeze({
   zoom: 5.3,
   minZoom: 4.2,
   maxZoom: 17.5,
-  pitch: 56,
+  pitch: 64,
   bearing: 0,
   maxBounds: SWEDEN_VIEW_BOUNDS,
   antialias: true,

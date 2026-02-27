@@ -1,15 +1,27 @@
-const baseBuildingHeightExpression = [
+const rawBuildingHeightExpression = [
   "coalesce",
   ["get", "render_height"],
   ["get", "height"],
-  6
+  0
 ];
 
-const baseBuildingMinHeightExpression = [
+const rawBuildingMinHeightExpression = [
   "coalesce",
   ["get", "render_min_height"],
   ["get", "min_height"],
   0
+];
+
+const baseBuildingHeightExpression = [
+  "max",
+  9,
+  ["to-number", rawBuildingHeightExpression, 9]
+];
+
+const baseBuildingMinHeightExpression = [
+  "max",
+  0,
+  ["to-number", rawBuildingMinHeightExpression, 0]
 ];
 
 const roundedMovingHeightExpression = [
@@ -114,7 +126,7 @@ export const createLayers = () => [
     source: "sweden_vector",
     "source-layer": "building",
     type: "fill-extrusion",
-    minzoom: 12,
+    minzoom: 11.5,
     layout: {
       visibility: "none"
     },
@@ -131,7 +143,7 @@ export const createLayers = () => [
     source: "sweden_vector",
     "source-layer": "building",
     type: "fill-extrusion",
-    minzoom: 12,
+    minzoom: 11.5,
     paint: {
       "fill-extrusion-color": [
         "interpolate",
