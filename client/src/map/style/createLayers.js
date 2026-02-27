@@ -1,4 +1,5 @@
 import { SWEDEN_BOUNDARY_GEOMETRY } from "../../data/swedenBoundary.js";
+import { SWEDEN_MAP_PALETTE } from "./palette/swedenPalette.js";
 
 const rawBuildingHeightExpression = [
   "coalesce",
@@ -45,7 +46,7 @@ export const createLayers = () => [
     id: "bg",
     type: "background",
     paint: {
-      "background-color": "#1b2435"
+      "background-color": SWEDEN_MAP_PALETTE.background
     }
   },
   {
@@ -53,8 +54,8 @@ export const createLayers = () => [
     source: "sweden_boundary",
     type: "fill",
     paint: {
-      "fill-color": "#192a3d",
-      "fill-opacity": 0.28
+      "fill-color": SWEDEN_MAP_PALETTE.swedenAreaFill,
+      "fill-opacity": SWEDEN_MAP_PALETTE.swedenAreaFillOpacity
     }
   },
   {
@@ -68,12 +69,12 @@ export const createLayers = () => [
         "match",
         ["get", "class"],
         ["wood", "forest"],
-        "#264431",
+        SWEDEN_MAP_PALETTE.landcoverForest,
         ["grass", "park"],
-        "#335236",
-        "#24384a"
+        SWEDEN_MAP_PALETTE.landcoverPark,
+        SWEDEN_MAP_PALETTE.landcoverBase
       ],
-      "fill-opacity": 0.22
+      "fill-opacity": SWEDEN_MAP_PALETTE.landcoverOpacity
     }
   },
   {
@@ -83,8 +84,8 @@ export const createLayers = () => [
     type: "fill",
     filter: swedenOnlyFilter,
     paint: {
-      "fill-color": "#2d5f91",
-      "fill-opacity": 0.3
+      "fill-color": SWEDEN_MAP_PALETTE.waterFill,
+      "fill-opacity": SWEDEN_MAP_PALETTE.waterFillOpacity
     }
   },
   {
@@ -94,8 +95,9 @@ export const createLayers = () => [
     type: "line",
     filter: swedenOnlyFilter,
     paint: {
-      "line-color": "#2a6ca6",
-      "line-width": 1
+      "line-color": SWEDEN_MAP_PALETTE.waterwayLine,
+      "line-width": 1,
+      "line-opacity": 0.65
     }
   },
   {
@@ -109,10 +111,10 @@ export const createLayers = () => [
         "match",
         ["get", "class"],
         ["motorway", "trunk"],
-        "#f6b054",
+        SWEDEN_MAP_PALETTE.roadsMotorway,
         ["primary", "secondary"],
-        "#dca06a",
-        "#9192a8"
+        SWEDEN_MAP_PALETTE.roadsPrimary,
+        SWEDEN_MAP_PALETTE.roadsLocal
       ],
       "line-width": [
         "interpolate",
@@ -125,7 +127,8 @@ export const createLayers = () => [
         14,
         2.2
       ],
-      "line-opacity": 0.85
+      "line-opacity": SWEDEN_MAP_PALETTE.roadsOpacity,
+      "line-blur": 0.3
     }
   },
   {
@@ -133,9 +136,9 @@ export const createLayers = () => [
     source: "sweden_boundary",
     type: "line",
     paint: {
-      "line-color": "#87b5ff",
+      "line-color": SWEDEN_MAP_PALETTE.swedenBorder,
       "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.8, 10, 1.6, 15, 3],
-      "line-opacity": 0.95
+      "line-opacity": SWEDEN_MAP_PALETTE.swedenBorderOpacity
     }
   },
   {
@@ -149,10 +152,10 @@ export const createLayers = () => [
       visibility: "none"
     },
     paint: {
-      "fill-extrusion-color": "#90a2bb",
+      "fill-extrusion-color": SWEDEN_MAP_PALETTE.buildingsLow,
       "fill-extrusion-height": roundedMovingHeightExpression,
       "fill-extrusion-base": roundedMovingMinHeightExpression,
-      "fill-extrusion-opacity": 0.62,
+      "fill-extrusion-opacity": 0.55,
       "fill-extrusion-vertical-gradient": false
     }
   },
@@ -169,15 +172,15 @@ export const createLayers = () => [
         ["linear"],
         baseBuildingHeightExpression,
         0,
-        "#7e95b1",
+        SWEDEN_MAP_PALETTE.buildingsHighLow,
         50,
-        "#9ab6d6",
+        SWEDEN_MAP_PALETTE.buildingsHighMid,
         180,
-        "#c3dbef"
+        SWEDEN_MAP_PALETTE.buildingsHighTall
       ],
       "fill-extrusion-height": baseBuildingHeightExpression,
       "fill-extrusion-base": baseBuildingMinHeightExpression,
-      "fill-extrusion-opacity": 0.9,
+      "fill-extrusion-opacity": 0.82,
       "fill-extrusion-vertical-gradient": true
     }
   }

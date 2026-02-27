@@ -11,8 +11,8 @@ html,
 body {
   margin: 0;
   height: 100%;
-  background: #0a0d13;
-  color: #f5f7ff;
+  background: #1f2a38;
+  color: #eef3fa;
 }
 
 #app-shell {
@@ -27,8 +27,8 @@ body {
   justify-content: space-between;
   gap: 1rem;
   padding: 0.8rem 1rem;
-  border-bottom: 1px solid #1d2230;
-  background: linear-gradient(90deg, #0e1220, #12192c);
+  border-bottom: 1px solid #2d3b4e;
+  background: linear-gradient(90deg, #2a3547, #34475f);
 }
 
 #top-bar h1 {
@@ -40,7 +40,7 @@ body {
 #map-status {
   margin: 0;
   font-size: 0.88rem;
-  color: #9ac2ff;
+  color: #d2deec;
 }
 
 #map-root {
@@ -60,14 +60,15 @@ body {
   border-radius: 999px;
   font-size: 0.8rem;
   font-weight: 600;
-  background: #0f1628dd;
-  border: 1px solid #2a3653;
+  background: #2b384bd9;
+  border: 1px solid #4f627d;
+  color: #e5edf8;
 }
 
 #lod-badge[data-profile="moving"] {
-  color: #ffca87;
+  color: #ffe0b9;
 }
 
 #lod-badge[data-profile="settled"] {
-  color: #96f8c1;
+  color: #d4ecd4;
 }
