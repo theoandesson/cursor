@@ -15,11 +15,11 @@ export const createSwedenStyle = () => ({
   },
   sky: {
     "sky-color": SWEDEN_MAP_PALETTE.skyColor,
-    "sky-horizon-blend": 0.42,
+    "sky-horizon-blend": 0.32,
     "horizon-color": SWEDEN_MAP_PALETTE.skyHorizonColor,
-    "horizon-fog-blend": 0.24,
+    "horizon-fog-blend": 0.35,
     "fog-color": SWEDEN_MAP_PALETTE.fogColor,
-    "fog-ground-blend": 0.28,
-    "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 4, 0.08, 9, 0.22]
+    "fog-ground-blend": 0.33,
+    "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 4, 0.1, 9, 0.26]
   }
 });

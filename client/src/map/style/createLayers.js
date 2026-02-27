@@ -40,6 +40,17 @@ const roundedMovingMinHeightExpression = [
 ];
 
 const swedenOnlyFilter = ["within", SWEDEN_BOUNDARY_GEOMETRY];
+const swedenUrbanLanduseFilter = [
+  "all",
+  swedenOnlyFilter,
+  [
+    "match",
+    ["get", "class"],
+    ["residential", "commercial", "industrial", "suburb", "neighbourhood"],
+    true,
+    false
+  ]
+];
 
 export const createLayers = () => [
   {
@@ -78,6 +89,17 @@ export const createLayers = () => [
     }
   },
   {
+    id: "landuse-urban",
+    source: "sweden_vector",
+    "source-layer": "landuse",
+    type: "fill",
+    filter: swedenUrbanLanduseFilter,
+    paint: {
+      "fill-color": SWEDEN_MAP_PALETTE.landuseUrban,
+      "fill-opacity": SWEDEN_MAP_PALETTE.landuseUrbanOpacity
+    }
+  },
+  {
     id: "water",
     source: "sweden_vector",
     "source-layer": "water",
@@ -101,6 +123,29 @@ export const createLayers = () => [
     }
   },
   {
+    id: "roads-casing",
+    source: "sweden_vector",
+    "source-layer": "transportation",
+    type: "line",
+    filter: swedenOnlyFilter,
+    paint: {
+      "line-color": SWEDEN_MAP_PALETTE.roadsCasing,
+      "line-width": [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        5,
+        1.1,
+        10,
+        3.2,
+        14,
+        6.2
+      ],
+      "line-opacity": SWEDEN_MAP_PALETTE.roadsCasingOpacity,
+      "line-blur": 0.35
+    }
+  },
+  {
     id: "roads",
     source: "sweden_vector",
     "source-layer": "transportation",
@@ -121,14 +166,35 @@ export const createLayers = () => [
         ["linear"],
         ["zoom"],
         5,
-        0.4,
+        0.45,
         10,
-        1.3,
+        1.8,
         14,
-        2.2
+        3.9
       ],
       "line-opacity": SWEDEN_MAP_PALETTE.roadsOpacity,
-      "line-blur": 0.3
+      "line-blur": 0.2
+    }
+  },
+  {
+    id: "road-labels",
+    source: "sweden_vector",
+    "source-layer": "transportation_name",
+    type: "symbol",
+    minzoom: 10,
+    filter: swedenOnlyFilter,
+    layout: {
+      "symbol-placement": "line",
+      "text-field": ["coalesce", ["get", "name:sv"], ["get", "name"], ""],
+      "text-font": ["Noto Sans Regular"],
+      "text-size": ["interpolate", ["linear"], ["zoom"], 10, 10, 13, 12, 16, 14],
+      "text-letter-spacing": 0.02
+    },
+    paint: {
+      "text-color": SWEDEN_MAP_PALETTE.roadLabel,
+      "text-halo-color": SWEDEN_MAP_PALETTE.roadLabelHalo,
+      "text-halo-width": 1.3,
+      "text-halo-blur": 0.4
     }
   },
   {
