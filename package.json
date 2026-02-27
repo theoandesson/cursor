@@ -1,0 +1,23 @@
+{
+  "name": "swedish-climate-globe",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Real-time 3D interactive Earth globe visualizing live Swedish climate data from SMHI",
+  "scripts": {
+    "start": "vite --open",
+    "dev": "vite --open",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "cesium": "^1.138.0",
+    "three": "^0.183.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.0.2",
+    "vite": "^7.3.1"
+  }
+}
