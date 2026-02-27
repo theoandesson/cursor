@@ -1,3 +1,5 @@
+import { SWEDEN_BOUNDARY_GEOMETRY } from "../../data/swedenBoundary.js";
+
 const rawBuildingHeightExpression = [
   "coalesce",
   ["get", "render_height"],
@@ -36,6 +38,8 @@ const roundedMovingMinHeightExpression = [
   ["round", ["/", baseBuildingMinHeightExpression, 4]]
 ];
 
+const swedenOnlyFilter = ["within", SWEDEN_BOUNDARY_GEOMETRY];
+
 export const createLayers = () => [
   {
     id: "bg",
@@ -45,13 +49,12 @@ export const createLayers = () => [
     }
   },
   {
-    id: "raster-base",
-    source: "sweden_raster",
-    type: "raster",
+    id: "sweden-area",
+    source: "sweden_boundary",
+    type: "fill",
     paint: {
-      "raster-opacity": 0.95,
-      "raster-saturation": -0.18,
-      "raster-contrast": 0.2
+      "fill-color": "#192a3d",
+      "fill-opacity": 0.28
     }
   },
   {
@@ -59,6 +62,7 @@ export const createLayers = () => [
     source: "sweden_vector",
     "source-layer": "landcover",
     type: "fill",
+    filter: swedenOnlyFilter,
     paint: {
       "fill-color": [
         "match",
@@ -77,6 +81,7 @@ export const createLayers = () => [
     source: "sweden_vector",
     "source-layer": "water",
     type: "fill",
+    filter: swedenOnlyFilter,
     paint: {
       "fill-color": "#2d5f91",
       "fill-opacity": 0.3
@@ -87,6 +92,7 @@ export const createLayers = () => [
     source: "sweden_vector",
     "source-layer": "waterway",
     type: "line",
+    filter: swedenOnlyFilter,
     paint: {
       "line-color": "#2a6ca6",
       "line-width": 1
@@ -97,6 +103,7 @@ export const createLayers = () => [
     source: "sweden_vector",
     "source-layer": "transportation",
     type: "line",
+    filter: swedenOnlyFilter,
     paint: {
       "line-color": [
         "match",
@@ -122,11 +129,22 @@ export const createLayers = () => [
     }
   },
   {
+    id: "sweden-border",
+    source: "sweden_boundary",
+    type: "line",
+    paint: {
+      "line-color": "#87b5ff",
+      "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.8, 10, 1.6, 15, 3],
+      "line-opacity": 0.95
+    }
+  },
+  {
     id: "sweden-buildings-low",
     source: "sweden_vector",
     "source-layer": "building",
     type: "fill-extrusion",
     minzoom: 11.5,
+    filter: swedenOnlyFilter,
     layout: {
       visibility: "none"
     },
@@ -144,6 +162,7 @@ export const createLayers = () => [
     "source-layer": "building",
     type: "fill-extrusion",
     minzoom: 11.5,
+    filter: swedenOnlyFilter,
     paint: {
       "fill-extrusion-color": [
         "interpolate",

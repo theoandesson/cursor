@@ -14,6 +14,7 @@ export const initSwedenMap = ({ maplibregl, container, onStatusChange }) => {
     pitch: SWEDEN_MAP_CONFIG.pitch,
     bearing: SWEDEN_MAP_CONFIG.bearing,
     antialias: SWEDEN_MAP_CONFIG.antialias,
+    renderWorldCopies: false,
     hash: SWEDEN_MAP_CONFIG.hash
   });
 

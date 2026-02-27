@@ -3,6 +3,13 @@ export const SWEDEN_VIEW_BOUNDS = Object.freeze([
   [24.8, 69.7]
 ]);
 
+export const SWEDEN_SOURCE_BOUNDS = Object.freeze([
+  SWEDEN_VIEW_BOUNDS[0][0],
+  SWEDEN_VIEW_BOUNDS[0][1],
+  SWEDEN_VIEW_BOUNDS[1][0],
+  SWEDEN_VIEW_BOUNDS[1][1]
+]);
+
 export const SWEDEN_MAP_CONFIG = Object.freeze({
   center: [16.5, 62.1],
   zoom: 5.3,
