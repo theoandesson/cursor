@@ -10,7 +10,7 @@ export const createSources = () => ({
   },
   sweden_vector: {
     type: "vector",
-    tiles: SWEDEN_DATA_SOURCES.vectorTiles,
+    url: SWEDEN_DATA_SOURCES.vectorTileJsonUrl,
     minzoom: 0,
     maxzoom: 14
   },

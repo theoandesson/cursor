@@ -16,8 +16,8 @@ export const SWEDEN_MAP_CONFIG = Object.freeze({
 });
 
 export const SWEDEN_DATA_SOURCES = Object.freeze({
-  vectorTiles: ["https://demotiles.maplibre.org/tiles/{z}/{x}/{y}.pbf"],
-  glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+  vectorTileJsonUrl: "https://tiles.openfreemap.org/planet",
+  glyphs: "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
   terrainTiles: [
     "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
   ]

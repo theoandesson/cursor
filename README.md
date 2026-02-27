@@ -9,6 +9,7 @@ Högupplöst 3D-karta över Sverige med adaptiv detaljnivå:
 
 Projektet är uppsatt för att kunna nå myndighetsnära noggrannhet genom:
 
+- OpenFreeMap OpenMapTiles-vektordata (inkl. byggnadslager för 3D)
 - georefererad terrängkälla i meter (Terrarium DEM)
 - 3D-byggnader med höjdfält
 - strikt fokus på Sverige (bbox + kamerabegränsning)
