@@ -1,47 +1,80 @@
-/* ── City weather markers ── */
+/* ── Weather hover popup ── */
 
-.weather-marker {
+.weather-hover-container .maplibregl-popup-content {
+  padding: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 18px rgba(20, 50, 80, 0.22);
+}
+
+.weather-hover {
+  padding: 12px 14px;
+  font-size: 0.82rem;
+  color: #1a3a52;
+  min-width: 210px;
+}
+
+.weather-hover__loading {
+  margin: 0;
+  color: #5a7a96;
+  text-align: center;
+  padding: 6px 0;
+}
+
+.weather-hover__header {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 1px;
-  cursor: pointer;
-  pointer-events: auto;
-  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.25));
-  transition: transform 0.12s ease;
+  gap: 10px;
+  margin-bottom: 4px;
 }
 
-.weather-marker:hover {
-  transform: scale(1.12);
-}
-
-.weather-marker__icon {
-  font-size: 1.5rem;
+.weather-hover__icon {
+  font-size: 2rem;
   line-height: 1;
 }
 
-.weather-marker__temp {
-  font-size: 0.78rem;
+.weather-hover__city {
+  display: block;
+  font-size: 0.92rem;
   font-weight: 700;
-  color: #1a3a52;
-  background: #ffffffdd;
-  padding: 1px 5px;
-  border-radius: 6px;
-  line-height: 1.2;
+  color: #183048;
 }
 
-.weather-marker__name {
-  font-size: 0.62rem;
+.weather-hover__temp {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #183048;
+}
+
+.weather-hover__condition {
+  margin: 2px 0 8px;
+  font-size: 0.78rem;
+  color: #4a6a84;
+  font-weight: 500;
+}
+
+.weather-hover__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.76rem;
+}
+
+.weather-hover__table tr {
+  border-top: 1px solid #e4eef6;
+}
+
+.weather-hover__table td {
+  padding: 4px 0;
+  color: #3a5a74;
+}
+
+.weather-hover__table td:first-child {
   font-weight: 600;
   color: #2a4a64;
-  background: #ffffffcc;
-  padding: 0 3px;
-  border-radius: 3px;
-  white-space: nowrap;
-  line-height: 1.3;
+  width: 45%;
 }
 
-/* ── Weather popup ── */
+/* ── Weather click popup ── */
 
 .weather-popup-container .maplibregl-popup-content {
   padding: 0;

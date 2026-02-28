@@ -1,5 +1,5 @@
 import { LOD_CONFIG, SWEDEN_MAP_CONFIG } from "../../config/swedenMapConfig.js";
-import { createCityWeatherMarkers } from "../../weather/createCityWeatherMarkers.js";
+import { createCityWeatherLayer } from "../../weather/createCityWeatherLayer.js";
 import { createWeatherPopup } from "../../weather/createWeatherPopup.js";
 import { createAdaptiveLodController } from "../lod/createAdaptiveLodController.js";
 import { createInitialLoadUxController } from "../loading/createInitialLoadUxController.js";
@@ -18,7 +18,6 @@ export const initSwedenMap = ({
     zoom: SWEDEN_MAP_CONFIG.zoom,
     minZoom: SWEDEN_MAP_CONFIG.minZoom,
     maxZoom: SWEDEN_MAP_CONFIG.maxZoom,
-    maxBounds: SWEDEN_MAP_CONFIG.maxBounds,
     pitch: SWEDEN_MAP_CONFIG.pitch,
     bearing: SWEDEN_MAP_CONFIG.bearing,
     antialias: false,
@@ -31,10 +30,16 @@ export const initSwedenMap = ({
     trackResize: true,
     preserveDrawingBuffer: false,
     refreshExpiredTiles: false,
-    pixelRatio: Math.min(devicePixelRatio, 2)
+    pixelRatio: Math.min(devicePixelRatio, 2),
+    dragRotate: true,
+    touchZoomRotate: true,
+    maxPitch: 85
   });
 
-  map.addControl(new maplibregl.NavigationControl({ showZoom: true }), "top-right");
+  map.addControl(
+    new maplibregl.NavigationControl({ showZoom: true, showCompass: true, visualizePitch: true }),
+    "top-right"
+  );
   map.addControl(new maplibregl.ScaleControl({ maxWidth: 180, unit: "metric" }));
 
   if (loadingOverlay) {
@@ -43,7 +48,7 @@ export const initSwedenMap = ({
 
   map.on("load", () => {
     createAdaptiveLodController({ map, lodConfig: LOD_CONFIG, onStatusChange });
-    createCityWeatherMarkers({ map, maplibregl });
+    createCityWeatherLayer({ map, maplibregl });
     createWeatherPopup({ map, maplibregl });
   });
 
