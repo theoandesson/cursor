@@ -5,9 +5,16 @@ export const SWEDEN_MAP_CONFIG = Object.freeze({
   zoom: 5.3,
   minZoom: 3,
   maxZoom: 17.5,
+  maxPitch: 85,
   pitch: 55,
   bearing: 0,
   hash: true
+});
+
+export const NAVIGATION_CONTROL_CONFIG = Object.freeze({
+  panStepPixels: 160,
+  rotateStepDegrees: 16,
+  pitchStepDegrees: 8
 });
 
 export const SWEDEN_DATA_SOURCES = Object.freeze({

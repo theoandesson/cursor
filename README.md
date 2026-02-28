@@ -67,6 +67,7 @@ Webbläsaren öppnas automatiskt. Om den inte öppnas, gå manuellt till:
 
 - **Zooma in/ut**: scrollhjul, `+`/`-` tangenter, dubbelklick, eller knapparna uppe till höger
 - **Panorera**: klicka och dra med musen
+- **Rotera/luta/flytta med panelen**: använd knapparna `R-`/`R+` (rotation), `L-`/`L+` (lutning) och `N/V/O/S` (forflyttning)
 - **Se väder**: markörer visas automatiskt för många svenska städer (70+)
 - **Klicka var som helst** på kartan för detaljerad väder-popup med 6-timmars prognos
 
