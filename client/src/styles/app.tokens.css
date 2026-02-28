@@ -1,19 +1,19 @@
 :root {
-  color-scheme: dark;
+  color-scheme: light;
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
 
-  --app-bg-top: #020d1d;
-  --app-bg-mid: #031a2f;
-  --app-bg-bottom: #082645;
-  --app-text-primary: #e6f2ff;
-  --app-text-muted: #9fbedb;
-  --app-panel-bg: #082039c9;
-  --app-panel-border: #5f95c17a;
-  --app-panel-shadow: #01091666;
-  --app-accent: #7fc7ff;
-  --app-accent-strong: #56a7ea;
-  --app-success: #8fe3be;
-  --app-warning: #f1bc7a;
+  --app-bg-top: #f0f5fa;
+  --app-bg-mid: #e6edf5;
+  --app-bg-bottom: #dbe4ef;
+  --app-text-primary: #1c2d3f;
+  --app-text-muted: #5c7389;
+  --app-panel-bg: #ffffffda;
+  --app-panel-border: #b8cde04d;
+  --app-panel-shadow: #1a2d4214;
+  --app-accent: #3a8fd6;
+  --app-accent-strong: #2a7bc0;
+  --app-success: #2da876;
+  --app-warning: #d9923b;
 }
 
 * {
