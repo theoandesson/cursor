@@ -5,6 +5,7 @@ const SOURCE_ID = "city-weather-source";
 const CIRCLE_LAYER_ID = "city-weather-circles";
 const LABEL_LAYER_ID = "city-weather-labels";
 const REFRESH_INTERVAL_MS = 10 * 60 * 1000;
+const CITY_MARKER_MAX_ZOOM = 13.8;
 
 const buildGeoJson = (cities) => ({
   type: "FeatureCollection",
@@ -68,6 +69,7 @@ export const createCityWeatherLayer = ({ map, maplibregl }) => {
     id: CIRCLE_LAYER_ID,
     type: "circle",
     source: SOURCE_ID,
+    maxzoom: CITY_MARKER_MAX_ZOOM,
     paint: {
       "circle-radius": 18,
       "circle-color": "#ffffffcc",
@@ -81,6 +83,7 @@ export const createCityWeatherLayer = ({ map, maplibregl }) => {
     id: LABEL_LAYER_ID,
     type: "symbol",
     source: SOURCE_ID,
+    maxzoom: CITY_MARKER_MAX_ZOOM,
     layout: {
       "text-field": [
         "format",

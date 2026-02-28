@@ -68,11 +68,11 @@ export const initSwedenMap = ({
       mapConfig: SWEDEN_MAP_CONFIG,
       controlConfig: NAVIGATION_CONTROL_CONFIG
     }),
-    "top-left"
+    "top-right"
   );
   map.addControl(
     new maplibregl.NavigationControl({ showZoom: true, showCompass: true, visualizePitch: true }),
-    "top-right"
+    "top-left"
   );
   map.addControl(new maplibregl.ScaleControl({ maxWidth: 180, unit: "metric" }));
 
@@ -81,9 +81,9 @@ export const initSwedenMap = ({
   }
 
   map.on("load", () => {
-    createAdaptiveLodController({ map, lodConfig: LOD_CONFIG, onStatusChange });
     createCityWeatherLayer({ map, maplibregl });
     createWeatherPopup({ map, maplibregl });
+    createAdaptiveLodController({ map, lodConfig: LOD_CONFIG, onStatusChange });
   });
 
   return map;
