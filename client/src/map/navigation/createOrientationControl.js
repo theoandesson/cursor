@@ -1,15 +1,25 @@
 import { createCameraActions } from "./createCameraActions.js";
 
-const ROOT_CLASS = "map-navigation-aid maplibregl-ctrl";
-const PAD_CLASS = "map-navigation-aid__pad";
-const ROW_CLASS = "map-navigation-aid__row";
-const BUTTON_CLASS = "map-navigation-aid__button";
-const SPACER_CLASS = "map-navigation-aid__spacer";
+const ROOT_CLASS = "map-navigation-panel maplibregl-ctrl";
+const HEADER_CLASS = "map-navigation-panel__header";
+const TITLE_CLASS = "map-navigation-panel__title";
+const TOGGLE_CLASS = "map-navigation-panel__toggle";
+const HINT_CLASS = "map-navigation-panel__hint";
+const SECTION_CLASS = "map-navigation-panel__section";
+const SECTION_LABEL_CLASS = "map-navigation-panel__section-label";
+const PAD_CLASS = "map-navigation-panel__pad";
+const ROW_CLASS = "map-navigation-panel__row";
+const BUTTON_CLASS = "map-navigation-panel__button";
+const BUTTON_PRIMARY_CLASS = "map-navigation-panel__button--primary";
+const SPACER_CLASS = "map-navigation-panel__spacer";
 
-const createButton = ({ label, title }) => {
+const createButton = ({ label, title, isPrimary = false }) => {
   const button = document.createElement("button");
   button.type = "button";
   button.className = BUTTON_CLASS;
+  if (isPrimary) {
+    button.classList.add(BUTTON_PRIMARY_CLASS);
+  }
   button.textContent = label;
   button.title = title;
   button.setAttribute("aria-label", title);
@@ -21,6 +31,24 @@ const createSpacer = () => {
   spacer.className = SPACER_CLASS;
   spacer.setAttribute("aria-hidden", "true");
   return spacer;
+};
+
+const setInversionToggleState = ({ button, isInverted }) => {
+  button.dataset.state = isInverted ? "active" : "idle";
+  button.setAttribute("aria-pressed", String(isInverted));
+  button.textContent = isInverted ? "Inverterad: På" : "Inverterad: Av";
+};
+
+const createSection = (labelText) => {
+  const section = document.createElement("div");
+  section.className = SECTION_CLASS;
+
+  const label = document.createElement("p");
+  label.className = SECTION_LABEL_CLASS;
+  label.textContent = labelText;
+  section.appendChild(label);
+
+  return section;
 };
 
 const bindAction = ({ button, action, listeners }) => {
@@ -36,21 +64,37 @@ const buildMovementPad = ({ actions, listeners }) => {
   const pad = document.createElement("div");
   pad.className = PAD_CLASS;
 
-  const northButton = createButton({ label: "N", title: "Flytta norrut" });
+  const northButton = createButton({
+    label: "↑",
+    title: "Flytta uppåt enligt vald styrning",
+    isPrimary: true
+  });
   bindAction({ button: northButton, action: actions.panNorth, listeners });
 
-  const westButton = createButton({ label: "V", title: "Flytta vasterut" });
+  const westButton = createButton({
+    label: "←",
+    title: "Flytta vänster enligt vald styrning",
+    isPrimary: true
+  });
   bindAction({ button: westButton, action: actions.panWest, listeners });
 
-  const eastButton = createButton({ label: "O", title: "Flytta osterut" });
+  const eastButton = createButton({
+    label: "→",
+    title: "Flytta höger enligt vald styrning",
+    isPrimary: true
+  });
   bindAction({ button: eastButton, action: actions.panEast, listeners });
 
-  const southButton = createButton({ label: "S", title: "Flytta soderut" });
+  const southButton = createButton({
+    label: "↓",
+    title: "Flytta nedåt enligt vald styrning",
+    isPrimary: true
+  });
   bindAction({ button: southButton, action: actions.panSouth, listeners });
 
   const resetButton = createButton({
-    label: "Hem",
-    title: "Aterstall riktning"
+    label: "⌂",
+    title: "Återställ riktning"
   });
   bindAction({
     button: resetButton,
@@ -109,41 +153,79 @@ export const createOrientationControl = ({
 }) => {
   let container = null;
   const listeners = [];
+  let isInverted = Boolean(controlConfig.defaultInverted);
 
   return {
     onAdd: () => {
       const actions = createCameraActions({
         map,
         mapConfig,
-        controlConfig
+        controlConfig,
+        getIsInverted: () => isInverted
       });
 
       container = document.createElement("section");
       container.className = ROOT_CLASS;
       container.setAttribute("role", "group");
-      container.setAttribute("aria-label", "Orientering och forflyttning");
+      container.setAttribute("aria-label", "Navigering och förflyttning");
 
+      const header = document.createElement("header");
+      header.className = HEADER_CLASS;
+
+      const title = document.createElement("p");
+      title.className = TITLE_CLASS;
+      title.textContent = "Navigering";
+
+      const inversionToggle = document.createElement("button");
+      inversionToggle.type = "button";
+      inversionToggle.className = TOGGLE_CLASS;
+      inversionToggle.title = "Växla inverterad styrning";
+      inversionToggle.setAttribute("aria-label", "Växla inverterad styrning");
+      setInversionToggleState({ button: inversionToggle, isInverted });
+
+      const onToggleClick = (event) => {
+        event.preventDefault();
+        isInverted = !isInverted;
+        setInversionToggleState({ button: inversionToggle, isInverted });
+      };
+      inversionToggle.addEventListener("click", onToggleClick);
+      listeners.push(() =>
+        inversionToggle.removeEventListener("click", onToggleClick)
+      );
+
+      header.append(title, inversionToggle);
+
+      const hint = document.createElement("p");
+      hint.className = HINT_CLASS;
+      hint.textContent =
+        "Styr med pilarna. Invertering är aktiverad som standard.";
+
+      const movementSection = createSection("Rörelse");
       const movementPad = buildMovementPad({ actions, listeners });
+      movementSection.appendChild(movementPad);
+
+      const orientationSection = createSection("Orientering");
       const rotateRow = buildActionRow({
-        leftLabel: "R-",
-        leftTitle: "Rotera vanster",
+        leftLabel: "↺",
+        leftTitle: "Rotera vänster",
         leftAction: actions.rotateLeft,
-        rightLabel: "R+",
-        rightTitle: "Rotera hoger",
+        rightLabel: "↻",
+        rightTitle: "Rotera höger",
         rightAction: actions.rotateRight,
         listeners
       });
       const tiltRow = buildActionRow({
-        leftLabel: "L-",
+        leftLabel: "Tilt -",
         leftTitle: "Luta ned",
         leftAction: actions.tiltDown,
-        rightLabel: "L+",
+        rightLabel: "Tilt +",
         rightTitle: "Luta upp",
         rightAction: actions.tiltUp,
         listeners
       });
+      orientationSection.append(rotateRow, tiltRow);
 
-      container.append(movementPad, rotateRow, tiltRow);
+      container.append(header, hint, movementSection, orientationSection);
       return container;
     },
     onRemove: () => {

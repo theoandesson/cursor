@@ -1,26 +1,10 @@
 import { SWEDEN_MAP_PALETTE } from "./palette/swedenPalette.js";
-
-const baseBuildingHeightExpression = [
-  "max",
-  9,
-  [
-    "to-number",
-    ["coalesce", ["get", "render_height"], ["get", "height"], 0],
-    9
-  ]
-];
-
-const baseBuildingMinHeightExpression = [
-  "max",
-  0,
-  [
-    "to-number",
-    ["coalesce", ["get", "render_min_height"], ["get", "min_height"], 0],
-    0
-  ]
-];
-
-const visualBuildingHeightExpression = ["*", 1.8, baseBuildingHeightExpression];
+import { LOD_CONFIG } from "../../config/swedenMapConfig.js";
+import {
+  baseBuildingHeightExpression,
+  baseBuildingMinHeightExpression,
+  createVisualBuildingHeightExpression
+} from "./expressions/buildingExpressions.js";
 
 const urbanLanduseFilter = [
   "match",
@@ -197,7 +181,9 @@ export const createLayers = () => [
         180,
         SWEDEN_MAP_PALETTE.buildingsHighTall
       ],
-      "fill-extrusion-height": visualBuildingHeightExpression,
+      "fill-extrusion-height": createVisualBuildingHeightExpression(
+        LOD_CONFIG.defaultBuildingHeightScale
+      ),
       "fill-extrusion-base": baseBuildingMinHeightExpression,
       "fill-extrusion-opacity": 0.88,
       "fill-extrusion-vertical-gradient": true

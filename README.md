@@ -56,6 +56,11 @@ cd cursor
 ```bash
 git checkout cursor/applikationsstart-kommando-1944
 git pull origin cursor/applikationsstart-kommando-1944
+Se till att du har den senaste koden från `main`-branchen:
+
+```bash
+git checkout main
+git pull origin main
 ```
 
 ### 3. Installera beroenden
@@ -106,6 +111,10 @@ LOD: låg detalj vid rörelse, hög detalj i idle.
 - **Zooma in/ut** – scrollhjul, `+`/`-` tangenter, dubbelklick, eller knapparna uppe till höger
 - **Panorera** – klicka och dra med musen
 - **Rotera/luta/flytta** – använd knapparna `R-`/`R+` (rotation), `L-`/`L+` (lutning) och `N/V/O/S` (förflyttning)
+- **Zooma in/ut** – scrollhjul, `+`/`-` tangenter, dubbelklick, eller knapparna uppe till vänster
+- **Panorera** – klicka och dra med musen
+- **Navigeringspanel** – använd pilarna (förflyttning), `↺`/`↻` (rotation), `Tilt -`/`Tilt +` (lutning) och `⌂` (återställning)
+- **Inverterad styrning** – växla med knappen `Inverterad: På/Av` i navigeringspanelen
 - **Se väder** – markörer visas automatiskt för 70+ svenska städer
 - **Klicka var som helst** på kartan för detaljerad väder-popup med 6-timmars prognos
 
