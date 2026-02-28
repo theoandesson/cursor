@@ -4,41 +4,69 @@ Högupplöst 3D-karta över Sverige med live väderdata från SMHI.
 
 ## Krav
 
-- **Node.js 18 eller nyare** (rekommenderat: 20 eller 22)
-- **npm** (följer med Node.js)
-- **Internetanslutning** (kartdata och väder laddas live)
-- **Modern webbläsare** (Chrome, Firefox, Edge)
+| Krav | Minimum | Rekommenderat |
+|------|---------|---------------|
+| **Node.js** | 18.0.0 | 20 LTS eller 22 LTS |
+| **npm** | Medföljer Node.js | – |
+| **Internet** | Krävs | – |
+| **Webbläsare** | Modern (Chrome, Firefox, Edge) | Chrome |
 
-### Kontrollera din Node-version
+### Kontrollera att Node.js är installerat
+
+Öppna en terminal (Kommandotolken, PowerShell, eller Terminal på macOS/Linux) och skriv:
 
 ```bash
 node -v
 ```
 
-Om du ser `v18.x.x` eller högre är du redo. Om inte, ladda ner senaste versionen från [nodejs.org](https://nodejs.org/).
+Du bör se något i stil med `v20.11.1`. Om kommandot inte hittas eller versionen är lägre än `v18`, installera senaste LTS-versionen från [nodejs.org](https://nodejs.org/).
 
-## Starta appen
+Kontrollera även att npm finns:
+
+```bash
+npm -v
+```
+
+## Starta appen – steg för steg
 
 ### 1. Klona repot
 
+Öppna en terminal och navigera till den mapp där du vill spara projektet:
+
+```bash
+cd ~/projekt
+```
+
+Klona sedan repot:
+
 ```bash
 git clone https://github.com/theoandesson/cursor.git
+```
+
+Gå in i projektmappen:
+
+```bash
 cd cursor
 ```
 
-### 2. Byt till rätt branch
+### 2. Hämta senaste versionen
+
+Se till att du har den senaste koden från `main`-branchen:
 
 ```bash
-git checkout cursor/zoomning-utan-lagg-7389
+git checkout main
+git pull origin main
 ```
 
 ### 3. Installera beroenden
+
+Installera alla npm-paket som projektet behöver:
 
 ```bash
 npm install
 ```
 
-Du ska se något i stil med:
+Du ska se något liknande:
 
 ```
 added 75 packages in 1s
@@ -59,16 +87,26 @@ Sverige 3D-karta startad: http://127.0.0.1:4173
 LOD: låg detalj vid rörelse, hög detalj i idle.
 ```
 
-Webbläsaren öppnas automatiskt. Om den inte öppnas, gå manuellt till:
+**Webbläsaren öppnas automatiskt.** Om den inte öppnas, kopiera länken ovan och klistra in i din webbläsare.
 
-**http://127.0.0.1:4173**
+> **Tips:** Vill du använda en annan port? Kör med miljövariabeln `PORT`:
+>
+> ```bash
+> PORT=3000 npm start
+> ```
+>
+> Vill du stänga av att webbläsaren öppnas automatiskt?
+>
+> ```bash
+> AUTO_OPEN_BROWSER=false npm start
+> ```
 
 ### 5. Använd appen
 
-- **Zooma in/ut**: scrollhjul, `+`/`-` tangenter, dubbelklick, eller knapparna uppe till höger
-- **Panorera**: klicka och dra med musen
-- **Rotera/luta/flytta med panelen**: använd knapparna `R-`/`R+` (rotation), `L-`/`L+` (lutning) och `N/V/O/S` (forflyttning)
-- **Se väder**: markörer visas automatiskt för många svenska städer (70+)
+- **Zooma in/ut** – scrollhjul, `+`/`-` tangenter, dubbelklick, eller knapparna uppe till höger
+- **Panorera** – klicka och dra med musen
+- **Rotera/luta/flytta** – använd knapparna `R-`/`R+` (rotation), `L-`/`L+` (lutning) och `N/V/O/S` (förflyttning)
+- **Se väder** – markörer visas automatiskt för 70+ svenska städer
 - **Klicka var som helst** på kartan för detaljerad väder-popup med 6-timmars prognos
 
 ## Stoppa servern
