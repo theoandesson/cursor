@@ -1,4 +1,6 @@
 import { LOD_CONFIG, SWEDEN_MAP_CONFIG } from "../../config/swedenMapConfig.js";
+import { createCityWeatherMarkers } from "../../weather/createCityWeatherMarkers.js";
+import { createWeatherPopup } from "../../weather/createWeatherPopup.js";
 import { createAdaptiveLodController } from "../lod/createAdaptiveLodController.js";
 import { createInitialLoadUxController } from "../loading/createInitialLoadUxController.js";
 import { createSwedenStyle } from "../style/createSwedenStyle.js";
@@ -41,6 +43,8 @@ export const initSwedenMap = ({
 
   map.on("load", () => {
     createAdaptiveLodController({ map, lodConfig: LOD_CONFIG, onStatusChange });
+    createCityWeatherMarkers({ map, maplibregl });
+    createWeatherPopup({ map, maplibregl });
   });
 
   return map;
