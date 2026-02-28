@@ -17,6 +17,7 @@ export const createSources = () => ({
     maxzoom: 14
   },
   "sweden-dem-low": {
+  "sweden-dem": {
     type: "raster-dem",
     tiles: SWEDEN_DATA_SOURCES.terrainTiles,
     encoding: "terrarium",
@@ -33,5 +34,6 @@ export const createSources = () => ({
     bounds: SWEDEN_SOURCE_BOUNDS,
     minzoom: 0,
     maxzoom: 12
+    maxzoom: 10
   }
 });

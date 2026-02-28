@@ -52,6 +52,20 @@ const swedenUrbanLanduseFilter = [
     true,
     false
   ]
+import { SWEDEN_MAP_PALETTE } from "./palette/swedenPalette.js";
+import { LOD_CONFIG } from "../../config/swedenMapConfig.js";
+import {
+  baseBuildingHeightExpression,
+  baseBuildingMinHeightExpression,
+  createVisualBuildingHeightExpression
+} from "./expressions/buildingExpressions.js";
+
+const urbanLanduseFilter = [
+  "match",
+  ["get", "class"],
+  ["residential", "commercial", "industrial", "suburb", "neighbourhood"],
+  true,
+  false
 ];
 
 export const createLayers = () => [
@@ -96,6 +110,7 @@ export const createLayers = () => [
     "source-layer": "landuse",
     type: "fill",
     filter: swedenUrbanLanduseFilter,
+    filter: urbanLanduseFilter,
     paint: {
       "fill-color": SWEDEN_MAP_PALETTE.landuseUrban,
       "fill-opacity": SWEDEN_MAP_PALETTE.landuseUrbanOpacity
@@ -232,6 +247,11 @@ export const createLayers = () => [
     "source-layer": "building",
     type: "fill-extrusion",
     minzoom: 11.5,
+    id: "sweden-buildings",
+    source: "sweden_vector",
+    "source-layer": "building",
+    type: "fill-extrusion",
+    minzoom: 13,
     paint: {
       "fill-extrusion-color": [
         "interpolate",
@@ -247,6 +267,11 @@ export const createLayers = () => [
       "fill-extrusion-height": visualBuildingHeightExpression,
       "fill-extrusion-base": baseBuildingMinHeightExpression,
       "fill-extrusion-opacity": 0.93,
+      "fill-extrusion-height": createVisualBuildingHeightExpression(
+        LOD_CONFIG.defaultBuildingHeightScale
+      ),
+      "fill-extrusion-base": baseBuildingMinHeightExpression,
+      "fill-extrusion-opacity": 0.88,
       "fill-extrusion-vertical-gradient": true
     }
   }

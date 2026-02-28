@@ -6,11 +6,15 @@
     <title>Sverige 3D-karta | Hög precision</title>
     <link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin />
     <link rel="preconnect" href="https://s3.amazonaws.com" crossorigin />
+    <title>Sverige 3D-karta</title>
+    <link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin />
+    <link rel="dns-prefetch" href="https://s3.amazonaws.com" />
     <link
       rel="stylesheet"
       href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"
     />
     <link rel="stylesheet" href="/src/styles/app.css" />
+    <link rel="stylesheet" href="/src/styles/weather.css" />
   </head>
   <body>
     <div id="app-shell">
@@ -18,6 +22,12 @@
         <h1>Sverige 3D-karta</h1>
         <div id="status-stack">
           <p id="map-status">Initierar högdetaljerat läge…</p>
+        <div id="brand-stack">
+          <h1>Sverige 3D-karta</h1>
+          <p id="brand-subtitle">Smidig 3D-navigering och liveväder i realtid</p>
+        </div>
+        <div id="status-stack">
+          <p id="map-status">Initierar…</p>
           <p id="cache-status">Tilecache initieras…</p>
         </div>
       </header>

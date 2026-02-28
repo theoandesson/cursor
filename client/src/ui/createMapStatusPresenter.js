@@ -1,6 +1,13 @@
 const STATUS_ELEMENT_ID = "map-status";
 const LOD_BADGE_ID = "lod-badge";
 
+const resolveBadgeText = ({ profile, message }) => {
+  if (profile === "moving" && message.includes("turbo")) {
+    return "LOD: Turbo";
+  }
+  return profile === "moving" ? "LOD: Rörelse" : "LOD: Stilla";
+};
+
 const createBadge = (rootElement) => {
   const badge = document.createElement("output");
   badge.id = LOD_BADGE_ID;
@@ -19,6 +26,7 @@ export const createMapStatusPresenter = ({ mapRootElement }) => {
     }
     lodBadge.value = message;
     lodBadge.textContent = profile === "moving" ? "LOD: Rörelse" : "LOD: Stilla";
+    lodBadge.textContent = resolveBadgeText({ profile, message });
     lodBadge.dataset.profile = profile;
   };
 };

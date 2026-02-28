@@ -33,6 +33,29 @@ const run = async () => {
       throw new Error(`/healthz svarade ${healthResponse.status}`);
     }
 
+    const apiHealthResponse = await fetch(`http://${host}:${port}/api/healthz`);
+    if (!apiHealthResponse.ok) {
+      throw new Error(`/api/healthz svarade ${apiHealthResponse.status}`);
+    }
+
+    const endpointResponse = await fetch(`http://${host}:${port}/api/endpoints`);
+    if (!endpointResponse.ok) {
+      throw new Error(`/api/endpoints svarade ${endpointResponse.status}`);
+    }
+    const endpointPayload = await endpointResponse.json();
+    if (!Array.isArray(endpointPayload.endpoints) || endpointPayload.endpoints.length < 5) {
+      throw new Error("/api/endpoints returnerade inte förväntad endpoint-lista.");
+    }
+
+    const citiesResponse = await fetch(`http://${host}:${port}/api/cities`);
+    if (!citiesResponse.ok) {
+      throw new Error(`/api/cities svarade ${citiesResponse.status}`);
+    }
+    const citiesPayload = await citiesResponse.json();
+    if (!Array.isArray(citiesPayload.cities) || citiesPayload.cities.length < 50) {
+      throw new Error("/api/cities returnerade för få städer.");
+    }
+
     const mainScriptResponse = await fetch(`http://${host}:${port}/src/main.js`);
     if (!mainScriptResponse.ok) {
       throw new Error(`/src/main.js svarade ${mainScriptResponse.status}`);
@@ -44,6 +67,7 @@ const run = async () => {
     }
 
     console.log("Smoke-test klar: server + klientfiler fungerar.");
+    console.log("Smoke-test klar: server, API och klientfiler fungerar.");
   } finally {
     await new Promise((resolve, reject) => {
       server.close((error) => {

@@ -3,6 +3,37 @@ import { createAdaptiveLodController } from "../lod/createAdaptiveLodController.
 import { createInitialLoadUxController } from "../loading/createInitialLoadUxController.js";
 import { createSwedenStyle } from "../style/createSwedenStyle.js";
 
+import {
+  LOD_CONFIG,
+  NAVIGATION_CONTROL_CONFIG,
+  SWEDEN_MAP_CONFIG
+} from "../../config/swedenMapConfig.js";
+import { createCityWeatherLayer } from "../../weather/createCityWeatherLayer.js";
+import { createWeatherPopup } from "../../weather/createWeatherPopup.js";
+import { createAdaptiveLodController } from "../lod/createAdaptiveLodController.js";
+import { createInitialLoadUxController } from "../loading/createInitialLoadUxController.js";
+import { createOrientationControl } from "../navigation/createOrientationControl.js";
+import { createSwedenStyle } from "../style/createSwedenStyle.js";
+
+const enableInteraction = (handler) => {
+  if (handler && typeof handler.enable === "function") {
+    handler.enable();
+  }
+};
+
+const enableExtendedNavigation = (map) => {
+  enableInteraction(map.dragPan);
+  enableInteraction(map.scrollZoom);
+  enableInteraction(map.boxZoom);
+  enableInteraction(map.dragRotate);
+  enableInteraction(map.keyboard);
+  enableInteraction(map.doubleClickZoom);
+  enableInteraction(map.touchZoomRotate);
+  if (map.touchZoomRotate && typeof map.touchZoomRotate.enableRotation === "function") {
+    map.touchZoomRotate.enableRotation();
+  }
+};
+
 export const initSwedenMap = ({
   maplibregl,
   container,
@@ -42,6 +73,48 @@ export const initSwedenMap = ({
       lodConfig: LOD_CONFIG,
       onStatusChange
     });
+    pitch: SWEDEN_MAP_CONFIG.pitch,
+    bearing: SWEDEN_MAP_CONFIG.bearing,
+    antialias: false,
+    renderWorldCopies: false,
+    fadeDuration: 0,
+    hash: SWEDEN_MAP_CONFIG.hash,
+    maxTileCacheSize: 200,
+    collectResourceTiming: false,
+    crossSourceCollisions: false,
+    trackResize: true,
+    preserveDrawingBuffer: false,
+    refreshExpiredTiles: false,
+    pixelRatio: Math.min(devicePixelRatio, 2),
+    dragRotate: true,
+    touchZoomRotate: true,
+    maxPitch: SWEDEN_MAP_CONFIG.maxPitch
+  });
+
+  enableExtendedNavigation(map);
+
+  map.addControl(
+    createOrientationControl({
+      map,
+      mapConfig: SWEDEN_MAP_CONFIG,
+      controlConfig: NAVIGATION_CONTROL_CONFIG
+    }),
+    "top-right"
+  );
+  map.addControl(
+    new maplibregl.NavigationControl({ showZoom: true, showCompass: true, visualizePitch: true }),
+    "top-left"
+  );
+  map.addControl(new maplibregl.ScaleControl({ maxWidth: 180, unit: "metric" }));
+
+  if (loadingOverlay) {
+    createInitialLoadUxController({ map, loadingOverlay });
+  }
+
+  map.on("load", () => {
+    createCityWeatherLayer({ map, maplibregl });
+    createWeatherPopup({ map, maplibregl });
+    createAdaptiveLodController({ map, lodConfig: LOD_CONFIG, onStatusChange });
   });
 
   return map;
