@@ -67,7 +67,7 @@ Webbläsaren öppnas automatiskt. Om den inte öppnas, gå manuellt till:
 
 - **Zooma in/ut**: scrollhjul, `+`/`-` tangenter, dubbelklick, eller knapparna uppe till höger
 - **Panorera**: klicka och dra med musen
-- **Se väder**: markörer visas automatiskt för 12 svenska städer
+- **Se väder**: markörer visas automatiskt för många svenska städer (70+)
 - **Klicka var som helst** på kartan för detaljerad väder-popup med 6-timmars prognos
 
 ## Stoppa servern
@@ -81,6 +81,26 @@ npm run smoke
 ```
 
 Verifierar att servern fungerar och att health-endpoint svarar.
+
+## API-endpoints
+
+Servern exponerar även ett API som klienten använder för stad- och väderdata:
+
+- `GET /api/healthz` – API-status
+- `GET /api/endpoints` – lista alla tillgängliga API-endpoints
+- `GET /api/cities` – lista svenska städer (stöd för `search`, `limit`, `offset`)
+- `GET /api/cities/:cityId` – hämta en enskild stad
+- `GET /api/weather/point?lon=<lon>&lat=<lat>&hours=<1-48>` – väder för valfri punkt
+- `GET /api/weather/cities` – väder för alla städer (`refresh=true` för forcad uppdatering)
+- `GET /api/weather/cities/:cityId` – väder för en specifik stad
+
+Exempel:
+
+```bash
+curl "http://127.0.0.1:4173/api/cities?limit=20"
+curl "http://127.0.0.1:4173/api/weather/cities?limit=10"
+curl "http://127.0.0.1:4173/api/weather/point?lon=18.0686&lat=59.3293"
+```
 
 ## Felsökning
 
