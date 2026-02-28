@@ -18,7 +18,7 @@ export const NAVIGATION_CONTROL_CONFIG = Object.freeze({
   minPanStepPixels: 56,
   mediumZoomThreshold: 11.5,
   mediumZoomPanFactor: 0.74,
-  nearZoomThreshold: 14.8,
+  nearZoomThreshold: 14.2,
   nearZoomPanFactor: 0.46,
   animationMs: 170,
   defaultInverted: true
@@ -39,7 +39,7 @@ export const TERRAIN_CONFIG = Object.freeze({
 
 export const LOD_CONFIG = Object.freeze({
   idleDelayMs: 280,
-  closeRangeZoomThreshold: 14.8,
+  closeRangeZoomThreshold: 14.2,
   defaultBuildingHeightScale: 1.78,
   closeRangeBuildingHeightScale: 1.58,
   closeRangeMovingPixelRatio: 1.1,
