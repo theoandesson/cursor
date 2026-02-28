@@ -82,11 +82,9 @@ export const createCityWeatherLayer = ({ map, maplibregl }) => {
     layout: {
       "text-field": [
         "format",
-        ["get", "icon"], { "font-scale": 1.4 },
+        ["get", "temp"], { "font-scale": 0.95 },
         "\n", {},
-        ["get", "temp"], { "font-scale": 0.85 },
-        "\n", {},
-        ["get", "name"], { "font-scale": 0.65 }
+        ["get", "name"], { "font-scale": 0.7 }
       ],
       "text-font": ["Noto Sans Regular"],
       "text-anchor": "center",
