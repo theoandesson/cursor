@@ -2,25 +2,26 @@
 
 .weather-hover-container .maplibregl-popup-content {
   padding: 0;
-  border-radius: 12px;
-  border: 1px solid #7ab2dd66;
+  border-radius: 14px;
+  border: 1px solid #c4d8ea40;
   overflow: hidden;
-  box-shadow: 0 12px 26px -15px #000000dc;
+  box-shadow:
+    0 8px 30px -10px #1a2d4218,
+    0 2px 8px -2px #1a2d420c;
 }
 
 .weather-hover {
-  padding: 12px 14px;
+  padding: 14px 16px;
   font-size: 0.82rem;
-  color: #d9ebfb;
-  min-width: 210px;
-  background:
-    linear-gradient(180deg, #0d3354f7, #07233dd9),
-    radial-gradient(380px 180px at 8% -30%, #67b3f840 0%, transparent 60%);
+  color: #2a3e52;
+  min-width: 220px;
+  background: linear-gradient(180deg, #fffffffa, #f5f8fcf2);
+  backdrop-filter: blur(14px);
 }
 
 .weather-hover__loading {
   margin: 0;
-  color: #a9c8df;
+  color: var(--app-text-muted);
   text-align: center;
   padding: 6px 0;
 }
@@ -29,7 +30,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 .weather-hover__icon {
@@ -41,19 +42,19 @@
   display: block;
   font-size: 0.92rem;
   font-weight: 700;
-  color: #eff8ff;
+  color: #1c2d3f;
 }
 
 .weather-hover__temp {
   font-size: 1.3rem;
   font-weight: 700;
-  color: #f4fbff;
+  color: var(--app-accent-strong);
 }
 
 .weather-hover__condition {
-  margin: 2px 0 8px;
+  margin: 2px 0 10px;
   font-size: 0.78rem;
-  color: #add1ea;
+  color: var(--app-text-muted);
   font-weight: 500;
 }
 
@@ -64,17 +65,17 @@
 }
 
 .weather-hover__table tr {
-  border-top: 1px solid #8cbad93a;
+  border-top: 1px solid #d8e4ee60;
 }
 
 .weather-hover__table td {
-  padding: 4px 0;
-  color: #c3ddf1;
+  padding: 5px 0;
+  color: #4a6378;
 }
 
 .weather-hover__table td:first-child {
   font-weight: 600;
-  color: #e8f5ff;
+  color: #1c2d3f;
   width: 45%;
 }
 
@@ -82,84 +83,85 @@
 
 .weather-popup-container .maplibregl-popup-content {
   padding: 0;
-  border-radius: 12px;
-  border: 1px solid #7ab2dd66;
+  border-radius: 16px;
+  border: 1px solid #c4d8ea40;
   overflow: hidden;
-  box-shadow: 0 14px 28px -16px #000000db;
+  box-shadow:
+    0 12px 40px -12px #1a2d4220,
+    0 2px 10px -2px #1a2d420e;
 }
 
 .weather-popup {
-  padding: 14px 16px;
+  padding: 16px 18px;
   font-size: 0.85rem;
-  color: #d9ebfb;
-  min-width: 200px;
-  background:
-    linear-gradient(180deg, #0d3354f7, #07233dd9),
-    radial-gradient(380px 180px at 8% -30%, #67b3f840 0%, transparent 60%);
+  color: #2a3e52;
+  min-width: 220px;
+  background: linear-gradient(180deg, #fffffffa, #f5f8fcf2);
+  backdrop-filter: blur(14px);
 }
 
 .weather-popup__loading {
   margin: 0;
-  color: #a9c8df;
+  color: var(--app-text-muted);
   text-align: center;
   padding: 10px 0;
 }
 
 .weather-popup__error {
   margin: 0;
-  color: #b34040;
+  color: #c53a3a;
   text-align: center;
   padding: 10px 0;
 }
 
 .weather-popup__coords {
-  margin: 0 0 8px;
+  margin: 0 0 10px;
   font-size: 0.72rem;
-  color: #8fb9db;
+  color: var(--app-text-muted);
   letter-spacing: 0.02em;
 }
 
 .weather-popup__current {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   margin-bottom: 4px;
 }
 
 .weather-popup__icon {
-  font-size: 2rem;
+  font-size: 2.2rem;
   line-height: 1;
 }
 
 .weather-popup__temp {
-  font-size: 1.6rem;
+  font-size: 1.7rem;
   font-weight: 700;
-  color: #f4fbff;
+  color: var(--app-accent-strong);
 }
 
 .weather-popup__label {
   margin: 0 0 10px;
   font-size: 0.82rem;
-  color: #add1ea;
+  color: var(--app-text-muted);
   font-weight: 500;
 }
 
 .weather-popup__details {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 12px;
+  gap: 6px 14px;
   font-size: 0.76rem;
-  color: #c3ddf1;
-  padding-top: 8px;
-  border-top: 1px solid #8cbad93a;
+  color: #4a6378;
+  padding-top: 10px;
+  border-top: 1px solid #d8e4ee60;
 }
 
 .weather-popup__forecast {
   display: flex;
-  gap: 2px;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid #8cbad93a;
+  gap: 4px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #d8e4ee60;
   overflow-x: auto;
 }
 
@@ -167,16 +169,22 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  min-width: 40px;
-  padding: 4px 2px;
+  gap: 3px;
+  min-width: 44px;
+  padding: 6px 4px;
   font-size: 0.72rem;
-  border-radius: 6px;
-  background: #123758d9;
+  border-radius: 10px;
+  background: #edf2f8;
+  color: #2a3e52;
+  transition: background 0.15s ease;
+}
+
+.weather-popup__fc-item:hover {
+  background: #e2ebf3;
 }
 
 .weather-popup__fc-time {
   font-size: 0.64rem;
-  color: #9bc2e3;
+  color: var(--app-text-muted);
   font-weight: 600;
 }
