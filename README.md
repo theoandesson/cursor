@@ -51,11 +51,11 @@ cd cursor
 
 ### 2. Hämta senaste versionen
 
-Se till att du har den senaste koden från `main`-branchen:
+`main`-branchen innehåller bara den initiala koden. **Alla förbättringar** (zoomning utan lagg, 70+ städer, orientering, väder-API) finns på branchen `cursor/applikationsstart-kommando-1944`:
 
 ```bash
-git checkout main
-git pull origin main
+git checkout cursor/applikationsstart-kommando-1944
+git pull origin cursor/applikationsstart-kommando-1944
 ```
 
 ### 3. Installera beroenden
