@@ -67,7 +67,7 @@ Webbläsaren öppnas automatiskt. Om den inte öppnas, gå manuellt till:
 
 - **Zooma in/ut**: scrollhjul, `+`/`-` tangenter, dubbelklick, eller knapparna uppe till höger
 - **Panorera**: klicka och dra med musen
-- **Se väder**: markörer visas automatiskt för många svenska städer (80+)
+- **Se väder**: markörer visas automatiskt för många svenska städer (70+)
 - **Klicka var som helst** på kartan för detaljerad väder-popup med 6-timmars prognos
 
 ## Stoppa servern
