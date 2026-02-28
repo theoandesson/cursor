@@ -38,10 +38,12 @@ export const TERRAIN_CONFIG = Object.freeze({
 });
 
 export const LOD_CONFIG = Object.freeze({
-  idleDelayMs: 280,
-  closeRangeZoomThreshold: 14.2,
-  defaultBuildingHeightScale: 1.78,
+  idleDelayMs: 170,
+  closeRangeZoomThreshold: 14,
+  defaultBuildingHeightScale: 1.72,
   closeRangeBuildingHeightScale: 1.58,
-  closeRangeMovingPixelRatio: 1.1,
+  settledBuildingOpacity: 0.9,
+  movingBuildingOpacity: 0.76,
+  closeRangeMovingPixelRatio: 1.35,
   maxPixelRatio: 2
 });
