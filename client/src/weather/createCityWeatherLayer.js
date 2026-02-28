@@ -73,7 +73,7 @@ export const createCityWeatherLayer = ({ map, maplibregl }) => {
     paint: {
       "circle-radius": 18,
       "circle-color": "#ffffffcc",
-      "circle-stroke-color": "#5a9fd4",
+      "circle-stroke-color": "#8aa8c4",
       "circle-stroke-width": 1.5,
       "circle-blur": 0.15
     }
@@ -99,7 +99,7 @@ export const createCityWeatherLayer = ({ map, maplibregl }) => {
       "text-line-height": 1.3
     },
     paint: {
-      "text-color": "#1a3a52",
+      "text-color": "#3a3a3c",
       "text-halo-color": "#ffffffdd",
       "text-halo-width": 1.2
     }
