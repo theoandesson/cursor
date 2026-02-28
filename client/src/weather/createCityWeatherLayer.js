@@ -1,5 +1,4 @@
-import { SWEDEN_CITIES } from "../data/swedenCities.js";
-import { fetchWeatherAtPoint } from "./smhiWeatherService.js";
+import { fetchCities, fetchCityWeather } from "./smhiWeatherService.js";
 import { getWeatherSymbol, getWindDirection } from "./weatherSymbols.js";
 
 const SOURCE_ID = "city-weather-source";
@@ -13,6 +12,7 @@ const buildGeoJson = (cities) => ({
     type: "Feature",
     geometry: { type: "Point", coordinates: [c.lon, c.lat] },
     properties: {
+      cityId: c.id,
       name: c.name,
       icon: "",
       temp: "",
@@ -57,8 +57,10 @@ const buildHoverHtml = (props) => {
 };
 
 export const createCityWeatherLayer = ({ map, maplibregl }) => {
-  const geojson = buildGeoJson(SWEDEN_CITIES);
+  let geojson = buildGeoJson([]);
   let intervalId = null;
+  let isDisposed = false;
+  let cityIdToFeatureIndex = new Map();
 
   map.addSource(SOURCE_ID, { type: "geojson", data: geojson });
 
@@ -124,10 +126,18 @@ export const createCityWeatherLayer = ({ map, maplibregl }) => {
   });
 
   const updateFeature = (idx, weather) => {
+    if (idx == null || !weather) {
+      return;
+    }
+
     const sym = getWeatherSymbol(weather.symbol);
     const f = geojson.features[idx];
+    if (!f) {
+      return;
+    }
+
     f.properties.icon = sym.icon;
-    f.properties.temp = weather.temp != null ? `${weather.temp.toFixed(1)}°C` : "?";
+    f.properties.temp = weather.temp != null ? `${Number(weather.temp).toFixed(1)}°C` : "?";
     f.properties.label = sym.label;
     f.properties.symbolLabel = sym.label;
     f.properties.windSpeed = weather.windSpeed;
@@ -139,22 +149,55 @@ export const createCityWeatherLayer = ({ map, maplibregl }) => {
     f.properties.loaded = true;
   };
 
-  const loadAll = async () => {
-    const fetches = SWEDEN_CITIES.map(async (city, idx) => {
-      try {
-        const data = await fetchWeatherAtPoint(city.lon, city.lat);
-        if (data.current) updateFeature(idx, data.current);
-      } catch { /* ignore individual failures */ }
-    });
-
-    await Promise.allSettled(fetches);
+  const applyCities = (cities) => {
+    geojson = buildGeoJson(cities);
+    cityIdToFeatureIndex = new Map(
+      cities.map((city, index) => [city.id, index])
+    );
     map.getSource(SOURCE_ID)?.setData(geojson);
   };
 
-  loadAll();
-  intervalId = setInterval(loadAll, REFRESH_INTERVAL_MS);
+  const loadAll = async () => {
+    try {
+      const cityWeather = await fetchCityWeather();
+      cityWeather.forEach((entry) => {
+        const cityId = entry.city?.id;
+        if (!cityId) {
+          return;
+        }
+        const idx = cityIdToFeatureIndex.get(cityId);
+        if (entry.current) {
+          updateFeature(idx, entry.current);
+        }
+      });
+      map.getSource(SOURCE_ID)?.setData(geojson);
+    } catch {
+      /* ignore weather refresh failures */
+    }
+  };
+
+  const bootstrap = async () => {
+    try {
+      const cities = await fetchCities();
+      if (isDisposed) {
+        return;
+      }
+
+      applyCities(cities);
+      await loadAll();
+    } catch {
+      /* ignore initial failures */
+    }
+
+    if (!isDisposed) {
+      intervalId = setInterval(loadAll, REFRESH_INTERVAL_MS);
+    }
+  };
+
+  bootstrap();
 
   return () => {
+    isDisposed = true;
     if (intervalId) clearInterval(intervalId);
     hoverPopup.remove();
   };
