@@ -1,8 +1,11 @@
 {
   "name": "sweden-3d-map-fidelity",
   "version": "1.0.0",
-  "description": "High-fidelity 3D map viewer for Sweden with adaptive LOD.",
+  "description": "High-fidelity 3D map viewer for Sweden with adaptive LOD and live SMHI weather.",
   "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "start": "node server/index.js",
     "smoke": "node scripts/smoke-test.mjs"
@@ -11,7 +14,8 @@
     "sweden",
     "3d",
     "map",
-    "lod"
+    "weather",
+    "smhi"
   ],
   "author": "",
   "license": "MIT",
