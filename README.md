@@ -51,6 +51,11 @@ cd cursor
 
 ### 2. Hämta senaste versionen
 
+`main`-branchen innehåller bara den initiala koden. **Alla förbättringar** (zoomning utan lagg, 70+ städer, orientering, väder-API) finns på branchen `cursor/applikationsstart-kommando-1944`:
+
+```bash
+git checkout cursor/applikationsstart-kommando-1944
+git pull origin cursor/applikationsstart-kommando-1944
 Se till att du har den senaste koden från `main`-branchen:
 
 ```bash
@@ -103,6 +108,9 @@ LOD: låg detalj vid rörelse, hög detalj i idle.
 
 ### 5. Använd appen
 
+- **Zooma in/ut** – scrollhjul, `+`/`-` tangenter, dubbelklick, eller knapparna uppe till höger
+- **Panorera** – klicka och dra med musen
+- **Rotera/luta/flytta** – använd knapparna `R-`/`R+` (rotation), `L-`/`L+` (lutning) och `N/V/O/S` (förflyttning)
 - **Zooma in/ut** – scrollhjul, `+`/`-` tangenter, dubbelklick, eller knapparna uppe till vänster
 - **Panorera** – klicka och dra med musen
 - **Navigeringspanel** – använd pilarna (förflyttning), `↺`/`↻` (rotation), `Tilt -`/`Tilt +` (lutning) och `⌂` (återställning)
