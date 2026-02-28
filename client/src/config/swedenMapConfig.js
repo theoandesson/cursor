@@ -14,7 +14,14 @@ export const SWEDEN_MAP_CONFIG = Object.freeze({
 export const NAVIGATION_CONTROL_CONFIG = Object.freeze({
   panStepPixels: 160,
   rotateStepDegrees: 16,
-  pitchStepDegrees: 8
+  pitchStepDegrees: 8,
+  minPanStepPixels: 56,
+  mediumZoomThreshold: 11.5,
+  mediumZoomPanFactor: 0.74,
+  nearZoomThreshold: 14.2,
+  nearZoomPanFactor: 0.46,
+  animationMs: 170,
+  defaultInverted: true
 });
 
 export const SWEDEN_DATA_SOURCES = Object.freeze({
@@ -31,5 +38,10 @@ export const TERRAIN_CONFIG = Object.freeze({
 });
 
 export const LOD_CONFIG = Object.freeze({
-  idleDelayMs: 350
+  idleDelayMs: 280,
+  closeRangeZoomThreshold: 14.2,
+  defaultBuildingHeightScale: 1.78,
+  closeRangeBuildingHeightScale: 1.58,
+  closeRangeMovingPixelRatio: 1.1,
+  maxPixelRatio: 2
 });
