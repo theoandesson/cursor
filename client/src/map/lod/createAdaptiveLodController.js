@@ -1,9 +1,7 @@
 import { createDebouncedAction } from "./createDebouncedAction.js";
-import { TERRAIN_CONFIG } from "../../config/swedenMapConfig.js";
 import { createVisualBuildingHeightExpression } from "../style/expressions/buildingExpressions.js";
 
 const BUILDING_LAYER_ID = "sweden-buildings";
-const ROAD_LABEL_LAYER_ID = "road-labels";
 const WEATHER_LABEL_LAYER_ID = "city-weather-labels";
 
 const setLayerVisibility = ({ map, layerId, visible }) => {
@@ -17,8 +15,10 @@ export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) 
   let currentProfile = null;
   let currentCloseRange = null;
   let rafId = null;
-  let terrainEnabled = true;
   let pixelRatio = null;
+  let weatherLabelsVisible = true;
+  let currentBuildingOpacity = null;
+  let currentBuildingHeightScale = null;
 
   const defaultPixelRatio = Math.min(
     globalThis.devicePixelRatio ?? 1,
@@ -26,21 +26,6 @@ export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) 
   );
 
   const isCloseRange = () => map.getZoom() >= lodConfig.closeRangeZoomThreshold;
-
-  const setMapTerrain = (enabled) => {
-    if (terrainEnabled === enabled || typeof map.setTerrain !== "function") {
-      return;
-    }
-    terrainEnabled = enabled;
-    map.setTerrain(
-      enabled
-        ? {
-            source: TERRAIN_CONFIG.source,
-            exaggeration: TERRAIN_CONFIG.exaggeration
-          }
-        : null
-    );
-  };
 
   const setMapPixelRatio = (nextPixelRatio) => {
     if (pixelRatio === nextPixelRatio || typeof map.setPixelRatio !== "function") {
@@ -50,15 +35,43 @@ export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) 
     map.setPixelRatio(nextPixelRatio);
   };
 
+  const setBuildingStyle = ({ heightScale, opacity }) => {
+    if (!map.getLayer(BUILDING_LAYER_ID)) {
+      return;
+    }
+
+    if (currentBuildingHeightScale !== heightScale) {
+      currentBuildingHeightScale = heightScale;
+      map.setPaintProperty(
+        BUILDING_LAYER_ID,
+        "fill-extrusion-height",
+        createVisualBuildingHeightExpression(heightScale)
+      );
+    }
+
+    if (currentBuildingOpacity !== opacity) {
+      currentBuildingOpacity = opacity;
+      map.setPaintProperty(BUILDING_LAYER_ID, "fill-extrusion-opacity", opacity);
+    }
+  };
+
+  const setWeatherLabelVisibility = (visible) => {
+    if (weatherLabelsVisible === visible) {
+      return;
+    }
+    weatherLabelsVisible = visible;
+    setLayerVisibility({ map, layerId: WEATHER_LABEL_LAYER_ID, visible });
+  };
+
   const resolveStatusMessage = ({ profileName, closeRange }) => {
     if (profileName === "moving") {
       return closeRange
-        ? "Närzoom i rörelse: turbo-läge för mjukare respons."
-        : "Rörelse: snabb rendering.";
+        ? "Närzoom i rörelse: prioriterar stabil, mjuk rendering."
+        : "Rörelse: flytande rendering utan blockhopp.";
     }
     return closeRange
-      ? "Närzoom: hög detalj med optimerad 3D."
-      : "Stilla: full detalj med terräng.";
+      ? "Närzoom: hög detalj med jämn 3D-terräng."
+      : "Stilla: full detalj och färgsatt terräng.";
   };
 
   const applyProfile = (profileName) => {
@@ -70,32 +83,18 @@ export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) 
     currentCloseRange = closeRange;
 
     const isMoving = profileName === "moving";
-    const useCloseRangeFastMode = isMoving && closeRange;
+    const useCloseRangeMotionProfile = isMoving && closeRange;
+    const buildingHeightScale = closeRange
+      ? lodConfig.closeRangeBuildingHeightScale
+      : lodConfig.defaultBuildingHeightScale;
+    const buildingOpacity = isMoving
+      ? lodConfig.movingBuildingOpacity
+      : lodConfig.settledBuildingOpacity;
 
-    setLayerVisibility({ map, layerId: BUILDING_LAYER_ID, visible: !isMoving });
-    setLayerVisibility({ map, layerId: ROAD_LABEL_LAYER_ID, visible: !isMoving });
-    setLayerVisibility({
-      map,
-      layerId: WEATHER_LABEL_LAYER_ID,
-      visible: !(isMoving && closeRange)
-    });
-
-    if (map.getLayer(BUILDING_LAYER_ID)) {
-      const buildingHeightScale = closeRange
-        ? lodConfig.closeRangeBuildingHeightScale
-        : lodConfig.defaultBuildingHeightScale;
-      map.setPaintProperty(
-        BUILDING_LAYER_ID,
-        "fill-extrusion-height",
-        createVisualBuildingHeightExpression(buildingHeightScale)
-      );
-    }
-
-    setMapTerrain(!useCloseRangeFastMode);
+    setBuildingStyle({ heightScale: buildingHeightScale, opacity: buildingOpacity });
+    setWeatherLabelVisibility(!useCloseRangeMotionProfile);
     setMapPixelRatio(
-      useCloseRangeFastMode
-        ? lodConfig.closeRangeMovingPixelRatio
-        : defaultPixelRatio
+      useCloseRangeMotionProfile ? lodConfig.closeRangeMovingPixelRatio : defaultPixelRatio
     );
 
     onStatusChange?.({
@@ -145,7 +144,7 @@ export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) 
     map.off("moveend", queueSettledMode);
     map.off("idle", queueSettledMode);
     map.off("zoom", queueProfileRefresh);
-    setMapTerrain(true);
+    setWeatherLabelVisibility(true);
     setMapPixelRatio(defaultPixelRatio);
   };
 };

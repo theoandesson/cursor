@@ -1,0 +1,97 @@
+#loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background:
+    radial-gradient(1000px 520px at 50% -10%, #5da3dd4a 0%, transparent 52%),
+    linear-gradient(180deg, #031628da, #04172adf);
+  backdrop-filter: blur(10px);
+  transition: opacity 0.26s ease;
+}
+
+#loading-overlay[data-state="ready"] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.loading-overlay__card {
+  width: min(500px, 92vw);
+  display: grid;
+  gap: 0.72rem;
+  padding: 1rem 1rem 1.08rem;
+  border-radius: 1rem;
+  border: 1px solid #7cb4de63;
+  background:
+    linear-gradient(180deg, #0f3454f0, #09233de6),
+    radial-gradient(420px 190px at 10% -30%, #6bc2ff3b 0%, transparent 56%);
+  box-shadow: 0 25px 35px -24px #000000d9;
+}
+
+.loading-overlay__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #eaf6ff;
+}
+
+.loading-overlay__message {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #b4d2eb;
+}
+
+.loading-overlay__track {
+  width: 100%;
+  height: 0.48rem;
+  border-radius: 999px;
+  background: #0a253e;
+  border: 1px solid #437ba44d;
+  overflow: hidden;
+}
+
+.loading-overlay__fill {
+  width: 100%;
+  height: 100%;
+  transform-origin: left center;
+  transform: scaleX(0.06);
+  background: linear-gradient(90deg, #50a9ee, #8ee0cc);
+  transition: transform 0.18s ease-out;
+}
+
+.loading-overlay__progress {
+  margin: 0;
+  font-size: 0.73rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #8fc7ea;
+  justify-self: end;
+}
+
+#lod-badge {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  z-index: 5;
+  padding: 0.42rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.77rem;
+  font-weight: 650;
+  background: linear-gradient(180deg, #11395ba8, #082640c7);
+  border: 1px solid #79b7df61;
+  color: #cde8ff;
+  box-shadow: 0 12px 20px -16px #000000ed;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+#lod-badge[data-profile="moving"] {
+  color: var(--app-warning);
+  border-color: #f2bd7f88;
+}
+
+#lod-badge[data-profile="settled"] {
+  color: var(--app-success);
+  border-color: #8ce2be7c;
+}

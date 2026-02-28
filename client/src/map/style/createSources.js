@@ -23,6 +23,6 @@ export const createSources = () => ({
     tileSize: 256,
     bounds: SWEDEN_SOURCE_BOUNDS,
     minzoom: 0,
-    maxzoom: 10
+    maxzoom: 12
   }
 });

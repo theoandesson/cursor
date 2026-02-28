@@ -8,6 +8,9 @@ export const createLoadingOverlayPresenter = ({ mapRootElement }) => {
   overlay.setAttribute("role", "status");
   overlay.setAttribute("aria-live", "polite");
 
+  const card = document.createElement("div");
+  card.className = "loading-overlay__card";
+
   const title = document.createElement("p");
   title.className = "loading-overlay__title";
   title.textContent = "Förbereder kartresurser…";
@@ -22,15 +25,23 @@ export const createLoadingOverlayPresenter = ({ mapRootElement }) => {
   progressFill.className = "loading-overlay__fill";
   progressTrack.appendChild(progressFill);
 
-  overlay.appendChild(title);
-  overlay.appendChild(message);
-  overlay.appendChild(progressTrack);
+  const progressText = document.createElement("p");
+  progressText.className = "loading-overlay__progress";
+  progressText.textContent = "06%";
+
+  card.appendChild(title);
+  card.appendChild(message);
+  card.appendChild(progressTrack);
+  card.appendChild(progressText);
+  overlay.appendChild(card);
   mapRootElement.appendChild(overlay);
 
   let hideTimeoutId = null;
 
   const setProgress = (progress) => {
-    progressFill.style.transform = `scaleX(${clampProgress(progress)})`;
+    const clamped = clampProgress(progress);
+    progressFill.style.transform = `scaleX(${clamped})`;
+    progressText.textContent = `${String(Math.round(clamped * 100)).padStart(2, "0")}%`;
   };
 
   const setMessage = (text) => {
