@@ -3,6 +3,7 @@ import { getWeatherSymbol, getWindDirection } from "./weatherSymbols.js";
 
 const SOURCE_ID = "city-weather-source";
 const CIRCLE_LAYER_ID = "city-weather-circles";
+const GLOW_LAYER_ID = "city-weather-glow";
 const LABEL_LAYER_ID = "city-weather-labels";
 const REFRESH_INTERVAL_MS = 10 * 60 * 1000;
 const CITY_MARKER_MAX_ZOOM = 13.8;
@@ -35,25 +36,40 @@ const buildHoverHtml = (props) => {
     return `<div class="weather-hover"><p class="weather-hover__loading">Laddar väder…</p></div>`;
   }
 
-  const gustRow = props.gust ? `<tr><td>Vindbyar</td><td>${props.gust} m/s</td></tr>` : "";
+  const gustStat = props.gust
+    ? `<div class="weather-hover__stat">
+        <span class="weather-hover__stat-label">Vindbyar</span>
+        <span class="weather-hover__stat-value">${props.gust} m/s</span>
+      </div>`
+    : "";
 
   return `
     <div class="weather-hover">
-      <div class="weather-hover__header">
-        <span class="weather-hover__icon">${props.icon}</span>
-        <div>
-          <strong class="weather-hover__city">${props.name}</strong>
-          <span class="weather-hover__temp">${props.temp}</span>
+      <div class="weather-hover__top">
+        <div class="weather-hover__header">
+          <span class="weather-hover__icon">${props.icon}</span>
+          <div>
+            <strong class="weather-hover__city">${props.name}</strong>
+            <span class="weather-hover__temp">${props.temp}</span>
+          </div>
+        </div>
+        <p class="weather-hover__condition">${props.symbolLabel}</p>
+      </div>
+      <div class="weather-hover__stats">
+        <div class="weather-hover__stat">
+          <span class="weather-hover__stat-label">Vind</span>
+          <span class="weather-hover__stat-value">${props.windSpeed ?? "?"} m/s ${props.windDirText}</span>
+        </div>
+        <div class="weather-hover__stat">
+          <span class="weather-hover__stat-label">Fuktighet</span>
+          <span class="weather-hover__stat-value">${props.humidity ?? "?"}%</span>
+        </div>
+        ${gustStat}
+        <div class="weather-hover__stat">
+          <span class="weather-hover__stat-label">Lufttryck</span>
+          <span class="weather-hover__stat-value">${props.pressure ? Math.round(props.pressure) + " hPa" : "?"}</span>
         </div>
       </div>
-      <p class="weather-hover__condition">${props.symbolLabel}</p>
-      <table class="weather-hover__table">
-        <tr><td>Temperatur</td><td>${props.temp}</td></tr>
-        <tr><td>Vind</td><td>${props.windSpeed ?? "?"} m/s ${props.windDirText}</td></tr>
-        ${gustRow}
-        <tr><td>Luftfuktighet</td><td>${props.humidity ?? "?"}%</td></tr>
-        <tr><td>Lufttryck</td><td>${props.pressure ? Math.round(props.pressure) + " hPa" : "?"}</td></tr>
-      </table>
     </div>`;
 };
 
@@ -66,16 +82,29 @@ export const createCityWeatherLayer = ({ map, maplibregl }) => {
   map.addSource(SOURCE_ID, { type: "geojson", data: geojson });
 
   map.addLayer({
+    id: GLOW_LAYER_ID,
+    type: "circle",
+    source: SOURCE_ID,
+    maxzoom: CITY_MARKER_MAX_ZOOM,
+    paint: {
+      "circle-radius": 26,
+      "circle-color": "#667eea",
+      "circle-opacity": 0.15,
+      "circle-blur": 0.8
+    }
+  });
+
+  map.addLayer({
     id: CIRCLE_LAYER_ID,
     type: "circle",
     source: SOURCE_ID,
     maxzoom: CITY_MARKER_MAX_ZOOM,
     paint: {
-      "circle-radius": 18,
-      "circle-color": "#ffffffcc",
-      "circle-stroke-color": "#5a9fd4",
-      "circle-stroke-width": 1.5,
-      "circle-blur": 0.15
+      "circle-radius": 20,
+      "circle-color": "#ffffff",
+      "circle-stroke-color": "#667eea",
+      "circle-stroke-width": 2.5,
+      "circle-blur": 0
     }
   });
 
@@ -89,9 +118,9 @@ export const createCityWeatherLayer = ({ map, maplibregl }) => {
         "format",
         ["get", "temp"], { "font-scale": 0.95 },
         "\n", {},
-        ["get", "name"], { "font-scale": 0.7 }
+        ["get", "name"], { "font-scale": 0.68 }
       ],
-      "text-font": ["Noto Sans Regular"],
+      "text-font": ["Noto Sans Bold"],
       "text-anchor": "center",
       "text-allow-overlap": true,
       "text-ignore-placement": true,
@@ -99,18 +128,18 @@ export const createCityWeatherLayer = ({ map, maplibregl }) => {
       "text-line-height": 1.3
     },
     paint: {
-      "text-color": "#1a3a52",
-      "text-halo-color": "#ffffffdd",
-      "text-halo-width": 1.2
+      "text-color": "#4a2d7a",
+      "text-halo-color": "#ffffffee",
+      "text-halo-width": 1.4
     }
   });
 
   const hoverPopup = new maplibregl.Popup({
     closeButton: false,
     closeOnClick: false,
-    maxWidth: "280px",
+    maxWidth: "300px",
     className: "weather-hover-container",
-    offset: 20
+    offset: 24
   });
 
   map.on("mouseenter", LABEL_LAYER_ID, (e) => {
@@ -140,7 +169,7 @@ export const createCityWeatherLayer = ({ map, maplibregl }) => {
     }
 
     f.properties.icon = sym.icon;
-    f.properties.temp = weather.temp != null ? `${Number(weather.temp).toFixed(1)}°C` : "?";
+    f.properties.temp = weather.temp != null ? `${Number(weather.temp).toFixed(1)}°` : "?";
     f.properties.label = sym.label;
     f.properties.symbolLabel = sym.label;
     f.properties.windSpeed = weather.windSpeed;

@@ -15,17 +15,32 @@ const buildCurrentHtml = (w) => {
   const windDir = getWindDirection(w.windDir);
 
   return `
-    <div class="weather-popup__current">
-      <span class="weather-popup__icon">${sym.icon}</span>
-      <span class="weather-popup__temp">${w.temp != null ? w.temp.toFixed(1) : "?"}°C</span>
+    <div class="weather-popup__hero">
+      <div class="weather-popup__current">
+        <span class="weather-popup__icon">${sym.icon}</span>
+        <span class="weather-popup__temp">${w.temp != null ? w.temp.toFixed(1) : "?"}°</span>
+      </div>
+      <p class="weather-popup__label">${sym.label}</p>
     </div>
-    <p class="weather-popup__label">${sym.label}</p>
-    <div class="weather-popup__details">
-      <span>Vind: ${w.windSpeed ?? "?"} m/s ${windDir}</span>
-      <span>Fukt: ${w.humidity ?? "?"}%</span>
-      <span>Tryck: ${w.pressure ? Math.round(w.pressure) : "?"} hPa</span>
-      ${w.gust ? `<span>Byar: ${w.gust} m/s</span>` : ""}
-    </div>`;
+    <div class="weather-popup__body">
+      <div class="weather-popup__details">
+        <div class="weather-popup__detail-item">
+          <span class="weather-popup__detail-label">Vind</span>
+          <span class="weather-popup__detail-value">${w.windSpeed ?? "?"} m/s ${windDir}</span>
+        </div>
+        <div class="weather-popup__detail-item">
+          <span class="weather-popup__detail-label">Fuktighet</span>
+          <span class="weather-popup__detail-value">${w.humidity ?? "?"}%</span>
+        </div>
+        <div class="weather-popup__detail-item">
+          <span class="weather-popup__detail-label">Lufttryck</span>
+          <span class="weather-popup__detail-value">${w.pressure ? Math.round(w.pressure) + " hPa" : "?"}</span>
+        </div>
+        <div class="weather-popup__detail-item">
+          <span class="weather-popup__detail-label">Vindbyar</span>
+          <span class="weather-popup__detail-value">${w.gust ? w.gust + " m/s" : "—"}</span>
+        </div>
+      </div>`;
 };
 
 const buildForecastHtml = (forecast) => {
@@ -37,7 +52,7 @@ const buildForecastHtml = (forecast) => {
     return `<div class="weather-popup__fc-item">
       <span class="weather-popup__fc-time">${formatTime(f.time)}</span>
       <span>${sym.icon}</span>
-      <span>${f.temp != null ? f.temp.toFixed(0) : "?"}°</span>
+      <span class="weather-popup__fc-temp">${f.temp != null ? f.temp.toFixed(0) : "?"}°</span>
     </div>`;
   }).join("");
 
@@ -68,15 +83,15 @@ export const createWeatherPopup = ({ map, maplibregl }) => {
       if (abortController.signal.aborted) return;
 
       if (!data.current) {
-        popup.setHTML(`<div class="weather-popup"><p>Ingen väderdata tillgänglig.</p></div>`);
+        popup.setHTML(`<div class="weather-popup"><p class="weather-popup__error">Ingen väderdata tillgänglig.</p></div>`);
         return;
       }
 
       const html = `
         <div class="weather-popup">
-          <p class="weather-popup__coords">${lngLat.lat.toFixed(2)}°N, ${lngLat.lng.toFixed(2)}°E</p>
           ${buildCurrentHtml(data.current)}
           ${buildForecastHtml(data.forecast)}
+          </div>
         </div>`;
       popup.setHTML(html);
     } catch (err) {

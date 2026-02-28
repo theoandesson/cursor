@@ -3,6 +3,8 @@ import { createCameraActions } from "./createCameraActions.js";
 const ROOT_CLASS = "map-navigation-panel maplibregl-ctrl";
 const HEADER_CLASS = "map-navigation-panel__header";
 const TITLE_CLASS = "map-navigation-panel__title";
+const COLLAPSE_CLASS = "map-navigation-panel__collapse";
+const BODY_CLASS = "map-navigation-panel__body";
 const TOGGLE_CLASS = "map-navigation-panel__toggle";
 const HINT_CLASS = "map-navigation-panel__hint";
 const SECTION_CLASS = "map-navigation-panel__section";
@@ -39,13 +41,13 @@ const setInversionToggleState = ({ button, isInverted }) => {
   button.textContent = isInverted ? "Inverterad: På" : "Inverterad: Av";
 };
 
-const createSection = (labelText) => {
+const createSection = (labelText, emoji) => {
   const section = document.createElement("div");
   section.className = SECTION_CLASS;
 
   const label = document.createElement("p");
   label.className = SECTION_LABEL_CLASS;
-  label.textContent = labelText;
+  label.textContent = `${emoji} ${labelText}`;
   section.appendChild(label);
 
   return section;
@@ -154,6 +156,7 @@ export const createOrientationControl = ({
   let container = null;
   const listeners = [];
   let isInverted = Boolean(controlConfig.defaultInverted);
+  let isCollapsed = false;
 
   return {
     onAdd: () => {
@@ -174,7 +177,19 @@ export const createOrientationControl = ({
 
       const title = document.createElement("p");
       title.className = TITLE_CLASS;
-      title.textContent = "Navigering";
+      title.textContent = "🧭 Navigering";
+
+      const collapseButton = document.createElement("button");
+      collapseButton.type = "button";
+      collapseButton.className = COLLAPSE_CLASS;
+      collapseButton.title = "Minimera/expandera panel";
+      collapseButton.setAttribute("aria-label", "Minimera/expandera panel");
+      collapseButton.textContent = "▾";
+
+      header.append(title, collapseButton);
+
+      const body = document.createElement("div");
+      body.className = BODY_CLASS;
 
       const inversionToggle = document.createElement("button");
       inversionToggle.type = "button";
@@ -193,18 +208,16 @@ export const createOrientationControl = ({
         inversionToggle.removeEventListener("click", onToggleClick)
       );
 
-      header.append(title, inversionToggle);
-
       const hint = document.createElement("p");
       hint.className = HINT_CLASS;
       hint.textContent =
         "Styr med pilarna. Invertering är aktiverad som standard.";
 
-      const movementSection = createSection("Rörelse");
+      const movementSection = createSection("Rörelse", "🕹️");
       const movementPad = buildMovementPad({ actions, listeners });
       movementSection.appendChild(movementPad);
 
-      const orientationSection = createSection("Orientering");
+      const orientationSection = createSection("Orientering", "🔄");
       const rotateRow = buildActionRow({
         leftLabel: "↺",
         leftTitle: "Rotera vänster",
@@ -215,7 +228,7 @@ export const createOrientationControl = ({
         listeners
       });
       const tiltRow = buildActionRow({
-        leftLabel: "Tilt -",
+        leftLabel: "Tilt −",
         leftTitle: "Luta ned",
         leftAction: actions.tiltDown,
         rightLabel: "Tilt +",
@@ -225,7 +238,21 @@ export const createOrientationControl = ({
       });
       orientationSection.append(rotateRow, tiltRow);
 
-      container.append(header, hint, movementSection, orientationSection);
+      body.append(inversionToggle, hint, movementSection, orientationSection);
+
+      const onCollapseClick = (event) => {
+        event.preventDefault();
+        isCollapsed = !isCollapsed;
+        body.style.display = isCollapsed ? "none" : "";
+        collapseButton.textContent = isCollapsed ? "▸" : "▾";
+        container.dataset.collapsed = String(isCollapsed);
+      };
+      collapseButton.addEventListener("click", onCollapseClick);
+      listeners.push(() =>
+        collapseButton.removeEventListener("click", onCollapseClick)
+      );
+
+      container.append(header, body);
       return container;
     },
     onRemove: () => {
