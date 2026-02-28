@@ -4,12 +4,10 @@
     "SF Pro Text", system-ui, "Helvetica Neue", sans-serif;
 
   --app-bg: #f5f5f7;
-  --app-bg-secondary: #ffffff;
   --app-text-primary: #1d1d1f;
   --app-text-secondary: #86868b;
   --app-separator: rgba(0, 0, 0, 0.06);
   --app-panel-bg: rgba(255, 255, 255, 0.82);
-  --app-panel-border: rgba(0, 0, 0, 0.04);
   --app-panel-shadow: rgba(0, 0, 0, 0.04);
   --app-accent: #007aff;
   --app-accent-strong: #0066cc;
@@ -17,7 +15,6 @@
   --app-warning: #ff9500;
   --app-danger: #ff3b30;
   --app-glass-bg: rgba(255, 255, 255, 0.72);
-  --app-glass-border: rgba(255, 255, 255, 0.5);
   --app-radius-sm: 8px;
   --app-radius-md: 12px;
   --app-radius-lg: 16px;
