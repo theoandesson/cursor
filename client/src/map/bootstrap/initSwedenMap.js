@@ -1,9 +1,33 @@
-import { LOD_CONFIG, SWEDEN_MAP_CONFIG } from "../../config/swedenMapConfig.js";
+import {
+  LOD_CONFIG,
+  NAVIGATION_CONTROL_CONFIG,
+  SWEDEN_MAP_CONFIG
+} from "../../config/swedenMapConfig.js";
 import { createCityWeatherLayer } from "../../weather/createCityWeatherLayer.js";
 import { createWeatherPopup } from "../../weather/createWeatherPopup.js";
 import { createAdaptiveLodController } from "../lod/createAdaptiveLodController.js";
 import { createInitialLoadUxController } from "../loading/createInitialLoadUxController.js";
+import { createOrientationControl } from "../navigation/createOrientationControl.js";
 import { createSwedenStyle } from "../style/createSwedenStyle.js";
+
+const enableInteraction = (handler) => {
+  if (handler && typeof handler.enable === "function") {
+    handler.enable();
+  }
+};
+
+const enableExtendedNavigation = (map) => {
+  enableInteraction(map.dragPan);
+  enableInteraction(map.scrollZoom);
+  enableInteraction(map.boxZoom);
+  enableInteraction(map.dragRotate);
+  enableInteraction(map.keyboard);
+  enableInteraction(map.doubleClickZoom);
+  enableInteraction(map.touchZoomRotate);
+  if (map.touchZoomRotate && typeof map.touchZoomRotate.enableRotation === "function") {
+    map.touchZoomRotate.enableRotation();
+  }
+};
 
 export const initSwedenMap = ({
   maplibregl,
@@ -33,9 +57,19 @@ export const initSwedenMap = ({
     pixelRatio: Math.min(devicePixelRatio, 2),
     dragRotate: true,
     touchZoomRotate: true,
-    maxPitch: 85
+    maxPitch: SWEDEN_MAP_CONFIG.maxPitch
   });
 
+  enableExtendedNavigation(map);
+
+  map.addControl(
+    createOrientationControl({
+      map,
+      mapConfig: SWEDEN_MAP_CONFIG,
+      controlConfig: NAVIGATION_CONTROL_CONFIG
+    }),
+    "top-left"
+  );
   map.addControl(
     new maplibregl.NavigationControl({ showZoom: true, showCompass: true, visualizePitch: true }),
     "top-right"

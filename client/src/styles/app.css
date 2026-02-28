@@ -72,6 +72,52 @@ body {
   image-rendering: auto;
 }
 
+#map-root .map-navigation-aid {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 124px;
+  padding: 0.45rem;
+  border-radius: 0.55rem;
+  border: 1px solid #b7d3ea;
+  background: #f7fbffeb;
+  box-shadow: 0 1px 8px #6f97ba33;
+}
+
+#map-root .map-navigation-aid__pad {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.25rem;
+}
+
+#map-root .map-navigation-aid__row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.25rem;
+}
+
+#map-root .map-navigation-aid__button {
+  min-height: 30px;
+  border: 1px solid #aac9e2;
+  border-radius: 0.35rem;
+  background: #ffffff;
+  color: #2b465f;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#map-root .map-navigation-aid__button:hover {
+  background: #edf6ff;
+}
+
+#map-root .map-navigation-aid__button:active {
+  background: #dceeff;
+}
+
+#map-root .map-navigation-aid__spacer {
+  min-height: 30px;
+}
+
 #loading-overlay {
   position: absolute;
   inset: 0;
