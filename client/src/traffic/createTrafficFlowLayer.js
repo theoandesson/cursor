@@ -1,3 +1,4 @@
+import { escapeHtml } from "../shared/escapeHtml.js";
 import { createTrafficLegend } from "./createTrafficLegend.js";
 import { TRAFFIC_CONGESTION_COLORS } from "./trafficPalette.js";
 import { fetchTrafficSegments } from "./trafficService.js";
@@ -60,14 +61,6 @@ const createRoadWidthExpression = (scale = 1) => [
   14,
   ["*", scale, ["match", ["get", "roadClass"], "motorway", 8.2, "trunk", 6.2, 4.2]]
 ];
-
-const escapeHtml = (value) =>
-  String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
 
 const segmentsToGeoJson = (segments = []) => ({
   type: "FeatureCollection",

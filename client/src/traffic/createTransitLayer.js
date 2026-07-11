@@ -1,3 +1,4 @@
+import { escapeHtml } from "../shared/escapeHtml.js";
 import {
   OVERLAY_SOURCE_IDS,
   STYLE_LAYER_IDS,
@@ -99,14 +100,6 @@ const STOP_LABEL_LAYER_ID = STYLE_LAYER_IDS.TRANSIT_STOP_LABELS;
 const STOP_MIN_ZOOM = 11;
 
 export const SWEDISH_TRANSIT_LAYER_IDS = OVERLAY_TRANSIT_LAYER_IDS;
-
-const escapeHtml = (value) =>
-  String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
 
 const TYPE_LABELS = {
   tunnelbana: "Tunnelbana",

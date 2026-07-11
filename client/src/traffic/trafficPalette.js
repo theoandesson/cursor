@@ -4,7 +4,9 @@
  * the base road stack (casing / fill / divider).
  */
 
-/** @type {Readonly<Record<import("./config/trafficLayerConfig.js").TrafficCongestionLevel, string>>} */
+/** @typedef {"free"|"moderate"|"heavy"|"severe"} TrafficCongestionLevel */
+
+/** @type {Readonly<Record<TrafficCongestionLevel, string>>} */
 export const TRAFFIC_CONGESTION_COLORS = Object.freeze({
   free: "#00c853",
   moderate: "#ffeb3b",
