@@ -139,6 +139,10 @@ const isWithinBbox = (lon, lat, bbox) => {
   }
 
   const { minLon, minLat, maxLon, maxLat } = bbox;
+  if ([minLon, minLat, maxLon, maxLat].some((value) => value == null)) {
+    return true;
+  }
+
   return lon >= minLon && lon <= maxLon && lat >= minLat && lat <= maxLat;
 };
 

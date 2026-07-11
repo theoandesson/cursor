@@ -12,6 +12,7 @@ export const createCitiesPanel = ({ onCitySelect, getCities }) => {
   let cities = [];
   let weatherMap = new Map();
   let filterQuery = "";
+  let listState = { loading: false, error: null };
 
   const element = document.createElement("section");
   element.className = "app-panel app-panel--cities";
@@ -41,17 +42,38 @@ export const createCitiesPanel = ({ onCitySelect, getCities }) => {
     if (!query) {
       return cities;
     }
-    return cities.filter((city) => city.name?.toLowerCase().includes(query));
+    return cities.filter((city) =>
+      (city.name ?? "").toLowerCase().includes(query)
+    );
   };
 
   const renderList = () => {
     const filtered = getFilteredCities();
     listRoot.replaceChildren();
 
+    if (listState.error) {
+      const error = document.createElement("p");
+      error.className = "cities-panel__error";
+      error.textContent = listState.error;
+      listRoot.appendChild(error);
+      return;
+    }
+
+    if (listState.loading) {
+      const loading = document.createElement("p");
+      loading.className = "cities-panel__loading";
+      loading.textContent = "Laddar städer…";
+      listRoot.appendChild(loading);
+      return;
+    }
+
     if (filtered.length === 0) {
       const empty = document.createElement("p");
       empty.className = "cities-panel__empty";
-      empty.textContent = cities.length === 0 ? "Laddar städer…" : "Inga städer matchar sökningen.";
+      empty.textContent =
+        cities.length === 0
+          ? "Inga städer tillgängliga."
+          : "Inga städer matchar sökningen.";
       listRoot.appendChild(empty);
       return;
     }
@@ -68,9 +90,16 @@ export const createCitiesPanel = ({ onCitySelect, getCities }) => {
       item.setAttribute("role", "listitem");
       item.dataset.cityId = String(city.id);
 
+      const cityName = city.name ?? "Okänd stad";
+      const tempLabel = formatTemp(weather);
+      item.setAttribute(
+        "aria-label",
+        weather ? `${cityName}, ${tempLabel}` : cityName
+      );
+
       const name = document.createElement("span");
       name.className = "cities-panel__name";
-      name.textContent = city.name ?? "Okänd stad";
+      name.textContent = cityName;
 
       const meta = document.createElement("span");
       meta.className = "cities-panel__meta";
@@ -110,12 +139,21 @@ export const createCitiesPanel = ({ onCitySelect, getCities }) => {
 
   return {
     element,
-    updateCities: (nextCities, nextWeatherMap) => {
+    updateCities: (nextCities, nextWeatherMap, { loading, error } = {}) => {
       cities = Array.isArray(nextCities) ? nextCities : [];
       weatherMap =
         nextWeatherMap instanceof Map
           ? nextWeatherMap
           : new Map(nextWeatherMap ?? []);
+      if (loading !== undefined) {
+        listState.loading = loading;
+      }
+      if (error !== undefined) {
+        listState.error = error;
+      }
+      if (cities.length > 0 && listState.error == null) {
+        listState.loading = false;
+      }
       renderList();
     },
     destroy: () => {

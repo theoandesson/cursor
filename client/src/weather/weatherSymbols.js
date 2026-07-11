@@ -33,7 +33,10 @@ const FALLBACK = Object.freeze({ icon: "\u2753", label: "Ok\u00E4nt" });
 export const getWeatherSymbol = (code) => SYMBOLS[code] ?? FALLBACK;
 
 export const getWindDirection = (degrees) => {
-  if (degrees == null) return "";
+  if (degrees == null || !Number.isFinite(degrees)) {
+    return "";
+  }
+  const normalized = ((degrees % 360) + 360) % 360;
   const dirs = ["N", "NO", "\u00D6", "SO", "S", "SV", "V", "NV"];
-  return dirs[Math.round(degrees / 45) % 8];
+  return dirs[Math.round(normalized / 45) % 8];
 };

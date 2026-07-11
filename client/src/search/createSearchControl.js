@@ -248,6 +248,7 @@ export const createSearchControl = ({ map, mapConfig, onPlaceSelect }) => {
     const normalizedQuery = query.trim();
     if (normalizedQuery.length < MIN_QUERY_LENGTH) {
       abortController?.abort();
+      activeRequestId += 1;
       renderResults([], { statusMessage: "" });
       closeDropdown();
       return;
@@ -412,6 +413,7 @@ export const createSearchControl = ({ map, mapConfig, onPlaceSelect }) => {
       updateClearButton();
       debouncedSearch.cancel();
       abortController?.abort();
+      activeRequestId += 1;
       results = [];
       activeIndex = -1;
       closeDropdown();

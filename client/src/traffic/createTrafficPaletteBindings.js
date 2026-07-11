@@ -45,17 +45,7 @@ const createTextColorBinding = (layerId, property, resolve, options = {}) => ({
   ...options
 });
 
-const createTransitRouteColorExpression = () => [
-  "match",
-  ["get", "class"],
-  ["subway", "light_rail"],
-  "#7b1fa2",
-  ["tram"],
-  "#00897b",
-  ["rail"],
-  "#1565c0",
-  "#1e88e5"
-];
+const createTransitRouteColorExpression = () => ["coalesce", ["get", "color"], "#1e88e5"];
 
 /**
  * Paint bindings consumed by createDayNightController.applyMapPalette.

@@ -16,43 +16,37 @@ export const warmWeatherCache = async ({ forecastHours = DEFAULT_FORECAST_HOURS 
 
 export const startBackgroundRefresh = ({ intervalMs = DEFAULT_REFRESH_INTERVAL_MS } = {}) => {
   let stopped = false;
-  let refreshIndex = 0;
+  let timer = null;
 
-  const scheduleNext = () => {
+  const runRefresh = async () => {
     if (stopped) {
       return;
     }
 
-    const staggerMs = Math.max(1, Math.floor(intervalMs / Math.max(1, SWEDISH_CITIES.length)));
-    const timer = setTimeout(async () => {
-      if (stopped) {
-        return;
-      }
+    try {
+      console.log("Bakgrundsuppdatering väder (full refresh)...");
+      await getCityWeather({ forecastHours: DEFAULT_FORECAST_HOURS, forceRefresh: true });
+    } catch (error) {
+      console.error(
+        "Bakgrundsuppdatering av vädercache misslyckades.",
+        error instanceof Error ? error.message : error
+      );
+    }
 
-      const forecastHours = DEFAULT_FORECAST_HOURS;
-      refreshIndex = (refreshIndex + 1) % SWEDISH_CITIES.length;
-
-      try {
-        console.log(
-          `Bakgrundsuppdatering väder (${refreshIndex + 1}/${SWEDISH_CITIES.length})...`
-        );
-        await getCityWeather({ forecastHours, forceRefresh: true });
-      } catch (error) {
-        console.error(
-          "Bakgrundsuppdatering av vädercache misslyckades.",
-          error instanceof Error ? error.message : error
-        );
-      }
-
-      scheduleNext();
-    }, staggerMs);
-
-    timer.unref?.();
+    if (!stopped) {
+      timer = setTimeout(runRefresh, intervalMs);
+      timer.unref?.();
+    }
   };
 
-  scheduleNext();
+  timer = setTimeout(runRefresh, intervalMs);
+  timer.unref?.();
 
   return () => {
     stopped = true;
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
   };
 };

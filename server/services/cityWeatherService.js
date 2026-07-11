@@ -1,12 +1,14 @@
 import { SWEDISH_CITIES } from "../data/swedishCities.js";
 import { fetchWeatherByPoint } from "./smhiWeatherService.js";
 import { createFileCache } from "./cache/fileCache.js";
+import { cityWeatherCacheKey } from "./cache/cacheKeys.js";
 
 const CITY_WEATHER_CACHE_TTL_MS = 5 * 60 * 1000;
 const FILE_CACHE_TTL_MS = 15 * 60 * 1000;
 const MAX_PARALLEL_FETCHES = 16;
 
 const cityWeatherCacheByHours = new Map();
+const refreshPromisesByHours = new Map();
 const fileCache = createFileCache({ directory: ".cache/city-weather" });
 
 export const toCityDto = ({ id, name, lon, lat, county }) => ({
@@ -61,6 +63,63 @@ const withCityWeather = async (city, { forecastHours }) => {
 };
 
 const getCacheEntry = (forecastHours) => cityWeatherCacheByHours.get(forecastHours) ?? null;
+
+const refreshCityWeather = async (forecastHours, forceRefresh = false) => {
+  const now = Date.now();
+  const fileCacheKey = cityWeatherCacheKey(forecastHours);
+
+  if (!forceRefresh) {
+    const fileCachedItems = await fileCache.get(fileCacheKey);
+    if (fileCachedItems) {
+      cityWeatherCacheByHours.set(forecastHours, {
+        items: fileCachedItems,
+        expiresAt: now + CITY_WEATHER_CACHE_TTL_MS,
+        populatedAt: now
+      });
+      return { cacheHit: true, source: "file" };
+    }
+  }
+
+  const workers = SWEDISH_CITIES.map((city) => () => withCityWeather(city, { forecastHours }));
+  const items = await runWithConcurrency(workers);
+
+  await fileCache.set(fileCacheKey, items, FILE_CACHE_TTL_MS);
+
+  cityWeatherCacheByHours.set(forecastHours, {
+    items,
+    expiresAt: now + CITY_WEATHER_CACHE_TTL_MS,
+    populatedAt: now
+  });
+
+  return { cacheHit: false, source: "network" };
+};
+
+const ensureCityWeather = async (forecastHours, forceRefresh) => {
+  const now = Date.now();
+  const cached = getCacheEntry(forecastHours);
+  const canUseMemoryCache =
+    !forceRefresh &&
+    cached &&
+    cached.items.length > 0 &&
+    cached.expiresAt > now;
+
+  if (canUseMemoryCache) {
+    return { cacheHit: true, source: "memory" };
+  }
+
+  const existingRefresh = refreshPromisesByHours.get(forecastHours);
+  if (existingRefresh) {
+    const result = await existingRefresh;
+    return { cacheHit: result.cacheHit, source: result.source };
+  }
+
+  const refreshPromise = refreshCityWeather(forecastHours, forceRefresh).finally(() => {
+    refreshPromisesByHours.delete(forecastHours);
+  });
+
+  refreshPromisesByHours.set(forecastHours, refreshPromise);
+  return refreshPromise;
+};
 
 export const listCities = ({ search, limit, offset } = {}) => {
   const normalizedSearch = (search ?? "").trim().toLowerCase();
@@ -131,39 +190,7 @@ export const getCityWeather = async ({
   limit,
   offset
 } = {}) => {
-  const now = Date.now();
-  const cached = getCacheEntry(forecastHours);
-  const canUseCache =
-    !forceRefresh &&
-    cached &&
-    cached.items.length > 0 &&
-    cached.expiresAt > now;
-
-  if (!canUseCache) {
-    const fileCacheKey = `forecast-${forecastHours}`;
-    const fileCachedItems = forceRefresh ? null : await fileCache.get(fileCacheKey);
-
-    if (fileCachedItems) {
-      cityWeatherCacheByHours.set(forecastHours, {
-        items: fileCachedItems,
-        expiresAt: now + CITY_WEATHER_CACHE_TTL_MS,
-        populatedAt: now
-      });
-    } else {
-      const workers = SWEDISH_CITIES.map(
-        (city) => () => withCityWeather(city, { forecastHours })
-      );
-      const items = await runWithConcurrency(workers);
-
-      await fileCache.set(fileCacheKey, items, FILE_CACHE_TTL_MS);
-
-      cityWeatherCacheByHours.set(forecastHours, {
-        items,
-        expiresAt: now + CITY_WEATHER_CACHE_TTL_MS,
-        populatedAt: now
-      });
-    }
-  }
+  const { cacheHit } = await ensureCityWeather(forecastHours, forceRefresh);
 
   const cacheEntry = getCacheEntry(forecastHours);
   const safeOffset = Math.max(0, offset ?? 0);
@@ -174,6 +201,7 @@ export const getCityWeather = async ({
     limit: safeLimit,
     offset: safeOffset,
     cachedUntil: new Date(cacheEntry.expiresAt).toISOString(),
+    cacheHit,
     cities: cacheEntry.items.slice(safeOffset, safeOffset + safeLimit)
   };
 };

@@ -9,10 +9,13 @@ export const createBootstrapPayload = async ({ forecastHours = 24, forceRefresh 
   const weather = await getCityWeather({ forecastHours, forceRefresh });
 
   return {
-    cities,
-    weather,
-    serverTime: new Date().toISOString(),
-    cacheAge: getCityWeatherCacheAge(forecastHours),
-    version: "1"
+    payload: {
+      cities,
+      weather,
+      serverTime: new Date().toISOString(),
+      cacheAge: getCityWeatherCacheAge(forecastHours),
+      version: "1"
+    },
+    cacheHit: Boolean(weather.cacheHit) && !forceRefresh
   };
 };

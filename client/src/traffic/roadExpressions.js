@@ -38,7 +38,8 @@ export const createRoadCasingColorExpression = (palette) => palette.roadsCasing;
 export const createBridgeCasingColorExpression = (palette) => palette.roadsCasingBridge;
 
 /** Slightly muted fill inside tunnels. */
-export const createTunnelFillColorExpression = (palette) => buildRoadClassColorMatch(palette);
+export const createTunnelFillColorExpression = (palette) =>
+  palette.roadsTunnel ?? buildRoadClassColorMatch(palette);
 
 export const createTunnelCasingColorExpression = (palette) => palette.roadsCasingTunnel;
 

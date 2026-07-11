@@ -9,6 +9,8 @@ export const createOverlaySystem = ({ map, maplibregl }) => {
   const definitions = createOverlayDefinitions();
   const overlayManager = createOverlayManager({ map, definitions });
   let panelControl = null;
+  let mountPromise = null;
+  let disposed = false;
   let unsubscribeStatus = null;
 
   overlayManager.registerPlugin(createSmhiRadarPlugin());
@@ -16,12 +18,20 @@ export const createOverlaySystem = ({ map, maplibregl }) => {
   overlayManager.registerPlugin(createTransitPlugin({ maplibregl }));
 
   const mount = async () => {
-    await overlayManager.mountAll();
-    panelControl = createLayerPanelControl({ overlayManager });
-    map.addControl(panelControl, "bottom-right");
+    mountPromise = (async () => {
+      await overlayManager.mountAll();
+      if (disposed) {
+        return;
+      }
+      panelControl = createLayerPanelControl({ overlayManager });
+      map.addControl(panelControl, "bottom-right");
+    })();
+
+    return mountPromise;
   };
 
-  const dispose = () => {
+  const dispose = async () => {
+    disposed = true;
     unsubscribeStatus?.();
     unsubscribeStatus = null;
 
@@ -29,7 +39,13 @@ export const createOverlaySystem = ({ map, maplibregl }) => {
       map.removeControl(panelControl);
       panelControl = null;
     }
-    overlayManager.dispose();
+
+    if (mountPromise) {
+      await mountPromise.catch(() => {});
+    }
+
+    await overlayManager.dispose();
+    mountPromise = null;
   };
 
   const onStatusChange = (listener) => {

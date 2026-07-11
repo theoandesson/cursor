@@ -3,12 +3,16 @@ import { fetchWeatherAtPoint } from "./smhiWeatherService.js";
 import { getWeatherSymbol, getWindDirection } from "./weatherSymbols.js";
 
 const formatTime = (isoString) => {
-  try {
-    const d = new Date(isoString);
-    return d.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
-  } catch {
+  if (isoString == null) {
     return "";
   }
+
+  const d = new Date(isoString);
+  if (Number.isNaN(d.getTime())) {
+    return "";
+  }
+
+  return d.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
 };
 
 const buildCurrentHtml = (w) => {
@@ -24,8 +28,8 @@ const buildCurrentHtml = (w) => {
     <div class="weather-popup__details">
       <span>Vind: ${w.windSpeed ?? "?"} m/s ${windDir}</span>
       <span>Fukt: ${w.humidity ?? "?"}%</span>
-      <span>Tryck: ${w.pressure ? Math.round(w.pressure) : "?"} hPa</span>
-      ${w.gust ? `<span>Byar: ${w.gust} m/s</span>` : ""}
+      <span>Tryck: ${w.pressure != null ? Math.round(w.pressure) : "?"} hPa</span>
+      ${w.gust != null ? `<span>Byar: ${w.gust} m/s</span>` : ""}
     </div>`;
 };
 

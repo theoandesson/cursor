@@ -4,6 +4,8 @@ import { compressionSetup } from "../middleware/compressionSetup.js";
 import { requestTiming } from "../middleware/requestTiming.js";
 import { createApiRouter } from "../routes/createApiRouter.js";
 
+const ASSET_EXTENSION_PATTERN = /\.[a-z0-9]+$/i;
+
 export const createApp = ({ staticDirectory }) => {
   const app = express();
 
@@ -29,8 +31,25 @@ export const createApp = ({ staticDirectory }) => {
   );
 
   const indexFile = path.join(staticDirectory, "index.html");
-  app.get(/.*/, (_request, response) => {
-    response.sendFile(indexFile);
+  app.get(/.*/, (request, response) => {
+    if (ASSET_EXTENSION_PATTERN.test(request.path)) {
+      response.status(404).send("Not found");
+      return;
+    }
+
+    response.sendFile(indexFile, (error) => {
+      if (error) {
+        response.status(500).send("Kunde inte ladda applikationen.");
+      }
+    });
+  });
+
+  app.use((error, _request, response, _next) => {
+    console.error("Ohanterat serverfel:", error);
+    if (response.headersSent) {
+      return;
+    }
+    response.status(500).json({ error: "Internt serverfel." });
   });
 
   return app;

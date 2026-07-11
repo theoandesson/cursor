@@ -10,12 +10,28 @@ export const createFileCache = ({ directory }) => {
     await fs.mkdir(directory, { recursive: true });
   };
 
+  const deleteKey = async (key) => {
+    try {
+      await fs.unlink(resolvePath(key));
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+        return;
+      }
+      throw error;
+    }
+  };
+
   const readEntry = async (key) => {
     try {
       const raw = await fs.readFile(resolvePath(key), "utf8");
       return JSON.parse(raw);
     } catch (error) {
       if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+        return null;
+      }
+      if (error instanceof SyntaxError) {
+        console.warn(`Korrupt cachefil för ${key}, raderar.`);
+        await deleteKey(key);
         return null;
       }
       throw error;
@@ -46,17 +62,6 @@ export const createFileCache = ({ directory }) => {
   };
 
   const has = async (key) => (await get(key)) !== undefined;
-
-  const deleteKey = async (key) => {
-    try {
-      await fs.unlink(resolvePath(key));
-    } catch (error) {
-      if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
-        return;
-      }
-      throw error;
-    }
-  };
 
   const clear = async () => {
     try {

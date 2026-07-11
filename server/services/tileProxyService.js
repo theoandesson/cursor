@@ -37,9 +37,14 @@ const inferContentType = (targetUrl, upstreamType) => {
     return upstreamType;
   }
 
-  const extension = targetUrl.pathname
-    .slice(targetUrl.pathname.lastIndexOf("."))
-    .toLowerCase();
+  const pathname = targetUrl.pathname;
+  const lastDot = pathname.lastIndexOf(".");
+  const lastSlash = pathname.lastIndexOf("/");
+  if (lastDot <= lastSlash) {
+    return "application/octet-stream";
+  }
+
+  const extension = pathname.slice(lastDot).toLowerCase();
   return CONTENT_TYPE_BY_EXTENSION[extension] ?? "application/octet-stream";
 };
 
@@ -154,6 +159,10 @@ export const createTileProxyService = ({
         buffer: cached.buffer,
         cache: "HIT"
       };
+    }
+
+    if (cached) {
+      cache.delete(cacheKey);
     }
 
     try {

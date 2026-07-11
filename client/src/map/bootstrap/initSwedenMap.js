@@ -278,7 +278,9 @@ export const initSwedenMap = ({
             const overlaySystem = createOverlaySystem({ map, maplibregl });
             overlayManager = overlaySystem.overlayManager;
             void overlaySystem.mount();
-            disposeOverlaySystem = overlaySystem.dispose;
+            disposeOverlaySystem = () => {
+              void overlaySystem.dispose();
+            };
             unsubscribeOverlayStatus = overlaySystem.onStatusChange(({ overlays }) => {
               refreshRoadLabels?.();
               publishStatus({

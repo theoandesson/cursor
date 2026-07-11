@@ -38,7 +38,13 @@ export const createNavRevealController = ({
     throw new Error("createNavRevealController kräver shellElement och topBarElement.");
   }
 
-  const config = { ...DEFAULT_OPTIONS, ...options };
+  const config = {
+    ...DEFAULT_OPTIONS,
+    ...options,
+    panelRoutes: options.panelRoutes
+      ? new Set(options.panelRoutes)
+      : new Set(DEFAULT_OPTIONS.panelRoutes)
+  };
   const listeners = [];
   let collapseTimer = null;
   let currentRoute = ROUTES.MAP;
@@ -146,14 +152,18 @@ export const createNavRevealController = ({
   };
 
   const togglePinned = () => {
-    if (shouldStayExpanded()) {
+    if (navState === NAV_STATES.PINNED) {
+      clearCollapseTimer();
+      setNavState(NAV_STATES.COLLAPSED);
+      return;
+    }
+
+    if (config.panelRoutes.has(currentRoute)) {
       return;
     }
 
     clearCollapseTimer();
-    setNavState(
-      navState === NAV_STATES.PINNED ? NAV_STATES.COLLAPSED : NAV_STATES.PINNED
-    );
+    setNavState(NAV_STATES.PINNED);
   };
 
   const syncWithRoute = (route) => {

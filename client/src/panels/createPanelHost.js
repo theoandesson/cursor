@@ -15,8 +15,18 @@ export const createPanelHost = ({ mapRootElement }) => {
   overlayRoot.setAttribute("aria-live", "polite");
   mapRootElement.appendChild(overlayRoot);
 
+  const setMapAccessible = (accessible) => {
+    mapRootElement
+      .querySelectorAll(".maplibregl-map, .maplibregl-control-container, .map-loading-overlay")
+      .forEach((element) => {
+        element.setAttribute("aria-hidden", accessible ? "false" : "true");
+        element.inert = !accessible;
+      });
+  };
+
   const setMapVisible = (visible) => {
     mapRootElement.classList.toggle("panel-host--map-hidden", !visible);
+    setMapAccessible(visible);
   };
 
   const hideAllPanels = () => {

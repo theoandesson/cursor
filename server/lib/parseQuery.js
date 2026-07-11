@@ -24,6 +24,10 @@ export const parseIntegerInRange = (value, { min, max } = {}) => {
     return null;
   }
 
+  if (Array.isArray(value)) {
+    return null;
+  }
+
   const parsed = Number.parseInt(String(value), 10);
   if (!Number.isFinite(parsed)) {
     return null;

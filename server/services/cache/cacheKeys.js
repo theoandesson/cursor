@@ -1,4 +1,4 @@
-export const cityWeatherCacheKey = (forecastHours) => `city-weather:${forecastHours}`;
+export const cityWeatherCacheKey = (forecastHours) => `forecast-${forecastHours}`;
 
 export const pointWeatherCacheKey = (lon, lat, forecastHours) => {
   const roundedLon = Math.round(lon * 100) / 100;
