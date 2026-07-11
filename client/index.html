@@ -32,17 +32,19 @@
     <link rel="stylesheet" href="/src/styles/traffic.css" />
   </head>
   <body>
-    <div id="app-shell">
-      <header id="top-bar">
-        <div id="brand-stack">
-          <p id="brand-kicker">Nordic Terrain Suite</p>
-          <h1>Sverige 3D-karta</h1>
-          <p id="brand-subtitle">Premium 3D-navigering och liveväder i realtid</p>
-        </div>
-        <nav id="app-nav" aria-label="Huvudnavigering"></nav>
-        <div id="status-stack">
-          <p id="map-status">Initierar…</p>
-          <p id="cache-status">Tilecache initieras…</p>
+    <div id="app-shell" data-nav-state="collapsed">
+      <header id="top-bar" data-nav-state="collapsed">
+        <div id="top-bar-surface" class="top-bar__surface">
+          <div id="brand-stack">
+            <p id="brand-kicker">Nordic Terrain Suite</p>
+            <h1>Sverige 3D-karta</h1>
+            <p id="brand-subtitle">Premium 3D-navigering och liveväder i realtid</p>
+          </div>
+          <nav id="app-nav" aria-label="Huvudnavigering"></nav>
+          <div id="status-stack">
+            <p id="map-status">Initierar…</p>
+            <p id="cache-status">Tilecache initieras…</p>
+          </div>
         </div>
       </header>
       <main id="map-root" aria-label="3D-karta över Sverige"></main>

@@ -280,3 +280,10 @@
     font-size: 0.72rem;
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  #map-root .map-navigation-panel,
+  #map-root .map-navigation-panel__body {
+    transition-duration: 0.01ms;
+  }
+}

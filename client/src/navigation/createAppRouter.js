@@ -1,11 +1,22 @@
 import { buildHash, parseHash } from "./routes.js";
 
 const runWithViewTransition = (callback) => {
-  if (typeof document.startViewTransition === "function") {
-    document.startViewTransition(callback);
+  if (typeof document.startViewTransition !== "function") {
+    callback();
     return;
   }
-  callback();
+
+  try {
+    const transition = document.startViewTransition(() => {
+      callback();
+    });
+
+    transition?.finished?.catch(() => {
+      /* View transition avbröts – DOM-uppdateringen är redan klar. */
+    });
+  } catch {
+    callback();
+  }
 };
 
 export const createAppRouter = ({ onRouteChange, initialRoute }) => {
