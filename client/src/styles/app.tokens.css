@@ -1,21 +1,103 @@
 :root {
   color-scheme: light;
-  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
+  /* Surfaces */
   --app-bg-top: #f0f5fa;
   --app-bg-mid: #e6edf5;
   --app-bg-bottom: #dbe4ef;
+  --surface-base: #ffffff;
+  --surface-raised: #ffffffee;
+  --surface-overlay: #fffffff2;
+  --surface-muted: #f4f7fb;
+  --surface-hover: #e8f0f8;
+  --surface-active: #dce8f2;
+
+  /* Text */
   --app-text-primary: #1c2d3f;
   --app-text-muted: #5c7389;
+  --app-text-subtle: #8a9db0;
+  --text-on-accent: #ffffff;
+
+  /* Borders & shadows */
   --app-panel-bg: #ffffffda;
   --app-panel-border: #b8cde04d;
   --app-panel-shadow: #1a2d4214;
+  --border-subtle: #b8cde050;
+  --border-strong: #9bb8d066;
+  --shadow-sm: 0 2px 8px -4px #1a2d4218;
+  --shadow-md: 0 8px 24px -12px #1a2d4228;
+  --shadow-lg: 0 16px 40px -16px #1a2d4230;
+  --shadow-focus: 0 0 0 3px #3a8fd640;
+
+  /* Accent */
   --app-accent: #3a8fd6;
   --app-accent-strong: #2a7bc0;
+  --app-accent-subtle: #3a8fd618;
   --app-success: #2da876;
   --app-warning: #d9923b;
+  --app-danger: #d9534f;
+
+  /* Typography */
+  --font-size-xs: 0.68rem;
+  --font-size-sm: 0.78rem;
+  --font-size-md: 0.875rem;
+  --font-size-lg: 1rem;
+  --font-size-xl: 1.125rem;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 650;
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.45;
+  --line-height-relaxed: 1.6;
+
+  /* Spacing (4px base) */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+
+  /* Radius */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  --radius-full: 999px;
+
+  /* Motion */
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+  --duration-slow: 320ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Z-index */
+  --z-dropdown: 100;
+  --z-header: 200;
+  --z-overlay: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+
+  /* Layout */
+  --header-height: 3.25rem;
+  --search-width: 28rem;
+  --breakpoint-sm: 480px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
 }
 
 * {
   box-sizing: border-box;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-normal: 0ms;
+    --duration-slow: 0ms;
+  }
 }

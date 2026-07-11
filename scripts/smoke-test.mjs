@@ -24,8 +24,8 @@ const run = async () => {
     }
 
     const html = await indexResponse.text();
-    if (!html.includes("Sverige 3D-karta")) {
-      throw new Error("index.html verkar inte vara korrekt serverad.");
+    if (!html.includes("search-mount")) {
+      throw new Error("index.html saknar sökmontering (#search-mount).");
     }
 
     const healthResponse = await fetch(`http://${host}:${port}/healthz`);

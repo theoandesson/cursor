@@ -7,7 +7,7 @@ import { createCityWeatherLayer } from "../../weather/createCityWeatherLayer.js"
 import { createWeatherPopup } from "../../weather/createWeatherPopup.js";
 import { createAdaptiveLodController } from "../lod/createAdaptiveLodController.js";
 import { createInitialLoadUxController } from "../loading/createInitialLoadUxController.js";
-import { createOrientationControl } from "../navigation/createOrientationControl.js";
+import { createCompactNavControl } from "../navigation/createCompactNavControl.js";
 import { createSwedenStyle } from "../style/createSwedenStyle.js";
 
 const enableInteraction = (handler) => {
@@ -62,18 +62,12 @@ export const initSwedenMap = ({
 
   enableExtendedNavigation(map);
 
-  map.addControl(
-    createOrientationControl({
-      map,
-      mapConfig: SWEDEN_MAP_CONFIG,
-      controlConfig: NAVIGATION_CONTROL_CONFIG
-    }),
-    "top-right"
-  );
-  map.addControl(
-    new maplibregl.NavigationControl({ showZoom: true, showCompass: true, visualizePitch: true }),
-    "top-left"
-  );
+  const navControl = createCompactNavControl({
+    map,
+    mapConfig: SWEDEN_MAP_CONFIG,
+    controlConfig: NAVIGATION_CONTROL_CONFIG
+  });
+  map.addControl(navControl, "top-right");
   map.addControl(new maplibregl.ScaleControl({ maxWidth: 180, unit: "metric" }));
 
   if (loadingOverlay) {
@@ -86,5 +80,5 @@ export const initSwedenMap = ({
     createAdaptiveLodController({ map, lodConfig: LOD_CONFIG, onStatusChange });
   });
 
-  return map;
+  return { map, navControl };
 };

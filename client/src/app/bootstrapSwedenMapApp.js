@@ -3,6 +3,8 @@ import { initSwedenMap } from "../map/bootstrap/initSwedenMap.js";
 import { createCacheStatusPresenter } from "../ui/createCacheStatusPresenter.js";
 import { createLoadingOverlayPresenter } from "../ui/createLoadingOverlayPresenter.js";
 import { createMapStatusPresenter } from "../ui/createMapStatusPresenter.js";
+import { createAppChrome } from "../ui/shell/createAppChrome.js";
+import { createToastPresenter } from "../ui/shell/createToastPresenter.js";
 
 const MAP_ROOT_ID = "map-root";
 
@@ -26,10 +28,14 @@ export const bootstrapSwedenMapApp = ({ maplibregl }) => {
     onStatusChange: setCacheStatus
   });
 
-  initSwedenMap({
+  const toast = createToastPresenter();
+
+  const { map, navControl } = initSwedenMap({
     maplibregl,
     container: mapRootElement,
     onStatusChange: setStatus,
     loadingOverlay
   });
+
+  createAppChrome({ map, navControl, toast });
 };

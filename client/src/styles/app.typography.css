@@ -1,0 +1,39 @@
+body {
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.ui-text-xs {
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-tight);
+}
+
+.ui-text-sm {
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+}
+
+.ui-text-md {
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-normal);
+}
+
+.ui-text-lg {
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-tight);
+}
+
+.ui-text-muted {
+  color: var(--app-text-muted);
+}
+
+.ui-text-subtle {
+  color: var(--app-text-subtle);
+}
+
+.ui-text-strong {
+  font-weight: var(--font-weight-semibold);
+  color: var(--app-text-primary);
+}
