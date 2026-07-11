@@ -33,7 +33,8 @@ export const initSwedenMap = ({
   maplibregl,
   container,
   onStatusChange,
-  loadingOverlay
+  loadingOverlay,
+  perfTracker
 }) => {
   const map = new maplibregl.Map({
     container,
@@ -81,7 +82,11 @@ export const initSwedenMap = ({
   }
 
   map.on("load", () => {
-    createCityWeatherLayer({ map, maplibregl });
+    createCityWeatherLayer({
+      map,
+      maplibregl,
+      onTiming: perfTracker?.onTiming
+    });
     createWeatherPopup({ map, maplibregl });
     createAdaptiveLodController({ map, lodConfig: LOD_CONFIG, onStatusChange });
   });

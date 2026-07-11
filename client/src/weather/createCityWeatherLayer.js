@@ -1,34 +1,21 @@
-import { fetchCities, fetchCityWeather } from "./smhiWeatherService.js";
+import { fetchBootstrap, fetchBootstrapWithSwr } from "../api/bootstrapClient.js";
+import { saveBootstrapSnapshot } from "../store/weatherStore.js";
 import { getWeatherSymbol, getWindDirection } from "./weatherSymbols.js";
+import {
+  applyWeatherToGeoJson,
+  buildGeoJsonFromCities,
+  createFeatureUpdater,
+  extractBootstrapParts,
+  haveSameCityIds
+} from "./applyCityWeather.js";
 
 const SOURCE_ID = "city-weather-source";
 const CIRCLE_LAYER_ID = "city-weather-circles";
 const LABEL_LAYER_ID = "city-weather-labels";
 const REFRESH_INTERVAL_MS = 10 * 60 * 1000;
 const CITY_MARKER_MAX_ZOOM = 13.8;
-
-const buildGeoJson = (cities) => ({
-  type: "FeatureCollection",
-  features: cities.map((c) => ({
-    type: "Feature",
-    geometry: { type: "Point", coordinates: [c.lon, c.lat] },
-    properties: {
-      cityId: c.id,
-      name: c.name,
-      icon: "",
-      temp: "",
-      label: "",
-      windSpeed: null,
-      windDir: null,
-      windDirText: "",
-      humidity: null,
-      pressure: null,
-      gust: null,
-      symbolLabel: "",
-      loaded: false
-    }
-  }))
-});
+const SMOOTH_UPDATE_BATCH_SIZE = 8;
+const SMOOTH_UPDATE_DELAY_MS = 40;
 
 const buildHoverHtml = (props) => {
   if (!props.loaded) {
@@ -57,11 +44,17 @@ const buildHoverHtml = (props) => {
     </div>`;
 };
 
-export const createCityWeatherLayer = ({ map, maplibregl }) => {
-  let geojson = buildGeoJson([]);
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export const createCityWeatherLayer = ({ map, maplibregl, onTiming }) => {
+  let geojson = buildGeoJsonFromCities([]);
   let intervalId = null;
   let isDisposed = false;
   let cityIdToFeatureIndex = new Map();
+  let currentCities = [];
+  let smoothUpdateToken = 0;
+
+  const updateFeature = createFeatureUpdater(getWeatherSymbol, getWindDirection);
 
   map.addSource(SOURCE_ID, { type: "geojson", data: geojson });
 
@@ -128,52 +121,74 @@ export const createCityWeatherLayer = ({ map, maplibregl }) => {
     hoverPopup.remove();
   });
 
-  const updateFeature = (idx, weather) => {
-    if (idx == null || !weather) {
-      return;
-    }
-
-    const sym = getWeatherSymbol(weather.symbol);
-    const f = geojson.features[idx];
-    if (!f) {
-      return;
-    }
-
-    f.properties.icon = sym.icon;
-    f.properties.temp = weather.temp != null ? `${Number(weather.temp).toFixed(1)}°C` : "?";
-    f.properties.label = sym.label;
-    f.properties.symbolLabel = sym.label;
-    f.properties.windSpeed = weather.windSpeed;
-    f.properties.windDir = weather.windDir;
-    f.properties.windDirText = getWindDirection(weather.windDir);
-    f.properties.humidity = weather.humidity;
-    f.properties.pressure = weather.pressure;
-    f.properties.gust = weather.gust;
-    f.properties.loaded = true;
-  };
-
-  const applyCities = (cities) => {
-    geojson = buildGeoJson(cities);
-    cityIdToFeatureIndex = new Map(
-      cities.map((city, index) => [city.id, index])
-    );
+  const syncSource = () => {
     map.getSource(SOURCE_ID)?.setData(geojson);
   };
 
-  const loadAll = async () => {
-    try {
-      const cityWeather = await fetchCityWeather();
-      cityWeather.forEach((entry) => {
-        const cityId = entry.city?.id;
-        if (!cityId) {
+  const applyCities = (cities) => {
+    geojson = buildGeoJsonFromCities(cities);
+    currentCities = cities;
+    cityIdToFeatureIndex = new Map(cities.map((city, index) => [city.id, index]));
+    syncSource();
+  };
+
+  const applyWeather = (weatherEntries, { smooth = false } = {}) => {
+    if (!weatherEntries?.length) {
+      return;
+    }
+
+    if (!smooth) {
+      applyWeatherToGeoJson(geojson, cityIdToFeatureIndex, weatherEntries, updateFeature);
+      syncSource();
+      return;
+    }
+
+    const token = ++smoothUpdateToken;
+    const batches = [];
+    for (let i = 0; i < weatherEntries.length; i += SMOOTH_UPDATE_BATCH_SIZE) {
+      batches.push(weatherEntries.slice(i, i + SMOOTH_UPDATE_BATCH_SIZE));
+    }
+
+    const runBatches = async () => {
+      for (const batch of batches) {
+        if (isDisposed || token !== smoothUpdateToken) {
           return;
         }
-        const idx = cityIdToFeatureIndex.get(cityId);
-        if (entry.current) {
-          updateFeature(idx, entry.current);
+
+        applyWeatherToGeoJson(geojson, cityIdToFeatureIndex, batch, updateFeature);
+        syncSource();
+
+        if (batches.length > 1) {
+          await wait(SMOOTH_UPDATE_DELAY_MS);
         }
-      });
-      map.getSource(SOURCE_ID)?.setData(geojson);
+      }
+    };
+
+    runBatches().catch(() => undefined);
+  };
+
+  const applyBootstrapPayload = (bootstrapData, { smooth = false } = {}) => {
+    const { cities, weatherEntries } = extractBootstrapParts(bootstrapData);
+    if (!cities.length) {
+      return;
+    }
+
+    if (!currentCities.length || !haveSameCityIds(currentCities, cities)) {
+      applyCities(cities);
+      applyWeather(weatherEntries, { smooth: false });
+      return;
+    }
+
+    applyWeather(weatherEntries, { smooth });
+  };
+
+  const refreshWeather = async () => {
+    try {
+      const freshData = await fetchBootstrap({ onTiming });
+      if (!isDisposed) {
+        applyBootstrapPayload(freshData, { smooth: true });
+        await saveBootstrapSnapshot(freshData);
+      }
     } catch {
       /* ignore weather refresh failures */
     }
@@ -181,19 +196,25 @@ export const createCityWeatherLayer = ({ map, maplibregl }) => {
 
   const bootstrap = async () => {
     try {
-      const cities = await fetchCities();
-      if (isDisposed) {
-        return;
-      }
-
-      applyCities(cities);
-      await loadAll();
+      await fetchBootstrapWithSwr({
+        onTiming,
+        onCached: (cachedData) => {
+          if (!isDisposed) {
+            applyBootstrapPayload(cachedData, { smooth: false });
+          }
+        },
+        onFresh: (freshData) => {
+          if (!isDisposed) {
+            applyBootstrapPayload(freshData, { smooth: true });
+          }
+        }
+      });
     } catch {
       /* ignore initial failures */
     }
 
     if (!isDisposed) {
-      intervalId = setInterval(loadAll, REFRESH_INTERVAL_MS);
+      intervalId = setInterval(refreshWeather, REFRESH_INTERVAL_MS);
     }
   };
 
