@@ -1,4 +1,5 @@
 import {
+  SELF_HOSTED_TILE_PATH_PREFIXES,
   TILE_CACHE_PREFIX,
   TILE_CACHE_RETENTION_VERSIONS,
   buildTileCacheName,
@@ -10,6 +11,8 @@ import {
 const API_CACHE_NAME = "sweden-map-api-v1";
 const API_SWR_PATHS = new Set(["/api/bootstrap", "/api/weather/cities"]);
 const DELETE_OUTDATED_DEBOUNCE_MS = 60000;
+const SELF_HOSTED_TILE_CACHE_NAME = `${TILE_CACHE_PREFIX}-self-hosted-immutable-v1`;
+const SELF_HOSTED_TILEJSON_CACHE_NAME = `${TILE_CACHE_PREFIX}-self-hosted-tilejson-v1`;
 
 let lastDeleteOutdatedAt = 0;
 let deleteOutdatedInFlight = null;
@@ -30,6 +33,35 @@ const isApiCacheableRequest = (request) => {
   }
 };
 
+const isSelfHostedTileRequest = (request) => {
+  if (!request || request.method !== "GET") {
+    return false;
+  }
+
+  try {
+    const url = new URL(request.url);
+    return (
+      url.origin === self.location.origin &&
+      SELF_HOSTED_TILE_PATH_PREFIXES.some((prefix) => url.pathname.startsWith(prefix))
+    );
+  } catch {
+    return false;
+  }
+};
+
+const isSelfHostedTileJsonRequest = (request) => {
+  if (!isSelfHostedTileRequest(request)) {
+    return false;
+  }
+
+  try {
+    const url = new URL(request.url);
+    return url.pathname.endsWith("/tilejson.json");
+  } catch {
+    return false;
+  }
+};
+
 const putInCache = async (cache, request, response) => {
   try {
     await cache.put(request, response.clone());
@@ -38,8 +70,8 @@ const putInCache = async (cache, request, response) => {
   }
 };
 
-const staleWhileRevalidateApi = async (request) => {
-  const cache = await caches.open(API_CACHE_NAME);
+const staleWhileRevalidate = async (request, cacheName) => {
+  const cache = await caches.open(cacheName);
   const cached = await cache.match(request);
 
   const networkPromise = fetch(request)
@@ -64,10 +96,34 @@ const staleWhileRevalidateApi = async (request) => {
   return networkPromise;
 };
 
+const staleWhileRevalidateApi = (request) =>
+  staleWhileRevalidate(request, API_CACHE_NAME);
+
+const staleWhileRevalidateTileJson = (request) =>
+  staleWhileRevalidate(request, SELF_HOSTED_TILEJSON_CACHE_NAME);
+
+const cacheFirstSelfHostedTile = async (request) => {
+  const cache = await caches.open(SELF_HOSTED_TILE_CACHE_NAME);
+  const cached = await cache.match(request);
+  if (cached) {
+    return cached;
+  }
+
+  const response = await fetch(request);
+  if (cacheableResponse(response)) {
+    await putInCache(cache, request, response);
+  }
+  return response;
+};
+
 const getTileCacheNamesByFreshness = async () => {
   const cacheNames = await caches.keys();
   return cacheNames
-    .filter((cacheName) => cacheName.startsWith(TILE_CACHE_PREFIX))
+    .filter(
+      (cacheName) =>
+        cacheName.startsWith(`${TILE_CACHE_PREFIX}-`) &&
+        extractVersionFromCacheName(cacheName) !== null
+    )
     .sort((left, right) => right.localeCompare(left));
 };
 
@@ -96,7 +152,9 @@ const deleteOutdatedTileCaches = async (activeCacheName) => {
   const cacheNames = await caches.keys();
   const outdated = cacheNames.filter(
     (cacheName) =>
-      cacheName.startsWith(TILE_CACHE_PREFIX) && !retainedSet.has(cacheName)
+      cacheName.startsWith(`${TILE_CACHE_PREFIX}-`) &&
+      extractVersionFromCacheName(cacheName) !== null &&
+      !retainedSet.has(cacheName)
   );
   await Promise.all(outdated.map((cacheName) => caches.delete(cacheName)));
 };
@@ -185,6 +243,16 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
+  if (isSelfHostedTileJsonRequest(event.request)) {
+    event.respondWith(staleWhileRevalidateTileJson(event.request));
+    return;
+  }
+
+  if (isSelfHostedTileRequest(event.request)) {
+    event.respondWith(cacheFirstSelfHostedTile(event.request));
+    return;
+  }
+
   if (isApiCacheableRequest(event.request)) {
     event.respondWith(staleWhileRevalidateApi(event.request));
     return;
