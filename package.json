@@ -12,7 +12,7 @@
     "dev:client": "vite",
     "smoke": "node scripts/smoke-test.mjs",
     "test:tiles": "node --test server/services/__tests__/selfHostedTileService.test.js server/routes/__tests__/tilesRouter.test.js",
-    "test:unit": "node --test client/src/map/loading/__tests__/loadingLogic.test.js",
+    "test:unit": "node --test client/src/map/loading/__tests__/loadingLogic.test.js client/src/map/loading/__tests__/tileSchedulerPrefetch.test.js",
     "test:full": "node scripts/full-test.mjs",
     "test:benchmark": "node scripts/benchmark-api.mjs",
     "tiles:sync": "node scripts/tiles/syncAll.mjs",
