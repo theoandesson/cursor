@@ -91,7 +91,8 @@ const createInlineSchedulerWorker = () => {
         type: "scheduled",
         requestId: payload.requestId,
         visibleTileCount: schedule.visibleTileCount,
-        prioritizedTiles: schedule.prioritizedTiles.slice(0, ${TILE_COORDINATE_RANGE})
+        prioritizedTiles: schedule.prioritizedTiles,
+        statusTiles: schedule.prioritizedTiles.slice(0, ${TILE_COORDINATE_RANGE})
       });
     };
   `;
@@ -104,7 +105,7 @@ const createInlineSchedulerWorker = () => {
   };
 };
 
-export const createViewportTileScheduler = ({ map, onStatusChange }) => {
+export const createViewportTileScheduler = ({ map, onStatusChange, onSchedule }) => {
   let worker = null;
   let workerUrl = null;
   let requestId = 0;
@@ -125,7 +126,12 @@ export const createViewportTileScheduler = ({ map, onStatusChange }) => {
   };
 
   const applySchedule = (schedule) => {
-    reportStatus(schedule.visibleTileCount, schedule.prioritizedTiles);
+    const prioritizedTiles = Array.isArray(schedule.prioritizedTiles) ? schedule.prioritizedTiles : [];
+    const statusTiles = Array.isArray(schedule.statusTiles)
+      ? schedule.statusTiles
+      : prioritizedTiles.slice(0, TILE_COORDINATE_RANGE);
+    onSchedule?.(prioritizedTiles);
+    reportStatus(schedule.visibleTileCount, statusTiles);
   };
 
   const onWorkerMessage = (event) => {
@@ -135,7 +141,8 @@ export const createViewportTileScheduler = ({ map, onStatusChange }) => {
     }
     applySchedule({
       visibleTileCount: payload.visibleTileCount,
-      prioritizedTiles: payload.prioritizedTiles
+      prioritizedTiles: payload.prioritizedTiles,
+      statusTiles: payload.statusTiles
     });
   };
 

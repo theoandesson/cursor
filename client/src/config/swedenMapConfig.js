@@ -2,8 +2,25 @@ import {
   DEM_TILE_SOURCE,
   GLYPHS_URL,
   SWEDEN_TILE_BOUNDS,
-  VECTOR_TILE_SOURCE
+  VECTOR_TILE_SOURCE,
+  getActiveGlyphsUrl,
+  isSelfHostedTileMode
 } from "../map/tiles/swedenTileSources.js";
+
+const SELF_HOSTED_DEM_TILES = Object.freeze(["/tiles/dem/{z}/{x}/{y}.png"]);
+
+export const getSwedenDataSources = () => {
+  const useSelfHostedTiles = isSelfHostedTileMode();
+
+  return Object.freeze({
+    tileMode: useSelfHostedTiles ? "self-hosted" : "external",
+    vectorTileJsonUrl: useSelfHostedTiles
+      ? VECTOR_TILE_SOURCE.selfHostedTileJsonUrl
+      : VECTOR_TILE_SOURCE.tileJsonUrl,
+    glyphs: getActiveGlyphsUrl(),
+    terrainTiles: useSelfHostedTiles ? SELF_HOSTED_DEM_TILES : DEM_TILE_SOURCE.tiles
+  });
+};
 
 export const SWEDEN_SOURCE_BOUNDS = SWEDEN_TILE_BOUNDS;
 
@@ -29,12 +46,6 @@ export const NAVIGATION_CONTROL_CONFIG = Object.freeze({
   nearZoomPanFactor: 0.46,
   animationMs: 170,
   defaultInverted: true
-});
-
-export const SWEDEN_DATA_SOURCES = Object.freeze({
-  vectorTileJsonUrl: VECTOR_TILE_SOURCE.tileJsonUrl,
-  glyphs: GLYPHS_URL,
-  terrainTiles: DEM_TILE_SOURCE.tiles
 });
 
 export const TERRAIN_CONFIG = Object.freeze({

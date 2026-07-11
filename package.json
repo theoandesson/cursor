@@ -8,10 +8,16 @@
   },
   "scripts": {
     "start": "node server/index.js",
+    "build": "vite build",
+    "dev:client": "vite",
     "smoke": "node scripts/smoke-test.mjs",
+    "test:tiles": "node --test server/services/__tests__/selfHostedTileService.test.js server/routes/__tests__/tilesRouter.test.js",
     "test:unit": "node --test client/src/map/loading/__tests__/loadingLogic.test.js",
     "test:full": "node scripts/full-test.mjs",
-    "test:benchmark": "node scripts/benchmark-api.mjs"
+    "test:benchmark": "node scripts/benchmark-api.mjs",
+    "tiles:sync": "node scripts/tiles/syncAll.mjs",
+    "tiles:sync:vector": "node scripts/tiles/syncVectorTiles.mjs",
+    "tiles:sync:dem": "node scripts/tiles/syncDemTiles.mjs"
   },
   "keywords": [
     "sweden",
@@ -24,6 +30,10 @@
   "license": "MIT",
   "dependencies": {
     "express": "^5.1.0",
+    "maplibre-gl": "^5.9.0",
     "open": "^10.2.0"
+  },
+  "devDependencies": {
+    "vite": "^6.4.1"
   }
 }

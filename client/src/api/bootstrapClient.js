@@ -5,6 +5,18 @@ import {
 } from "../store/weatherStore.js";
 
 const BOOTSTRAP_URL = "/api/bootstrap";
+const TILE_MODE_SELF_HOSTED = "self-hosted";
+const TILE_MODE_EXTERNAL = "external";
+
+const applyBootstrapTileMode = (bootstrapData) => {
+  if (typeof window === "undefined" || !bootstrapData || typeof bootstrapData !== "object") {
+    return;
+  }
+
+  const tileMode =
+    bootstrapData.tileMode === TILE_MODE_EXTERNAL ? TILE_MODE_EXTERNAL : TILE_MODE_SELF_HOSTED;
+  window.__SWEDEN_MAP_TILE_MODE__ = tileMode;
+};
 
 const throwIfAborted = (signal) => {
   if (signal?.aborted) {
@@ -45,6 +57,7 @@ export const fetchBootstrap = async ({ signal, onTiming, fetchFn = fetch } = {})
       throw new Error("Invalid bootstrap response structure");
     }
 
+    applyBootstrapTileMode(data);
     emitTiming(onTiming, "parse", parseStartedAt);
     return data;
   } catch (error) {
@@ -71,6 +84,7 @@ export const fetchBootstrapWithSwr = async ({
   emitTiming(onTiming, "idb-read", cacheReadStartedAt, snapshot ? "hit" : "miss");
 
   if (snapshot?.data) {
+    applyBootstrapTileMode(snapshot.data);
     fromCache = true;
     onCached?.(snapshot.data, snapshot);
   }
@@ -81,6 +95,7 @@ export const fetchBootstrapWithSwr = async ({
     throwIfAborted(signal);
     fromNetwork = true;
     emitTiming(onTiming, "apply-fresh", networkStartedAt);
+    applyBootstrapTileMode(freshData);
 
     onFresh?.(freshData);
 

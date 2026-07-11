@@ -8,7 +8,7 @@
 /** [west, south, east, north] — Sweden including Gotland and border buffer. */
 export const SWEDEN_TILE_BOUNDS = Object.freeze([9.5, 54.8, 24.8, 69.7]);
 
-export const SWEDEN_TILE_LIMITS = Object.freeze({
+const SWEDEN_TILE_LIMITS = Object.freeze({
   vector: { minzoom: 0, maxzoom: 14 },
   dem: { minzoom: 0, maxzoom: 12 },
   satellite: { minzoom: 0, maxzoom: 18 }
@@ -35,6 +35,51 @@ export const VECTOR_TILE_SOURCE = Object.freeze({
 
 export const GLYPHS_URL =
   "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf";
+
+const SELF_HOSTED_GLYPHS_URL = "/tiles/fonts/{fontstack}/{range}.pbf";
+
+const SELF_HOSTED_DEM_TILE_URL_TEMPLATE = "/tiles/dem/{z}/{x}/{y}.png";
+
+const TILE_MODES = Object.freeze({
+  external: "external",
+  selfHosted: "self-hosted"
+});
+
+const resolveTileMode = () => {
+  const mode =
+    typeof window !== "undefined" &&
+    typeof window.__SWEDEN_MAP_TILE_MODE__ === "string"
+      ? window.__SWEDEN_MAP_TILE_MODE__.trim().toLowerCase()
+      : null;
+  return mode === TILE_MODES.selfHosted ? TILE_MODES.selfHosted : TILE_MODES.external;
+};
+
+export const isSelfHostedTileMode = (tileMode = resolveTileMode()) =>
+  tileMode === TILE_MODES.selfHosted;
+
+export const getActiveGlyphsUrl = (tileMode = resolveTileMode()) =>
+  isSelfHostedTileMode(tileMode) ? SELF_HOSTED_GLYPHS_URL : GLYPHS_URL;
+
+export const getActiveVectorTileTemplate = ({
+  tileMode = resolveTileMode(),
+  useSelfHostedVector = isSelfHostedTileMode(tileMode)
+} = {}) =>
+  useSelfHostedVector
+    ? VECTOR_TILE_SOURCE.selfHostedTileUrlTemplate
+    : VECTOR_TILE_SOURCE.tileUrlTemplate;
+
+const getActiveDemTileTemplates = ({
+  tileMode = resolveTileMode(),
+  useSelfHostedVector
+} = {}) => {
+  const useSelfHostedDem =
+    typeof useSelfHostedVector === "boolean"
+      ? useSelfHostedVector
+      : isSelfHostedTileMode(tileMode);
+  return useSelfHostedDem
+    ? [SELF_HOSTED_DEM_TILE_URL_TEMPLATE]
+    : [...DEM_TILE_SOURCE.tiles];
+};
 
 /**
  * Primary DEM: Mapzen Terrarium tiles (global, terrarium encoding).
@@ -80,7 +125,7 @@ export const SWEDEN_MAP_MODES = Object.freeze({
  * Lantmäteriet Ortofoto Nedladdning is available via STAC Bild — same auth model as DEM.
  * @see https://api.lantmateriet.se/stac-bild/v1/
  */
-export const SATELLITE_TILE_SOURCES = Object.freeze({
+const SATELLITE_TILE_SOURCES = Object.freeze({
   esriWorldImagery: Object.freeze({
     id: "sweden-satellite-esri",
     type: "raster",
@@ -108,13 +153,29 @@ export const DEFAULT_SATELLITE_SOURCE = SATELLITE_TILE_SOURCES.esriWorldImagery;
 
 /** Tile URL templates the viewport prefetcher may warm-cache. */
 export const PREFETCHABLE_TILE_TEMPLATES = Object.freeze([
-  VECTOR_TILE_SOURCE.tileUrlTemplate,
-  ...DEM_TILE_SOURCE.tiles
+  getActiveVectorTileTemplate(),
+  ...getActiveDemTileTemplates()
 ]);
 
 /** Prefetch templates scoped to the active basemap mode. */
-export const getPrefetchableTileTemplatesForMode = (mode) => {
-  const templates = [VECTOR_TILE_SOURCE.tileUrlTemplate, ...DEM_TILE_SOURCE.tiles];
+export const getPrefetchableTileTemplatesForMode = (
+  mode,
+  { tileMode = resolveTileMode(), useSelfHostedVector } = {}
+) => {
+  const resolvedUseSelfHostedVector =
+    typeof useSelfHostedVector === "boolean"
+      ? useSelfHostedVector
+      : isSelfHostedTileMode(tileMode);
+  const templates = [
+    getActiveVectorTileTemplate({
+      tileMode,
+      useSelfHostedVector: resolvedUseSelfHostedVector
+    }),
+    ...getActiveDemTileTemplates({
+      tileMode,
+      useSelfHostedVector: resolvedUseSelfHostedVector
+    })
+  ];
   if (mode === "satellite" || mode === "hybrid") {
     templates.push(...DEFAULT_SATELLITE_SOURCE.tiles);
   }
@@ -146,7 +207,7 @@ const tileToLngLatBounds = (x, y, z) => {
 };
 
 /** True when a tile index intersects Sweden bounds. */
-export const isTileWithinSwedenBounds = (x, y, z) => {
+const isTileWithinSwedenBounds = (x, y, z) => {
   const tileBounds = tileToLngLatBounds(x, y, z);
   const [west, south, east, north] = SWEDEN_TILE_BOUNDS;
   return !(
@@ -188,11 +249,23 @@ export const resolveTileUrl = (template, { x, y, z }) =>
  */
 export const createSwedenTileSources = ({
   mode = SWEDEN_MAP_MODES.vector,
-  useSelfHostedVector = false
+  tileMode = resolveTileMode(),
+  useSelfHostedVector
 } = {}) => {
-  const vectorTiles = useSelfHostedVector
-    ? [VECTOR_TILE_SOURCE.selfHostedTileUrlTemplate]
-    : [VECTOR_TILE_SOURCE.tileUrlTemplate];
+  const resolvedUseSelfHostedVector =
+    typeof useSelfHostedVector === "boolean"
+      ? useSelfHostedVector
+      : isSelfHostedTileMode(tileMode);
+  const vectorTiles = [
+    getActiveVectorTileTemplate({
+      tileMode,
+      useSelfHostedVector: resolvedUseSelfHostedVector
+    })
+  ];
+  const demTiles = getActiveDemTileTemplates({
+    tileMode,
+    useSelfHostedVector: resolvedUseSelfHostedVector
+  });
 
   const sources = {
     [VECTOR_TILE_SOURCE.id]: {
@@ -204,7 +277,7 @@ export const createSwedenTileSources = ({
     },
     [DEM_TILE_SOURCE.id]: {
       type: DEM_TILE_SOURCE.type,
-      tiles: DEM_TILE_SOURCE.tiles,
+      tiles: demTiles,
       encoding: DEM_TILE_SOURCE.encoding,
       tileSize: DEM_TILE_SOURCE.tileSize,
       bounds: DEM_TILE_SOURCE.bounds,

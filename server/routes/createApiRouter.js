@@ -199,6 +199,21 @@ export const createApiRouter = () => {
           path: "/api/pressure/frames/:frameKey.geojson",
           description: "GeoJSON med hög-/lågtrycksområden och åskrisk för en prognostid"
         },
+        {
+          method: "GET",
+          path: "/tiles/vector/tilejson.json",
+          description: "Self-hosted vector TileJSON (kräver synkade tile-filer lokalt)"
+        },
+        {
+          method: "GET",
+          path: "/tiles/vector/:z/:x/:y.pbf",
+          description: "Self-hosted vector tile endpoint (kräver synkade tile-filer lokalt)"
+        },
+        {
+          method: "GET",
+          path: "/tiles/fonts/:fontstack/:range.pbf",
+          description: "Proxade MapLibre-glyphs för self-hosted tile-läge"
+        },
         { method: "GET", path: "/api/tiles/proxy?url=", description: "CORS-säker tile-proxy med minnescache" },
         { method: "GET", path: "/api/tiles/proxy/stats", description: "Tile-proxy cachestatistik" },
         { method: "GET", path: "/api/search?q=&limit=", description: "Autocomplete-sökning av platser i Sverige" },

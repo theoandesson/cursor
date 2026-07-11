@@ -10,6 +10,8 @@ import { createAppShell } from "./createAppShell.js";
 const MAP_ROOT_ID = "map-root";
 const CITY_FLY_ZOOM = 11;
 const SW_WAIT_TIMEOUT_MS = 8000;
+const TILE_MODE_SELF_HOSTED = "self-hosted";
+const TILE_MODE_EXTERNAL = "external";
 
 const createBootstrapOnTiming = (perfTracker) => {
   if (!perfTracker) {
@@ -37,6 +39,27 @@ const buildWeatherMap = (weatherEntries) => {
   return weatherMap;
 };
 
+const applyBootstrapTileConfig = (bootstrapData) => {
+  if (typeof window === "undefined" || !bootstrapData || typeof bootstrapData !== "object") {
+    return;
+  }
+
+  window.__SWEDEN_MAP_TILE_MODE__ =
+    bootstrapData.tileMode === TILE_MODE_EXTERNAL ? TILE_MODE_EXTERNAL : TILE_MODE_SELF_HOSTED;
+
+  if (typeof bootstrapData.vectorTileJsonUrl === "string") {
+    window.__SWEDEN_MAP_VECTOR_TILEJSON_URL__ = bootstrapData.vectorTileJsonUrl;
+  }
+
+  if (typeof bootstrapData.demTileJsonUrl === "string") {
+    window.__SWEDEN_MAP_DEM_TILEJSON_URL__ = bootstrapData.demTileJsonUrl;
+  }
+
+  if (typeof bootstrapData.tilesReady === "boolean") {
+    window.__SWEDEN_MAP_TILES_READY__ = bootstrapData.tilesReady;
+  }
+};
+
 export const bootstrapSwedenMapApp = async ({ maplibregl, perfTracker }) => {
   perfTracker?.recordMilestone("bootstrap-start");
 
@@ -54,6 +77,8 @@ export const bootstrapSwedenMapApp = async ({ maplibregl, perfTracker }) => {
     onTiming
   });
   perfTracker?.recordMilestone("bootstrap-prefetch-start");
+  const bootstrapData = await bootstrapPrefetch.fetchPromise;
+  applyBootstrapTileConfig(bootstrapData);
 
   const appShell = createAppShell({
     mapRootElement,
