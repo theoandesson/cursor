@@ -19,6 +19,11 @@ import { POI_CATEGORY_BY_ID } from "../data/poiCategories.js";
 import { getPoiById, getPoisNearPoint, listPois, toPoiDto } from "../services/poiService.js";
 import { getPointWeather } from "../services/pointWeatherService.js";
 import {
+  getPressureFrameGeoJson,
+  getPressureMetadataPayload,
+  listPressureFrames
+} from "../services/pressureProxyService.js";
+import {
   getRadarImage,
   getRadarMetadataPayload,
   listRadarFrames
@@ -37,6 +42,8 @@ const MAX_PAGE_SIZE = 300;
 const MAX_FORECAST_HOURS = 48;
 const MAX_RADAR_HOURS = 6;
 const MAX_RADAR_FRAMES = 72;
+const MAX_PRESSURE_HOURS = 48;
+const MAX_PRESSURE_FRAMES = 72;
 const MAX_POI_RADIUS_KM = 100;
 const DEFAULT_POI_RADIUS_KM = 5;
 const DEFAULT_NEAR_POI_LIMIT = 20;
@@ -180,6 +187,17 @@ export const createApiRouter = () => {
           method: "GET",
           path: "/api/radar/frames/:frameKey.png",
           description: "Proxad SMHI-radarbild (frameKey=latest eller radar_YYMMDDHHMM)"
+        },
+        { method: "GET", path: "/api/pressure/metadata", description: "Tryck/åska-metadata och legend" },
+        {
+          method: "GET",
+          path: "/api/pressure/frames?hours=&limit=&offset=",
+          description: "Prognosframes för tryck- och åskvisualisering"
+        },
+        {
+          method: "GET",
+          path: "/api/pressure/frames/:frameKey.geojson",
+          description: "GeoJSON med hög-/lågtrycksområden och åskrisk för en prognostid"
         },
         { method: "GET", path: "/api/tiles/proxy?url=", description: "CORS-säker tile-proxy med minnescache" },
         { method: "GET", path: "/api/tiles/proxy/stats", description: "Tile-proxy cachestatistik" },
@@ -378,6 +396,78 @@ export const createApiRouter = () => {
     } catch {
       response.status(502).json({
         error: "Kunde inte hämta radarframes."
+      });
+    }
+  });
+
+  router.get("/pressure/metadata", async (_request, response) => {
+    try {
+      const metadata = await getPressureMetadataPayload();
+      response.status(200).json(metadata);
+    } catch (error) {
+      response.status(502).json({
+        error: error instanceof Error ? error.message : "Kunde inte hämta tryck-metadata."
+      });
+    }
+  });
+
+  router.get("/pressure/frames", async (request, response) => {
+    const hours =
+      parseIntegerInRange(request.query.hours, { min: 1, max: MAX_PRESSURE_HOURS }) ?? 24;
+    const limitResult = parseIntegerInRangeOrReject(request.query.limit, {
+      min: 1,
+      max: MAX_PRESSURE_FRAMES
+    });
+    if (!limitResult.ok) {
+      response.status(400).json({
+        error: `Ogiltig limit. Ange ett heltal mellan 1 och ${MAX_PRESSURE_FRAMES}.`
+      });
+      return;
+    }
+
+    const offsetResult = parseIntegerInRangeOrReject(request.query.offset, { min: 0 });
+    if (!offsetResult.ok) {
+      response.status(400).json({ error: "Ogiltig offset. Ange ett heltal >= 0." });
+      return;
+    }
+
+    const limit = limitResult.value ?? MAX_PRESSURE_FRAMES;
+    const offset = offsetResult.value ?? 0;
+    const forceRefresh = parseBoolean(request.query.refresh, false);
+
+    try {
+      const payload = await listPressureFrames({
+        hours,
+        limit,
+        offset,
+        forceRefresh
+      });
+      response.status(200).json(payload);
+    } catch (error) {
+      response.status(502).json({
+        error: error instanceof Error ? error.message : "Kunde inte hämta tryckframes."
+      });
+    }
+  });
+
+  router.get("/pressure/frames/:frameKey.geojson", async (request, response) => {
+    const frameKey = String(request.params.frameKey ?? "").trim();
+    const forceRefresh = parseBoolean(request.query.refresh, false);
+
+    if (!frameKey) {
+      response.status(400).json({ error: "Ogiltig tryckframe." });
+      return;
+    }
+
+    try {
+      const geojson = await getPressureFrameGeoJson({ frameKey, forceRefresh });
+      response.setHeader("Content-Type", "application/geo+json; charset=utf-8");
+      response.setHeader("Cache-Control", "public, max-age=300, stale-while-revalidate=600");
+      response.status(200).json(geojson);
+    } catch (error) {
+      const statusCode = error?.statusCode === 404 ? 404 : 502;
+      response.status(statusCode).json({
+        error: error instanceof Error ? error.message : "Kunde inte hämta tryckframe."
       });
     }
   });
