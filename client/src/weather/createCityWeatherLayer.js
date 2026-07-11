@@ -24,7 +24,10 @@ const buildHoverHtml = (props) => {
     return `<div class="weather-hover"><p class="weather-hover__loading">Laddar väder…</p></div>`;
   }
 
-  const gustRow = props.gust ? `<tr><td>Vindbyar</td><td>${props.gust} m/s</td></tr>` : "";
+  const gustRow =
+    props.gust != null
+      ? `<tr><td>Vindbyar</td><td>${props.gust} m/s</td></tr>`
+      : "";
 
   return `
     <div class="weather-hover">
@@ -41,7 +44,7 @@ const buildHoverHtml = (props) => {
         <tr><td>Vind</td><td>${props.windSpeed ?? "?"} m/s ${props.windDirText}</td></tr>
         ${gustRow}
         <tr><td>Luftfuktighet</td><td>${props.humidity ?? "?"}%</td></tr>
-        <tr><td>Lufttryck</td><td>${props.pressure ? Math.round(props.pressure) + " hPa" : "?"}</td></tr>
+        <tr><td>Lufttryck</td><td>${props.pressure != null ? Math.round(props.pressure) + " hPa" : "?"}</td></tr>
       </table>
     </div>`;
 };
@@ -65,6 +68,10 @@ export const createCityWeatherLayer = ({
   let currentCities = [];
   let smoothUpdateToken = 0;
   let weatherVisibleRecorded = false;
+  let bootstrapAbortController = null;
+  let refreshAbortController = null;
+  let hoveredCityId = null;
+  let isHoverPopupOpen = false;
 
   const recordWeatherVisible = (cached) => {
     if (weatherVisibleRecorded) {
@@ -126,16 +133,39 @@ export const createCityWeatherLayer = ({
     offset: 20
   });
 
+  const updateHoverPopup = (feature) => {
+    if (!feature) {
+      return;
+    }
+
+    hoverPopup
+      .setLngLat(feature.geometry.coordinates)
+      .setHTML(buildHoverHtml(feature.properties))
+      .addTo(map);
+    isHoverPopupOpen = true;
+  };
+
+  const refreshHoverPopupIfNeeded = () => {
+    if (!isHoverPopupOpen || hoveredCityId == null) {
+      return;
+    }
+
+    const idx = cityIdToFeatureIndex.get(hoveredCityId);
+    const feature = idx != null ? geojson.features[idx] : null;
+    if (feature) {
+      updateHoverPopup(feature);
+    }
+  };
+
   const onMouseEnter = (event) => {
     map.getCanvas().style.cursor = "pointer";
     const feature = event.features?.[0];
     if (!feature) {
       return;
     }
-    hoverPopup
-      .setLngLat(feature.geometry.coordinates)
-      .setHTML(buildHoverHtml(feature.properties))
-      .addTo(map);
+
+    hoveredCityId = feature.properties.cityId;
+    updateHoverPopup(feature);
   };
 
   const onMouseLeave = (event) => {
@@ -147,6 +177,8 @@ export const createCityWeatherLayer = ({
     }
 
     map.getCanvas().style.cursor = "";
+    hoveredCityId = null;
+    isHoverPopupOpen = false;
     hoverPopup.remove();
   };
 
@@ -157,6 +189,7 @@ export const createCityWeatherLayer = ({
 
   const syncSource = () => {
     map.getSource(SOURCE_ID)?.setData(geojson);
+    refreshHoverPopupIfNeeded();
   };
 
   const applyCities = (cities) => {
@@ -229,18 +262,29 @@ export const createCityWeatherLayer = ({
   };
 
   const refreshWeather = async () => {
+    refreshAbortController?.abort();
+    refreshAbortController = new AbortController();
+    const { signal } = refreshAbortController;
+
     try {
-      const freshData = await fetchBootstrap({ onTiming, fetchFn });
+      const freshData = await fetchBootstrap({ onTiming, fetchFn, signal });
       if (!isDisposed) {
         applyBootstrapPayload(freshData, { smooth: true, cached: false });
         await saveBootstrapSnapshot(freshData);
       }
-    } catch {
-      /* ignore weather refresh failures */
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        return;
+      }
+      console.error("Weather refresh failed:", error);
     }
   };
 
   const bootstrap = async () => {
+    bootstrapAbortController?.abort();
+    bootstrapAbortController = new AbortController();
+    const { signal } = bootstrapAbortController;
+
     try {
       if (bootstrapPrefetch) {
         const data = await bootstrapPrefetch.fetchPromise;
@@ -259,6 +303,7 @@ export const createCityWeatherLayer = ({
       await fetchBootstrapWithSwr({
         fetchFn,
         onTiming,
+        signal,
         onCached: (cachedData) => {
           if (!isDisposed) {
             applyBootstrapPayload(cachedData, { smooth: false, cached: true });
@@ -271,9 +316,11 @@ export const createCityWeatherLayer = ({
         }
       });
       onBootstrapComplete?.();
-    } catch {
+    } catch (error) {
+      if (error?.name !== "AbortError") {
+        console.error("City weather bootstrap failed:", error);
+      }
       onBootstrapComplete?.();
-      /* ignore initial failures */
     }
 
     if (!isDisposed) {
@@ -285,10 +332,14 @@ export const createCityWeatherLayer = ({
 
   return () => {
     isDisposed = true;
+    bootstrapAbortController?.abort();
+    refreshAbortController?.abort();
     if (intervalId) {
       clearInterval(intervalId);
       intervalId = null;
     }
+    hoveredCityId = null;
+    isHoverPopupOpen = false;
     hoverPopup.remove();
     WEATHER_LAYER_IDS.forEach((layerId) => {
       map.off("mouseenter", layerId, onMouseEnter);

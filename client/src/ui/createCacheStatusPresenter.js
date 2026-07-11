@@ -6,6 +6,9 @@ export const createCacheStatusPresenter = () => {
     return () => undefined;
   }
 
+  cacheStatusElement.setAttribute("aria-live", "polite");
+  cacheStatusElement.setAttribute("aria-atomic", "true");
+
   return (message) => {
     cacheStatusElement.textContent = message;
   };

@@ -29,6 +29,10 @@ const createBadge = (rootElement, id) => {
 
 export const createMapStatusPresenter = ({ mapRootElement }) => {
   const statusLine = document.getElementById(STATUS_ELEMENT_ID);
+  if (statusLine) {
+    statusLine.setAttribute("aria-live", "polite");
+    statusLine.setAttribute("aria-atomic", "true");
+  }
   const lodBadge = createBadge(mapRootElement, LOD_BADGE_ID);
   const tileBadge = createBadge(mapRootElement, TILE_BADGE_ID);
 

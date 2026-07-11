@@ -1,3 +1,5 @@
+import { escapeHtml } from "../shared/escapeHtml.js";
+import { WEATHER_LAYER_IDS } from "../weather/createCityWeatherLayer.js";
 import { fetchWeatherAtPoint } from "../weather/smhiWeatherService.js";
 import { getWeatherSymbol, getWindDirection } from "../weather/weatherSymbols.js";
 import { getPlaceCategoryMeta, getPoiCategoryMeta } from "./poiCategories.js";
@@ -7,7 +9,6 @@ import {
   normalizePlace
 } from "./placeService.js";
 
-const WEATHER_LAYER_IDS = ["city-weather-circles", "city-weather-labels"];
 const NAVIGATE_FLY_DURATION_MS = 1400;
 const DEFAULT_NAVIGATE_ZOOM = 15;
 const NEARBY_POI_LIMIT = 8;
@@ -73,28 +74,29 @@ const buildNearbyHtml = (pois, activePlaceId) => {
     .map((poi) => {
       const meta = getPoiCategoryMeta(poi.category);
       const distance = formatDistance(poi.distanceKm);
+      const poiName = poi.name ?? "Plats";
       const ariaLabel = distance
-        ? `${poi.name}, ${meta.label}, ${distance}`
-        : `${poi.name}, ${meta.label}`;
+        ? `${poiName}, ${meta.label}, ${distance}`
+        : `${poiName}, ${meta.label}`;
       return `
         <li>
           <button
             type="button"
             class="place-card__poi-item"
-            data-poi-id="${poi.id}"
+            data-poi-id="${escapeHtml(poi.id)}"
             data-poi-lon="${poi.lon}"
             data-poi-lat="${poi.lat}"
-            data-poi-category="${poi.category}"
-            data-poi-name="${poi.name.replace(/"/g, "&quot;")}"
-            data-poi-address="${(poi.address ?? "").replace(/"/g, "&quot;")}"
-            aria-label="${ariaLabel.replace(/"/g, "&quot;")}"
+            data-poi-category="${escapeHtml(poi.category)}"
+            data-poi-name="${escapeHtml(poiName)}"
+            data-poi-address="${escapeHtml(poi.address ?? "")}"
+            aria-label="${escapeHtml(ariaLabel)}"
           >
             <span class="place-card__poi-icon" aria-hidden="true">${meta.icon}</span>
             <span>
-              <p class="place-card__poi-name">${poi.name}</p>
-              <p class="place-card__poi-meta">${meta.label}</p>
+              <p class="place-card__poi-name">${escapeHtml(poiName)}</p>
+              <p class="place-card__poi-meta">${escapeHtml(meta.label)}</p>
             </span>
-            <span class="place-card__poi-distance" aria-hidden="true">${distance}</span>
+            <span class="place-card__poi-distance" aria-hidden="true">${escapeHtml(distance)}</span>
           </button>
         </li>`;
     })
@@ -270,7 +272,7 @@ export const createPlaceCard = ({ map, mapConfig }) => {
         reverseLookup
           ? fetchReverseGeocode(place.lon, place.lat, { signal })
           : Promise.resolve(place),
-        fetchWeatherAtPoint(place.lon, place.lat).catch(() => null),
+        fetchWeatherAtPoint(place.lon, place.lat, { signal }).catch(() => null),
         fetchPoisNear(place.lon, place.lat, {
           radiusKm: NEARBY_POI_RADIUS_KM,
           limit: NEARBY_POI_LIMIT + 1,

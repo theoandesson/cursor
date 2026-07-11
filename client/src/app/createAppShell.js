@@ -4,7 +4,6 @@ import { createNavRevealController } from "../navigation/createNavRevealControll
 import { createTabBar } from "../navigation/createTabBar.js";
 import { createCitiesPanel } from "../panels/createCitiesPanel.js";
 import { createPanelHost } from "../panels/createPanelHost.js";
-import { fetchBootstrap } from "../api/bootstrapClient.js";
 import { extractBootstrapParts } from "../weather/applyCityWeather.js";
 
 const ROUTE_ORDER = [ROUTES.MAP, ROUTES.CITIES, ROUTES.PERF];
@@ -20,7 +19,11 @@ const buildWeatherMap = (cityWeather) => {
   return weatherMap;
 };
 
-export const createAppShell = ({ mapRootElement, perfTracker, fetchFn = fetch }) => {
+export const createAppShell = ({
+  mapRootElement,
+  perfTracker,
+  bootstrapPrefetch
+}) => {
   const panelHost = createPanelHost({ mapRootElement });
 
   // Stub placeholder stays in DOM; real content is injected lazily on first PERF visit
@@ -54,6 +57,7 @@ export const createAppShell = ({ mapRootElement, perfTracker, fetchFn = fetch })
 
   let citiesCache = [];
   let weatherCache = new Map();
+  let citiesDataGeneration = 0;
   let citiesPrefetchPromise = null;
 
   const prefetchCitiesData = () => {
@@ -61,15 +65,36 @@ export const createAppShell = ({ mapRootElement, perfTracker, fetchFn = fetch })
       return citiesPrefetchPromise;
     }
 
-    citiesPrefetchPromise = fetchBootstrap({ fetchFn })
+    const fetchPromise = bootstrapPrefetch?.fetchPromise;
+    if (!fetchPromise) {
+      return null;
+    }
+
+    const generation = ++citiesDataGeneration;
+    citiesPanel.updateCities(citiesCache, weatherCache, { loading: true, error: null });
+
+    citiesPrefetchPromise = fetchPromise
       .then((bootstrapData) => {
+        if (generation !== citiesDataGeneration || !bootstrapData) {
+          return;
+        }
+
         const { cities, weatherEntries } = extractBootstrapParts(bootstrapData);
         citiesCache = cities;
         weatherCache = buildWeatherMap(weatherEntries);
-        citiesPanel.updateCities(citiesCache, weatherCache);
+        citiesPanel.updateCities(citiesCache, weatherCache, {
+          loading: false,
+          error: null
+        });
       })
       .catch(() => {
-        citiesPrefetchPromise = null;
+        if (generation === citiesDataGeneration) {
+          citiesPrefetchPromise = null;
+          citiesPanel.updateCities([], new Map(), {
+            loading: false,
+            error: "Kunde inte hämta städer."
+          });
+        }
       });
 
     return citiesPrefetchPromise;
@@ -101,7 +126,9 @@ export const createAppShell = ({ mapRootElement, perfTracker, fetchFn = fetch })
     navReveal.syncWithRoute(route);
 
     if (route === ROUTES.PERF) {
-      ensurePerfPanel().then((panel) => panel.refresh());
+      ensurePerfPanel()
+        .then((panel) => panel.refresh())
+        .catch(() => undefined);
     }
 
     if (endPanelSwitch) {
@@ -149,15 +176,19 @@ export const createAppShell = ({ mapRootElement, perfTracker, fetchFn = fetch })
     navReveal,
     panelHost,
     setCitiesData: (cities, weatherMap) => {
+      citiesDataGeneration += 1;
       citiesCache = Array.isArray(cities) ? cities : [];
-      weatherCache =
-        weatherMap instanceof Map ? weatherMap : new Map(weatherMap ?? []);
-      citiesPanel.updateCities(citiesCache, weatherCache);
+      weatherCache = weatherMap instanceof Map ? weatherMap : new Map();
+      citiesPanel.updateCities(citiesCache, weatherCache, {
+        loading: false,
+        error: null
+      });
     },
     setPerfContent: () => {
       ensurePerfPanel();
     },
     destroy: () => {
+      citiesDataGeneration += 1;
       router.destroy();
       navReveal.destroy();
       tabBar.destroy();

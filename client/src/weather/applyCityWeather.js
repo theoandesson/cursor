@@ -35,7 +35,9 @@ export const createFeatureUpdater = (getWeatherSymbol, getWindDirection) => {
 
     feature.properties.icon = sym.icon;
     feature.properties.temp =
-      weather.temp != null ? `${Number(weather.temp).toFixed(1)}°C` : "?";
+      weather.temp != null && Number.isFinite(Number(weather.temp))
+        ? `${Number(weather.temp).toFixed(1)}°C`
+        : "?";
     feature.properties.label = sym.label;
     feature.properties.symbolLabel = sym.label;
     feature.properties.windSpeed = weather.windSpeed;

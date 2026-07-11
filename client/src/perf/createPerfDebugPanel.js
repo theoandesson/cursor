@@ -1,4 +1,5 @@
 import { checkBudgets } from "./perfBudgets.js";
+import { escapeHtml } from "../shared/escapeHtml.js";
 
 const formatMs = (value) => {
   if (value == null || Number.isNaN(value)) {
@@ -7,7 +8,12 @@ const formatMs = (value) => {
   return `${value.toFixed(1)} ms`;
 };
 
-const formatPercent = (value) => `${Math.round((value ?? 0) * 100)}%`;
+const formatPercent = (value) => {
+  if (value == null || Number.isNaN(value)) {
+    return "—";
+  }
+  return `${Math.round(value * 100)}%`;
+};
 
 const formatBytes = (bytes) => {
   if (bytes == null || !Number.isFinite(bytes)) {
@@ -150,7 +156,7 @@ export const createPerfDebugPanel = ({ perfTracker, container }) => {
       element.innerHTML = `
         <p class="perf-debug__card-label">${card.label}</p>
         <p class="perf-debug__card-value">${card.value}</p>
-        ${card.detail ? `<p class="perf-debug__card-detail">${card.detail}</p>` : ""}
+        ${card.detail ? `<p class="perf-debug__card-detail">${escapeHtml(card.detail)}</p>` : ""}
       `;
       summaryGrid.appendChild(element);
     });
@@ -177,7 +183,10 @@ export const createPerfDebugPanel = ({ perfTracker, container }) => {
       return;
     }
 
-    const start = timeline[0].time;
+    const starts = timeline.map((entry) =>
+      entry.durationMs != null ? entry.time - entry.durationMs : entry.time
+    );
+    const start = Math.min(...starts);
     const end = timeline[timeline.length - 1].time;
     const span = Math.max(end - start, 1);
 
@@ -197,7 +206,9 @@ export const createPerfDebugPanel = ({ perfTracker, container }) => {
 
       const bar = document.createElement("div");
       bar.className = `perf-debug__waterfall-bar perf-debug__waterfall-bar--${entry.type}`;
-      const offset = ((entry.time - start) / span) * 100;
+      const barStart =
+        entry.durationMs != null ? entry.time - entry.durationMs : entry.time;
+      const offset = ((barStart - start) / span) * 100;
       const width =
         entry.type === "api" || entry.type === "measure"
           ? Math.max(((entry.durationMs ?? 8) / span) * 100, 2)
@@ -225,7 +236,7 @@ export const createPerfDebugPanel = ({ perfTracker, container }) => {
       .forEach((entry) => {
         const row = document.createElement("tr");
         row.innerHTML = `
-          <td class="perf-debug__url" title="${entry.url}">${entry.url}</td>
+          <td class="perf-debug__url" title="${escapeHtml(entry.url)}">${escapeHtml(entry.url)}</td>
           <td class="${durationClass(entry.durationMs)}">${formatMs(entry.durationMs)}</td>
           <td>${entry.status || "—"}</td>
           <td>${entry.cacheStatus ?? "NETWORK"}</td>
@@ -291,6 +302,15 @@ export const createPerfDebugPanel = ({ perfTracker, container }) => {
   };
 
   const refresh = () => {
+    if (!perfTracker) {
+      summaryGrid.replaceChildren();
+      const message = document.createElement("p");
+      message.className = "perf-debug__muted";
+      message.textContent = "Ingen perfTracker tillgänglig.";
+      summaryGrid.appendChild(message);
+      return;
+    }
+
     const summary = perfTracker.getSummary();
     const timeline = perfTracker.getTimeline();
     renderSummaryCards(summary, timeline);
@@ -302,6 +322,10 @@ export const createPerfDebugPanel = ({ perfTracker, container }) => {
   };
 
   const exportJson = () => {
+    if (!perfTracker) {
+      return;
+    }
+
     const blob = new Blob([perfTracker.exportJson()], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -312,6 +336,10 @@ export const createPerfDebugPanel = ({ perfTracker, container }) => {
   };
 
   const resetAll = async () => {
+    if (!perfTracker) {
+      return;
+    }
+
     perfTracker.reset();
     try {
       await fetch("/api/perf/reset", { method: "POST" });
@@ -346,7 +374,12 @@ export const createPerfDebugPanel = ({ perfTracker, container }) => {
     refresh();
   });
   exportButton.addEventListener("click", exportJson);
-  resetButton.addEventListener("click", resetAll);
+  resetButton.addEventListener("click", () => {
+    if (!window.confirm("Återställ alla prestandamätvärden?")) {
+      return;
+    }
+    resetAll();
+  });
 
   const visibilityObserver = new IntersectionObserver(
     (entries) => {
