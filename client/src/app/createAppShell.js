@@ -1,5 +1,6 @@
 import { createAppRouter } from "../navigation/createAppRouter.js";
 import { ROUTES, parseHash } from "../navigation/routes.js";
+import { createNavRevealController } from "../navigation/createNavRevealController.js";
 import { createTabBar } from "../navigation/createTabBar.js";
 import { createCitiesPanel } from "../panels/createCitiesPanel.js";
 import { createPanelHost } from "../panels/createPanelHost.js";
@@ -70,6 +71,7 @@ export const createAppShell = ({ mapRootElement, perfTracker, fetchFn = fetch })
 
     panelHost.showPanel(route);
     tabBar.setActive(route);
+    navReveal.syncWithRoute(route);
 
     if (route === ROUTES.PERF) {
       perfPanel.refresh();
@@ -82,8 +84,16 @@ export const createAppShell = ({ mapRootElement, perfTracker, fetchFn = fetch })
     }
   };
 
+  const shellElement = document.getElementById("app-shell");
+  const topBarElement = document.getElementById("top-bar");
   const navContainer =
-    document.getElementById("app-nav") ?? document.getElementById("top-bar");
+    document.getElementById("app-nav") ?? topBarElement;
+
+  const navReveal = createNavRevealController({
+    shellElement,
+    topBarElement,
+    getRoute: () => router?.getCurrentRoute?.() ?? parseHash()
+  });
 
   const tabBar = createTabBar({
     container: navContainer,
@@ -106,6 +116,7 @@ export const createAppShell = ({ mapRootElement, perfTracker, fetchFn = fetch })
   return {
     router,
     tabBar,
+    navReveal,
     panelHost,
     perfPanel,
     setCitiesData: (cities, weatherMap) => {
@@ -119,6 +130,7 @@ export const createAppShell = ({ mapRootElement, perfTracker, fetchFn = fetch })
     },
     destroy: () => {
       router.destroy();
+      navReveal.destroy();
       tabBar.destroy();
       citiesPanel.destroy();
       perfPanel.destroy();
