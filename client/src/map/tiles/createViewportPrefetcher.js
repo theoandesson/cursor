@@ -39,7 +39,10 @@ class PriorityQueue {
       if (priority < existing.priority) {
         existing.priority = priority;
         this.bubbleUp(existingIndex);
-        this.bubbleDown(existingIndex);
+        const currentIndex = this.keys.get(key);
+        if (currentIndex != null) {
+          this.bubbleDown(currentIndex);
+        }
       }
       return;
     }
@@ -216,7 +219,6 @@ export const createViewportPrefetcher = (map, userOptions = {}) => {
   let previousZoom = map.getZoom();
   let idleTimer = null;
   let disposed = false;
-  let draining = false;
   let abortController = new AbortController();
 
   const minZoom = Math.min(VECTOR_TILE_SOURCE.minzoom, DEM_TILE_SOURCE.minzoom);
@@ -251,27 +253,19 @@ export const createViewportPrefetcher = (map, userOptions = {}) => {
     }
   };
 
-  const drainQueue = async () => {
-    if (draining || disposed) {
+  const drainQueue = () => {
+    if (disposed) {
       return;
     }
 
-    draining = true;
-    try {
-      while (!disposed && queue.size > 0 && inflight.size < options.maxConcurrent) {
-        const entry = queue.dequeue();
-        if (!entry) {
-          break;
-        }
+    while (queue.size > 0 && inflight.size < options.maxConcurrent) {
+      const entry = queue.dequeue();
+      if (!entry) {
+        break;
+      }
 
-        const work = tileTemplates.map((template) => prefetchTile(entry.tile, template));
-        await Promise.allSettled(work);
-      }
-    } finally {
-      draining = false;
-      if (!disposed && queue.size > 0 && inflight.size < options.maxConcurrent) {
-        drainQueue();
-      }
+      const work = tileTemplates.map((template) => prefetchTile(entry.tile, template));
+      Promise.allSettled(work).then(() => drainQueue());
     }
   };
 
