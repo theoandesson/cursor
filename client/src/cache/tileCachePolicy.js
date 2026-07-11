@@ -1,5 +1,9 @@
-export const TILE_CACHE_PREFIX = "sweden-map-tiles";
+export const TILE_CACHE_PREFIX = "sweden-map-tiles-v2";
 export const TILE_CACHE_RETENTION_VERSIONS = 2;
+export const SELF_HOSTED_TILE_PATH_PREFIXES = Object.freeze([
+  "/tiles/vector/",
+  "/tiles/dem/"
+]);
 
 const OPEN_FREE_MAP_HOST = "tiles.openfreemap.org";
 const TERRAIN_HOST = "s3.amazonaws.com";
@@ -8,8 +12,9 @@ const ESRI_HOST = "server.arcgisonline.com";
 const isProxiedTileRequest = (url) =>
   url.pathname.startsWith("/api/tiles/proxy") && url.searchParams.has("url");
 
-const isSelfHostedVectorTile = (url, origin) =>
-  url.origin === origin && url.pathname.startsWith("/tiles/vector/");
+const isSelfHostedTile = (url, origin) =>
+  url.origin === origin &&
+  SELF_HOSTED_TILE_PATH_PREFIXES.some((prefix) => url.pathname.startsWith(prefix));
 
 export const getDailyCacheVersion = (date = new Date()) =>
   date.toISOString().slice(0, 10);
@@ -18,7 +23,8 @@ export const buildTileCacheName = (date = new Date()) =>
   `${TILE_CACHE_PREFIX}-${getDailyCacheVersion(date)}`;
 
 export const extractVersionFromCacheName = (cacheName) =>
-  cacheName.startsWith(`${TILE_CACHE_PREFIX}-`)
+  cacheName.startsWith(`${TILE_CACHE_PREFIX}-`) &&
+  /^\d{4}-\d{2}-\d{2}$/.test(cacheName.slice(`${TILE_CACHE_PREFIX}-`.length))
     ? cacheName.slice(`${TILE_CACHE_PREFIX}-`.length)
     : null;
 
@@ -41,12 +47,15 @@ export const isTileCacheableRequest = (request) => {
 
   try {
     const url = new URL(request.url);
+    if (isSelfHostedTile(url, url.origin)) {
+      return true;
+    }
+
     return (
       isOpenFreeMapTile(url) ||
       isTerrainTile(url) ||
       isEsriImageryTile(url) ||
-      isProxiedTileRequest(url) ||
-      isSelfHostedVectorTile(url, url.origin)
+      isProxiedTileRequest(url)
     );
   } catch {
     return false;

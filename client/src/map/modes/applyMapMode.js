@@ -1,5 +1,9 @@
 import { createSwedenStyle } from "../style/createSwedenStyle.js";
 import {
+  getActiveVectorTileTemplate,
+  isSelfHostedTileMode
+} from "../tiles/swedenTileSources.js";
+import {
   createHybridStyle,
   createSatelliteStyle
 } from "./createSatelliteStyle.js";
@@ -71,9 +75,27 @@ const restoreCamera = (map, camera) => {
   });
 };
 
-const getStyleForMode = (mode) => {
+const applyActiveVectorTemplate = (style, { useSelfHostedVector } = {}) => {
+  const vectorSource = style?.sources?.sweden_vector;
+  if (!vectorSource) {
+    return style;
+  }
+
+  return {
+    ...style,
+    sources: {
+      ...style.sources,
+      sweden_vector: {
+        ...vectorSource,
+        tiles: [getActiveVectorTileTemplate({ useSelfHostedVector })]
+      }
+    }
+  };
+};
+
+const getStyleForMode = (mode, { useSelfHostedVector } = {}) => {
   const buildStyle = STYLE_BUILDERS[mode] ?? STYLE_BUILDERS[MAP_MODES.STANDARD];
-  return buildStyle();
+  return applyActiveVectorTemplate(buildStyle(), { useSelfHostedVector });
 };
 
 let activeStyleSwitchId = 0;
@@ -87,8 +109,9 @@ export const applyMapMode = ({
 }) => {
   const nextMode = STYLE_BUILDERS[mode] ? mode : MAP_MODES.STANDARD;
   const switchId = ++activeStyleSwitchId;
+  const useSelfHostedVector = isSelfHostedTileMode();
   const camera = captureCamera(map);
-  const nextStyle = getStyleForMode(nextMode);
+  const nextStyle = getStyleForMode(nextMode, { useSelfHostedVector });
 
   onBeforeStyleChange?.();
 

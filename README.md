@@ -49,14 +49,9 @@ Gå in i projektmappen:
 cd cursor
 ```
 
-### 2. Hämta senaste versionen
+### 2. Hämta senaste versionen (main)
 
-`main`-branchen innehåller bara den initiala koden. **Alla förbättringar** (zoomning utan lagg, 70+ städer, orientering, väder-API) finns på branchen `cursor/applikationsstart-kommando-1944`:
-
-```bash
-git checkout cursor/applikationsstart-kommando-1944
-git pull origin cursor/applikationsstart-kommando-1944
-Se till att du har den senaste koden från `main`-branchen:
+Använd alltid `main` för aktuell och stabil kod:
 
 ```bash
 git checkout main
@@ -111,8 +106,6 @@ LOD: låg detalj vid rörelse, hög detalj i idle.
 - **Zooma in/ut** – scrollhjul, `+`/`-` tangenter, dubbelklick, eller knapparna uppe till vänster
 - **Panorera** – klicka och dra med musen
 - **Rotera/luta/flytta** – använd knapparna `R-`/`R+` (rotation), `L-`/`L+` (lutning) och `N/V/O/S` (förflyttning)
-- **Zooma in/ut** – scrollhjul, `+`/`-` tangenter, dubbelklick, eller knapparna uppe till vänster
-- **Panorera** – klicka och dra med musen
 - **Navigeringspanel** – använd pilarna (förflyttning), `↺`/`↻` (rotation), `Tilt -`/`Tilt +` (lutning) och `⌂` (återställning)
 - **Inverterad styrning** – växla med knappen `Inverterad: På/Av` i navigeringspanelen
 - **Se väder** – markörer visas automatiskt för 70+ svenska städer
@@ -121,6 +114,81 @@ LOD: låg detalj vid rörelse, hög detalj i idle.
 ## Stoppa servern
 
 Tryck `Ctrl + C` i terminalen.
+
+## Ambitiöst läge (self-hosted tiles)
+
+Det här läget kör tile-flödet lokalt från `data/tiles` för bättre kontroll över latens, cache och drift.
+
+### 1. Synka tile-data till `data/tiles`
+
+Kör synk före start:
+
+```bash
+npm run tiles:sync
+```
+
+Målet är att fylla `data/tiles` med den lokala tile-strukturen som `/tiles/*`-endpoints läser från.
+
+### 2. Styr läge med miljövariabler
+
+Aktivera self-hosted tile-läge:
+
+```bash
+SELF_HOSTED_TILES=true npm start
+```
+
+Hybridläge med fallback till upstream vid saknade lokala tiles:
+
+```bash
+SELF_HOSTED_TILES=true TILE_FALLBACK_UPSTREAM=true npm start
+```
+
+Ren self-hosted utan upstream-fallback:
+
+```bash
+SELF_HOSTED_TILES=true TILE_FALLBACK_UPSTREAM=false npm start
+```
+
+### 3. Bygg produktionsbundle
+
+Skapa produktionsanpassad bundle:
+
+```bash
+npm run build
+```
+
+### Arkitektur: self-hosted tile-flöde
+
+```mermaid
+flowchart LR
+    U[Användare i webbläsare] --> M[MapLibre-klient]
+    M --> S[Viewport Tile Scheduler]
+    S --> P[Predictive Prefetcher]
+    P --> TV[/tiles/vector/:z/:x/:y.pbf/]
+    P --> TD[/tiles/dem/:z/:x/:y.png/]
+    TV --> D[(data/tiles)]
+    TD --> D
+    D --> R[Tiles-router i Node/Express]
+    R --> C[HTTP-cache + Service Worker-cache]
+    C --> M
+    R -->|saknad tile + TILE_FALLBACK_UPSTREAM=true| X[/api/tiles/proxy/]
+    X --> O[Upstream tile-leverantör]
+```
+
+## NPM-skript
+
+| Script | Syfte |
+|--------|-------|
+| `npm start` | Startar applikationen lokalt. |
+| `npm run build` | Bygger produktionsbundle för client/server-flödet. |
+| `npm run tiles:sync` | Synkar/uppdaterar lokala tiles till `data/tiles`. |
+| `npm run test:tiles` | Verifierar tile-infrastruktur, lokala tiles och fallback-regler. |
+| `npm run smoke` | Enkel end-to-end-kontroll av server och health-endpoint. |
+| `npm run test:unit` | Kör utvalda enhetstester. |
+| `npm run test:full` | Kör en större testsekvens för appflöden. |
+| `npm run test:benchmark` | Kör benchmark för API-prestanda. |
+
+Se även [docs/AMBITIOUS_TILE_INFRA.md](docs/AMBITIOUS_TILE_INFRA.md) för tekniska detaljer.
 
 ## Smoke-test
 

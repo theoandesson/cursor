@@ -3,6 +3,7 @@ import path from "node:path";
 import { compressionSetup } from "../middleware/compressionSetup.js";
 import { requestTiming } from "../middleware/requestTiming.js";
 import { createApiRouter } from "../routes/createApiRouter.js";
+import { createTilesRouter } from "../routes/tilesRouter.js";
 
 const ASSET_EXTENSION_PATTERN = /\.[a-z0-9]+$/i;
 
@@ -16,6 +17,7 @@ export const createApp = ({ staticDirectory }) => {
   });
 
   app.use("/api", requestTiming, createApiRouter());
+  app.use("/tiles", requestTiming, createTilesRouter());
 
   app.use(
     express.static(staticDirectory, {
@@ -25,6 +27,11 @@ export const createApp = ({ staticDirectory }) => {
       setHeaders(res, filePath) {
         if (filePath.endsWith("/sw.js")) {
           res.setHeader("Cache-Control", "no-cache");
+          return;
+        }
+
+        if (filePath.includes(`${path.sep}tiles${path.sep}`)) {
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
         }
       }
     })

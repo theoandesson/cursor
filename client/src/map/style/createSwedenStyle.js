@@ -1,5 +1,5 @@
 import { TERRAIN_CONFIG } from "../../config/swedenMapConfig.js";
-import { GLYPHS_URL } from "../tiles/swedenTileSources.js";
+import { getActiveGlyphsUrl } from "../tiles/swedenTileSources.js";
 import { createLayers } from "./createLayers.js";
 import { SWEDEN_MAP_PALETTE } from "./palette/swedenPalette.js";
 import { createSources } from "./createSources.js";
@@ -8,7 +8,7 @@ export const createSwedenStyle = ({ mode, includeTerrain = true } = {}) => {
   const style = {
     version: 8,
     name: "sweden-3d-perf-profile",
-    glyphs: GLYPHS_URL,
+    glyphs: getActiveGlyphsUrl(),
     sources: createSources({ mode }),
     layers: createLayers({ mode }),
     light: {

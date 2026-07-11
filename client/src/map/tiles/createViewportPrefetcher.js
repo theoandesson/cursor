@@ -17,6 +17,30 @@ const DEFAULT_OPTIONS = Object.freeze({
   deferInitialPrefetch: false
 });
 
+export const parseTileKey = (key) => {
+  if (typeof key !== "string") {
+    return null;
+  }
+
+  const segments = key.split("/");
+  if (segments.length !== 3) {
+    return null;
+  }
+
+  const [zRaw, xRaw, yRaw] = segments;
+  if (![zRaw, xRaw, yRaw].every((segment) => /^\d+$/.test(segment))) {
+    return null;
+  }
+  const z = Number.parseInt(zRaw, 10);
+  const x = Number.parseInt(xRaw, 10);
+  const y = Number.parseInt(yRaw, 10);
+  if (![z, x, y].every((value) => Number.isInteger(value) && value >= 0)) {
+    return null;
+  }
+
+  return { z, x, y };
+};
+
 class PriorityQueue {
   constructor() {
     this.items = [];
@@ -214,6 +238,7 @@ export const createViewportPrefetcher = (map, userOptions = {}) => {
   const queue = new PriorityQueue();
   const inflight = new Set();
   const fetched = new BoundedFetchCache(options.maxFetchedEntries);
+  const schedulerUpdateSubscribers = new Set();
   let tileTemplates = buildPrefetchTemplates(options);
 
   let previousCenter = map.getCenter();
@@ -268,6 +293,47 @@ export const createViewportPrefetcher = (map, userOptions = {}) => {
       const work = tileTemplates.map((template) => prefetchTile(entry.tile, template));
       Promise.allSettled(work).then(() => drainQueue());
     }
+  };
+
+  const applyPrioritizedTileKeys = (tileKeys, applyOptions = {}) => {
+    const { clearQueue = true, priorityOffset = 0 } = applyOptions;
+    if (disposed || !Array.isArray(tileKeys) || tileKeys.length === 0) {
+      return { enqueued: 0, skipped: 0 };
+    }
+
+    if (clearQueue) {
+      queue.clear();
+    }
+
+    let enqueued = 0;
+    let skipped = 0;
+
+    tileKeys.forEach((tileKey, index) => {
+      const tile = parseTileKey(tileKey);
+      if (!tile) {
+        skipped += 1;
+        return;
+      }
+      queue.enqueue(tile, priorityOffset + index);
+      enqueued += 1;
+    });
+
+    schedulerUpdateSubscribers.forEach((callback) => {
+      try {
+        callback({
+          tileKeys,
+          enqueued,
+          skipped,
+          clearQueue,
+          priorityOffset
+        });
+      } catch {
+        // Keep prefetch path resilient if a subscriber throws.
+      }
+    });
+
+    drainQueue();
+    return { enqueued, skipped };
   };
 
   const enqueueTilesForBounds = (bounds, priorityBase, zoomOverride = null) => {
@@ -388,6 +454,16 @@ export const createViewportPrefetcher = (map, userOptions = {}) => {
       }
       tileTemplates = nextTemplates;
     },
+    applyPrioritizedTileKeys,
+    onSchedulerUpdate: (callback) => {
+      if (typeof callback !== "function") {
+        return () => {};
+      }
+      schedulerUpdateSubscribers.add(callback);
+      return () => {
+        schedulerUpdateSubscribers.delete(callback);
+      };
+    },
     destroy: () => {
       disposed = true;
       if (idleTimer) {
@@ -404,6 +480,7 @@ export const createViewportPrefetcher = (map, userOptions = {}) => {
       queue.clear();
       inflight.clear();
       fetched.clear();
+      schedulerUpdateSubscribers.clear();
     },
     getStats: () => ({
       queued: queue.size,

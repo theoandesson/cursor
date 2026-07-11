@@ -1,4 +1,4 @@
-import { DEFAULT_SATELLITE_SOURCE } from "../tiles/swedenTileSources.js";
+import { getPrefetchableTileTemplatesForMode } from "../tiles/swedenTileSources.js";
 
 export const MAP_MODES = Object.freeze({
   STANDARD: "standard",
@@ -43,4 +43,6 @@ export const TERRAIN_MODE_CONFIG = Object.freeze({
   })
 });
 
-export const ESRI_WORLD_IMAGERY_TILES = Object.freeze([...DEFAULT_SATELLITE_SOURCE.tiles]);
+export const ESRI_WORLD_IMAGERY_TILES = Object.freeze(
+  getPrefetchableTileTemplatesForMode(MAP_MODES.SATELLITE)
+);
