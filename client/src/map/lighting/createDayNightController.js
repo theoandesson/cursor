@@ -104,9 +104,15 @@ const LAYER_PAINT_BINDINGS = [
 ];
 
 const applySkyPalette = (map, palette) => {
-  if (typeof map.setSky !== "function") {
+  if (typeof map.setSky !== "function" || !map.isStyleLoaded()) {
     return;
   }
+
+  const style = map.getStyle();
+  if (!style?.sky) {
+    return;
+  }
+
   map.setSky({
     "sky-color": palette.skyColor,
     "sky-horizon-blend": 0.42,
@@ -225,7 +231,9 @@ export const createDayNightController = ({ map, initialMode = "day", onModeChang
     }
   };
 
-  reapplyMode();
+  if (map.isStyleLoaded()) {
+    reapplyMode();
+  }
 
   return {
     control,
