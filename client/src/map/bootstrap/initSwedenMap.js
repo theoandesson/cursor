@@ -110,6 +110,7 @@ export const initSwedenMap = ({
   let trafficFlowLayer = null;
   let transitLayer = null;
   let trafficControl = null;
+  let trafficControlAdded = false;
   let dayNightController = null;
   let mapFeaturesMounted = false;
 
@@ -152,25 +153,38 @@ export const initSwedenMap = ({
   });
   map.addControl(dayNightController.control, "top-right");
 
-  trafficControl = createTrafficControl({
-    map,
-    onStateChange: (trafficState) => {
-      trafficFlowLayer?.setVisible(trafficState.trafficFlow);
-      transitLayer?.setVisible(trafficState.transit);
-      publishStatus({
-        trafficFlow: trafficState.trafficFlow,
-        transit: trafficState.transit,
-        roadLabels: trafficState.roadLabels,
-        trafficLegend: trafficState.legend,
-        message: trafficState.trafficFlow
-          ? "Trafikflöde visas på kartan."
-          : trafficState.transit
-            ? "Kollektivtrafik visas på kartan."
-            : latestLodStatus?.message ?? "Trafikflöde dolt."
-      });
+  const ensureTrafficControl = () => {
+    if (trafficControl) {
+      return trafficControl;
     }
-  });
-  map.addControl(trafficControl.control, "bottom-left");
+
+    trafficControl = createTrafficControl({
+      map,
+      dayNightController,
+      onStateChange: (trafficState) => {
+        trafficFlowLayer?.setVisible(trafficState.trafficFlow);
+        transitLayer?.setVisible(trafficState.transit);
+        publishStatus({
+          trafficFlow: trafficState.trafficFlow,
+          transit: trafficState.transit,
+          roadLabels: trafficState.roadLabels,
+          trafficLegend: trafficState.legend,
+          message: trafficState.trafficFlow
+            ? "Trafikflöde visas på kartan."
+            : trafficState.transit
+              ? "Kollektivtrafik visas på kartan."
+              : latestLodStatus?.message ?? "Trafikflöde dolt."
+        });
+      }
+    });
+
+    if (!trafficControlAdded) {
+      map.addControl(trafficControl.control, "bottom-left");
+      trafficControlAdded = true;
+    }
+
+    return trafficControl;
+  };
 
   const teardownMapFeatures = () => {
     if (!mapFeaturesMounted) {
@@ -231,11 +245,12 @@ export const initSwedenMap = ({
     disposeMapClick = () => map.off("click", onMapClick);
 
     dayNightController.setMode(dayNightController.getMode());
-    trafficControl.applyState();
+    const activeTrafficControl = ensureTrafficControl();
+    activeTrafficControl.applyState();
 
     disposeLandmarks = createLandmarkLayer({ map, maplibregl });
 
-    const trafficState = trafficControl.getState();
+    const trafficState = activeTrafficControl.getState();
 
     trafficFlowLayer = createTrafficFlowLayer({
       map,
