@@ -26,7 +26,7 @@ const createSatelliteSources = ({ includeVector = false } = {}) => ({
     ? {
         [VECTOR_TILE_SOURCE.id]: {
           type: VECTOR_TILE_SOURCE.type,
-          url: VECTOR_TILE_SOURCE.tileJsonUrl,
+          tiles: [VECTOR_TILE_SOURCE.tileUrlTemplate],
           bounds: SWEDEN_TILE_BOUNDS,
           minzoom: VECTOR_TILE_SOURCE.minzoom,
           maxzoom: VECTOR_TILE_SOURCE.maxzoom

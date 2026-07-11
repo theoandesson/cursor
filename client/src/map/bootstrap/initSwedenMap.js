@@ -5,20 +5,20 @@ import {
 } from "../../config/swedenMapConfig.js";
 import { createPlaceCard, shouldIgnoreMapPlaceClick } from "../../places/createPlaceCard.js";
 import { createSearchControl } from "../../search/createSearchControl.js";
-import { createTrafficFlowLayer } from "../../traffic/createTrafficFlowLayer.js";
 import { createCityWeatherLayer } from "../../weather/createCityWeatherLayer.js";
 import { createWeatherPopup } from "../../weather/createWeatherPopup.js";
 import { createDayNightController } from "../lighting/createDayNightController.js";
 import { createLandmarkLayer } from "../landmarks/createLandmarkLayer.js";
 import { createAdaptiveLodController } from "../lod/createAdaptiveLodController.js";
 import { createViewportTileScheduler } from "../lod/createViewportTileScheduler.js";
-import { createInitialLoadUxController } from "../loading/createInitialLoadUxController.js";
+import { createMapLoadingOrchestrator } from "../loading/createMapLoadingOrchestrator.js";
+import { enableDeferredTerrain } from "../loading/enableDeferredTerrain.js";
+import { createStagedFeatureMount } from "../loading/createStagedFeatureMount.js";
 import { createOrientationControl } from "../navigation/createOrientationControl.js";
 import { createMapModeControl } from "../modes/createMapModeControl.js";
 import { getMapModeLabel } from "../modes/applyMapMode.js";
 import { createViewportPrefetcher } from "../tiles/createViewportPrefetcher.js";
-import { createTrafficControl } from "../../traffic/createTrafficControl.js";
-import { createTransitLayer } from "../../traffic/createTransitLayer.js";
+import { getPrefetchableTileTemplatesForMode } from "../tiles/swedenTileSources.js";
 import { createSwedenStyle } from "../style/createSwedenStyle.js";
 
 const enableInteraction = (handler) => {
@@ -53,13 +53,15 @@ export const initSwedenMap = ({
   onTiming,
   fetchFn,
   onBootstrapComplete,
-  onCitiesUpdate
+  onCitiesUpdate,
+  bootstrapPrefetch
 }) => {
   perfTracker?.mark("map-construct-start");
 
   let latestLodStatus = null;
   let latestTileStatus = null;
   let mapIdleRecorded = false;
+  let currentMapMode = null;
 
   const publishStatus = (patch = {}) => {
     mergeStatusUpdate(onStatusChange, {
@@ -79,7 +81,7 @@ export const initSwedenMap = ({
 
   const map = new maplibregl.Map({
     container: mapContainer,
-    style: createSwedenStyle(),
+    style: createSwedenStyle({ includeTerrain: false }),
     center: SWEDEN_MAP_CONFIG.center,
     zoom: SWEDEN_MAP_CONFIG.zoom,
     minZoom: SWEDEN_MAP_CONFIG.minZoom,
@@ -120,10 +122,13 @@ export const initSwedenMap = ({
   let trafficControl = null;
   let trafficControlAdded = false;
   let dayNightController = null;
+  let disposeDeferredTerrain = null;
+  let cancelDeferredMount = null;
+  let mapCoreMounted = false;
   let mapFeaturesMounted = false;
 
   if (loadingOverlay) {
-    disposeLoadUx = createInitialLoadUxController({ map, loadingOverlay, perfTracker });
+    disposeLoadUx = createMapLoadingOrchestrator({ map, loadingOverlay, perfTracker });
   }
 
   map.addControl(
@@ -161,41 +166,13 @@ export const initSwedenMap = ({
   });
   map.addControl(dayNightController.control, "top-right");
 
-  const ensureTrafficControl = () => {
-    if (trafficControl) {
-      return trafficControl;
-    }
-
-    trafficControl = createTrafficControl({
-      map,
-      dayNightController,
-      onStateChange: (trafficState) => {
-        trafficFlowLayer?.setVisible(trafficState.trafficFlow);
-        transitLayer?.setVisible(trafficState.transit);
-        publishStatus({
-          trafficFlow: trafficState.trafficFlow,
-          transit: trafficState.transit,
-          roadLabels: trafficState.roadLabels,
-          trafficLegend: trafficState.legend,
-          message: trafficState.trafficFlow
-            ? "Trafikflöde visas på kartan."
-            : trafficState.transit
-              ? "Kollektivtrafik visas på kartan."
-              : latestLodStatus?.message ?? "Trafikflöde dolt."
-        });
-      }
-    });
-
-    if (!trafficControlAdded) {
-      map.addControl(trafficControl.control, "bottom-left");
-      trafficControlAdded = true;
-    }
-
-    return trafficControl;
-  };
-
   const teardownMapFeatures = () => {
-    if (!mapFeaturesMounted) {
+    cancelDeferredMount?.();
+    cancelDeferredMount = null;
+    disposeDeferredTerrain?.();
+    disposeDeferredTerrain = null;
+
+    if (!mapFeaturesMounted && !mapCoreMounted) {
       return;
     }
 
@@ -220,25 +197,77 @@ export const initSwedenMap = ({
     disposeMapClick?.();
     disposeMapClick = null;
     mapFeaturesMounted = false;
+    mapCoreMounted = false;
   };
 
-  const mountMapFeatures = () => {
-    if (mapFeaturesMounted) {
+  const mountTrafficFeatures = async () => {
+    const [
+      { createTrafficFlowLayer },
+      { createTrafficControl },
+      { createTransitLayer }
+    ] = await Promise.all([
+      import("../../traffic/createTrafficFlowLayer.js"),
+      import("../../traffic/createTrafficControl.js"),
+      import("../../traffic/createTransitLayer.js")
+    ]);
+
+    if (!mapCoreMounted) {
+      return;
+    }
+
+    if (!trafficControl) {
+      trafficControl = createTrafficControl({
+        map,
+        dayNightController,
+        onStateChange: (trafficState) => {
+          trafficFlowLayer?.setVisible(trafficState.trafficFlow);
+          transitLayer?.setVisible(trafficState.transit);
+          publishStatus({
+            trafficFlow: trafficState.trafficFlow,
+            transit: trafficState.transit,
+            roadLabels: trafficState.roadLabels,
+            trafficLegend: trafficState.legend,
+            message: trafficState.trafficFlow
+              ? "Trafikflöde visas på kartan."
+              : trafficState.transit
+                ? "Kollektivtrafik visas på kartan."
+                : latestLodStatus?.message ?? "Trafikflöde dolt."
+          });
+        }
+      });
+
+      if (!trafficControlAdded) {
+        map.addControl(trafficControl.control, "bottom-left");
+        trafficControlAdded = true;
+      }
+    }
+
+    const trafficState = trafficControl.getState();
+    trafficControl.applyState();
+
+    trafficFlowLayer = createTrafficFlowLayer({
+      map,
+      maplibregl,
+      initialVisible: trafficState.trafficFlow
+    });
+    disposeTrafficFlow = trafficFlowLayer.destroy;
+
+    transitLayer = createTransitLayer({
+      map,
+      maplibregl,
+      initialVisible: trafficState.transit
+    });
+    disposeTransitLayer = transitLayer.destroy;
+    trafficControl.setTransitLayer(transitLayer);
+  };
+
+  const mountCoreMapFeatures = () => {
+    if (mapCoreMounted) {
       return;
     }
 
     perfTracker?.recordMilestone("map-load");
     perfTracker?.measure("map-construct", "map-construct-start", "milestone:map-load");
-
-    disposeWeatherLayer = createCityWeatherLayer({
-      map,
-      maplibregl,
-      perfTracker,
-      onTiming,
-      fetchFn,
-      onBootstrapComplete,
-      onCitiesUpdate
-    });
 
     if (!placeCard) {
       placeCard = createPlaceCard({ map, mapConfig: SWEDEN_MAP_CONFIG });
@@ -266,55 +295,102 @@ export const initSwedenMap = ({
     disposeMapClick = () => map.off("click", onMapClick);
 
     dayNightController.setMode(dayNightController.getMode());
-    const activeTrafficControl = ensureTrafficControl();
-    activeTrafficControl.applyState();
+    disposeDeferredTerrain = enableDeferredTerrain(map);
+    mapCoreMounted = true;
+  };
 
-    disposeLandmarks = createLandmarkLayer({ map, maplibregl });
+  const scheduleDeferredMapFeatures = () => {
+    cancelDeferredMount?.();
 
-    const trafficState = activeTrafficControl.getState();
+    cancelDeferredMount = createStagedFeatureMount({
+      stages: [
+        {
+          name: "weather",
+          priority: 1,
+          mount: () => {
+            disposeWeatherLayer = createCityWeatherLayer({
+              map,
+              maplibregl,
+              perfTracker,
+              onTiming,
+              fetchFn,
+              onBootstrapComplete,
+              onCitiesUpdate,
+              bootstrapPrefetch
+            });
+          }
+        },
+        {
+          name: "lod-and-scheduler",
+          priority: 2,
+          mount: () => {
+            disposeLod = createAdaptiveLodController({
+              map,
+              lodConfig: LOD_CONFIG,
+              onStatusChange: (status) => {
+                latestLodStatus = status;
+                publishStatus(status);
+              }
+            });
 
-    trafficFlowLayer = createTrafficFlowLayer({
-      map,
-      maplibregl,
-      initialVisible: trafficState.trafficFlow
+            disposeTileScheduler = createViewportTileScheduler({
+              map,
+              onStatusChange: (status) => {
+                latestTileStatus = status;
+                publishStatus(status);
+              }
+            });
+          }
+        },
+        {
+          name: "landmarks-and-traffic",
+          priority: 3,
+          mount: () => {
+            disposeLandmarks = createLandmarkLayer({ map, maplibregl });
+            mountTrafficFeatures().catch((error) => {
+              console.warn("[initSwedenMap] Traffic features failed to mount", error);
+            });
+          }
+        },
+        {
+          name: "prefetcher",
+          priority: 4,
+          mount: () => {
+            disposePrefetcher = createViewportPrefetcher(map, {
+              deferInitialPrefetch: true,
+              tileTemplates: currentMapMode
+                ? getPrefetchableTileTemplatesForMode(currentMapMode)
+                : undefined
+            });
+            disposePrefetcher.start();
+          }
+        }
+      ]
     });
-    disposeTrafficFlow = trafficFlowLayer.destroy;
 
-    transitLayer = createTransitLayer({
-      map,
-      maplibregl,
-      initialVisible: trafficState.transit
-    });
-    disposeTransitLayer = transitLayer.destroy;
-    trafficControl.setTransitLayer(transitLayer);
-
-    disposeLod = createAdaptiveLodController({
-      map,
-      lodConfig: LOD_CONFIG,
-      onStatusChange: (status) => {
-        latestLodStatus = status;
-        publishStatus(status);
-      }
-    });
-
-    disposeTileScheduler = createViewportTileScheduler({
-      map,
-      onStatusChange: (status) => {
-        latestTileStatus = status;
-        publishStatus(status);
-      }
-    });
-
-    disposePrefetcher = createViewportPrefetcher(map);
     mapFeaturesMounted = true;
   };
 
   map.addControl(
     createMapModeControl({
       map,
-      onBeforeStyleChange: teardownMapFeatures,
-      onStyleLoaded: () => {
-        mountMapFeatures();
+      onBeforeStyleChange: () => {
+        if (loadingOverlay) {
+          loadingOverlay.show();
+          loadingOverlay.setMessage("Byter kartläge…");
+        }
+        teardownMapFeatures();
+      },
+      onStyleLoaded: (mode) => {
+        currentMapMode = mode;
+        disposePrefetcher?.setTileTemplates(getPrefetchableTileTemplatesForMode(mode));
+        mountCoreMapFeatures();
+        scheduleDeferredMapFeatures();
+        if (loadingOverlay) {
+          map.once("idle", () => {
+            loadingOverlay.hide();
+          });
+        }
       },
       onModeChange: (mode) => {
         publishStatus({
@@ -332,7 +408,10 @@ export const initSwedenMap = ({
   );
   map.addControl(new maplibregl.ScaleControl({ maxWidth: 180, unit: "metric" }), "bottom-left");
 
-  map.once("load", mountMapFeatures);
+  map.once("load", () => {
+    mountCoreMapFeatures();
+    scheduleDeferredMapFeatures();
+  });
 
   map.once("idle", () => {
     if (mapIdleRecorded) {

@@ -58,7 +58,8 @@
   transform-origin: left center;
   transform: scaleX(0.06);
   background: linear-gradient(90deg, var(--app-accent), #2da876);
-  transition: transform 0.18s ease-out;
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
 }
 
 .loading-overlay__progress {

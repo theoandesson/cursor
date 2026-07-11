@@ -1,7 +1,7 @@
 const CACHE_POLICIES = {
   "static-cities": "public, max-age=3600",
   weather: "public, max-age=300, stale-while-revalidate=60",
-  bootstrap: "public, max-age=60, stale-while-revalidate=30",
+  bootstrap: "public, max-age=300, stale-while-revalidate=60",
   perf: "no-cache"
 };
 

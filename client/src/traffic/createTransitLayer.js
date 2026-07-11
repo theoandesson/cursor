@@ -124,8 +124,13 @@ const buildStopPopupHtml = ({ name, type, lineIds }) => `
 
 export const createTransitLayer = ({ map, maplibregl, initialVisible = false } = {}) => {
   let isDisposed = false;
+  let dataLoaded = false;
 
   const setVisible = (visible) => {
+    if (visible && !dataLoaded) {
+      dataLoaded = true;
+      loadData();
+    }
     const visibility = visible ? "visible" : "none";
     for (const layerId of SWEDISH_TRANSIT_LAYER_IDS) {
       if (map.getLayer(layerId)) {
@@ -282,7 +287,6 @@ export const createTransitLayer = ({ map, maplibregl, initialVisible = false } =
     }
   };
 
-  loadData();
   setVisible(initialVisible);
 
   return {

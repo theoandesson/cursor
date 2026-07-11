@@ -19,7 +19,12 @@ export const createApp = ({ staticDirectory }) => {
     express.static(staticDirectory, {
       extensions: ["html"],
       index: "index.html",
-      maxAge: "5m"
+      maxAge: "1h",
+      setHeaders(res, filePath) {
+        if (filePath.endsWith("/sw.js")) {
+          res.setHeader("Cache-Control", "no-cache");
+        }
+      }
     })
   );
 
