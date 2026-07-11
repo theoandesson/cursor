@@ -1,7 +1,10 @@
+import { fetchWithTimeout } from "../lib/fetchWithTimeout.js";
+
 const SMHI_RADAR_BASE_URL =
   "https://opendata-download-radar.smhi.se/api/version/latest/area/sweden/product/comp";
 
 const RADAR_FRAME_KEY_PATTERN = /^radar_\d{10}$/;
+const FETCH_TIMEOUT_MS = 12_000;
 
 const pad2 = (value) => String(value).padStart(2, "0");
 
@@ -22,7 +25,7 @@ const parseFrameKeyDate = (frameKey) => {
 };
 
 const fetchJson = async (url) => {
-  const response = await fetch(url);
+  const response = await fetchWithTimeout(url, { timeoutMs: FETCH_TIMEOUT_MS });
   if (!response.ok) {
     throw new Error(`SMHI Radar API ${response.status}: ${response.statusText}`);
   }
@@ -30,7 +33,7 @@ const fetchJson = async (url) => {
 };
 
 const fetchBinary = async (url) => {
-  const response = await fetch(url);
+  const response = await fetchWithTimeout(url, { timeoutMs: FETCH_TIMEOUT_MS });
   if (!response.ok) {
     throw new Error(`SMHI Radar API ${response.status}: ${response.statusText}`);
   }

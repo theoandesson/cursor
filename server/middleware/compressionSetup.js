@@ -2,6 +2,7 @@ import zlib from "node:zlib";
 
 const MIN_COMPRESS_BYTES = 1024;
 const COMPRESSIBLE_TYPES = /^(application\/json|text\/)/i;
+const SKIP_COMPRESSION_PATH = /^\/api\/(radar|tiles)\//;
 
 const shouldCompress = (body, contentType) => {
   if (!body || body.length < MIN_COMPRESS_BYTES) {
@@ -12,6 +13,11 @@ const shouldCompress = (body, contentType) => {
 };
 
 export const compressionSetup = (request, response, next) => {
+  if (SKIP_COMPRESSION_PATH.test(request.path)) {
+    next();
+    return;
+  }
+
   const acceptEncoding = request.headers["accept-encoding"] ?? "";
   if (!acceptEncoding.includes("gzip")) {
     next();

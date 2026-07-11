@@ -11,13 +11,11 @@ import {
 
 const FRAME_LIST_CACHE_TTL_MS = 60 * 1000;
 const LATEST_IMAGE_CACHE_TTL_MS = 30 * 1000;
+const MAX_IMAGE_CACHE_ENTRIES = 72;
 
-const frameListCache = {
-  expiresAt: 0,
-  payload: null
-};
-
+const frameListCacheByHours = new Map();
 const imageCache = new Map();
+const imageCacheOrder = [];
 
 const utcDateParts = (date) => ({
   year: date.getUTCFullYear(),
@@ -39,12 +37,19 @@ const uniqueDayKeys = (startDate, endDate) => {
   return [...keys];
 };
 
-const toProxyFrame = (frame) => ({
-  key: frame.key,
-  valid: new Date(parseRadarValidUtc(frame.valid)).toISOString(),
-  updated: frame.updated,
-  imageUrl: `/api/radar/frames/${frame.key}.png`
-});
+const toProxyFrame = (frame) => {
+  const validMs = parseRadarValidUtc(frame.valid);
+  if (!Number.isFinite(validMs)) {
+    return null;
+  }
+
+  return {
+    key: frame.key,
+    valid: new Date(validMs).toISOString(),
+    updated: frame.updated,
+    imageUrl: `/api/radar/frames/${frame.key}.png`
+  };
+};
 
 const fetchFramesForWindow = async ({ hours }) => {
   const now = Date.now();
@@ -54,21 +59,54 @@ const fetchFramesForWindow = async ({ hours }) => {
 
   for (const dayKey of dayKeys) {
     const [year, month, day] = dayKey.split("-");
-    const dayIndex = await fetchRadarDayIndex({ year, month, day });
+    try {
+      const dayIndex = await fetchRadarDayIndex({ year, month, day });
 
-    for (const frame of extractPngFramesFromDayIndex(dayIndex)) {
-      const validMs = parseRadarValidUtc(frame.valid);
-      if (validMs < cutoff) {
-        continue;
+      for (const frame of extractPngFramesFromDayIndex(dayIndex)) {
+        const validMs = parseRadarValidUtc(frame.valid);
+        if (!Number.isFinite(validMs) || validMs < cutoff) {
+          continue;
+        }
+
+        framesByKey.set(frame.key, frame);
       }
-
-      framesByKey.set(frame.key, frame);
+    } catch (error) {
+      console.warn(
+        `Kunde inte hämta radarindex för ${dayKey}:`,
+        error instanceof Error ? error.message : error
+      );
     }
   }
 
   return [...framesByKey.values()].sort(
     (left, right) => parseRadarValidUtc(left.valid) - parseRadarValidUtc(right.valid)
   );
+};
+
+const getFrameListCache = (hours) => frameListCacheByHours.get(hours) ?? null;
+
+const setFrameListCache = (hours, payload) => {
+  frameListCacheByHours.set(hours, {
+    expiresAt: Date.now() + FRAME_LIST_CACHE_TTL_MS,
+    payload
+  });
+};
+
+const touchImageCacheKey = (cacheKey) => {
+  const index = imageCacheOrder.indexOf(cacheKey);
+  if (index >= 0) {
+    imageCacheOrder.splice(index, 1);
+  }
+  imageCacheOrder.push(cacheKey);
+};
+
+const evictImageCacheIfNeeded = () => {
+  while (imageCacheOrder.length > MAX_IMAGE_CACHE_ENTRIES) {
+    const oldestKey = imageCacheOrder.shift();
+    if (oldestKey) {
+      imageCache.delete(oldestKey);
+    }
+  }
 };
 
 export const getRadarMetadataPayload = async () => {
@@ -94,21 +132,20 @@ export const listRadarFrames = async ({
   forceRefresh = false
 } = {}) => {
   const now = Date.now();
-  const canUseCache =
-    !forceRefresh && frameListCache.payload && frameListCache.expiresAt > now;
+  const cached = getFrameListCache(hours);
+  const canUseCache = !forceRefresh && cached && cached.expiresAt > now;
 
   if (!canUseCache) {
     const frames = await fetchFramesForWindow({ hours });
-    frameListCache.payload = {
+    setFrameListCache(hours, {
       product: "comp",
       hours,
       total: frames.length,
-      frames: frames.map(toProxyFrame)
-    };
-    frameListCache.expiresAt = now + FRAME_LIST_CACHE_TTL_MS;
+      frames: frames.map(toProxyFrame).filter(Boolean)
+    });
   }
 
-  const payload = frameListCache.payload;
+  const payload = getFrameListCache(hours).payload;
   const slicedFrames =
     limit == null
       ? payload.frames.slice(offset)
@@ -120,7 +157,7 @@ export const listRadarFrames = async ({
     offset,
     limit: limit ?? null,
     frames: slicedFrames,
-    cachedUntil: new Date(frameListCache.expiresAt).toISOString()
+    cachedUntil: new Date(getFrameListCache(hours).expiresAt).toISOString()
   };
 };
 
@@ -131,11 +168,22 @@ const getCachedImage = (cacheKey) => {
   }
 
   if (entry.expiresAt > Date.now()) {
+    touchImageCacheKey(cacheKey);
     return entry;
   }
 
   imageCache.delete(cacheKey);
+  const index = imageCacheOrder.indexOf(cacheKey);
+  if (index >= 0) {
+    imageCacheOrder.splice(index, 1);
+  }
   return null;
+};
+
+const setCachedImage = (cacheKey, entry) => {
+  imageCache.set(cacheKey, entry);
+  touchImageCacheKey(cacheKey);
+  evictImageCacheIfNeeded();
 };
 
 export const getRadarImage = async ({ frameKey, forceRefresh = false }) => {
@@ -171,6 +219,6 @@ export const getRadarImage = async ({ frameKey, forceRefresh = false }) => {
         : "public, max-age=21600, immutable"
   };
 
-  imageCache.set(cacheKey, entry);
+  setCachedImage(cacheKey, entry);
   return entry;
 };
