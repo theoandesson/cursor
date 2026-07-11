@@ -4,10 +4,7 @@ import { fetchWeatherByPoint } from "./smhiWeatherService.js";
 const CITY_WEATHER_CACHE_TTL_MS = 5 * 60 * 1000;
 const MAX_PARALLEL_FETCHES = 8;
 
-const cityWeatherCache = {
-  expiresAt: 0,
-  items: []
-};
+const cityWeatherCacheByHours = new Map();
 
 export const toCityDto = ({ id, name, lon, lat, county }) => ({
   id,
@@ -60,6 +57,8 @@ const withCityWeather = async (city, { forecastHours }) => {
   }
 };
 
+const getCacheEntry = (forecastHours) => cityWeatherCacheByHours.get(forecastHours) ?? null;
+
 export const listCities = ({ search, limit, offset } = {}) => {
   const normalizedSearch = (search ?? "").trim().toLowerCase();
 
@@ -89,6 +88,40 @@ export const listCities = ({ search, limit, offset } = {}) => {
 
 export const getCityById = (cityId) => SWEDISH_CITIES.find((city) => city.id === cityId) ?? null;
 
+export const isCacheWarm = (forecastHours = 24) => {
+  const entry = getCacheEntry(forecastHours);
+  return Boolean(entry && entry.expiresAt > Date.now() && entry.items.length > 0);
+};
+
+export const getCityWeatherCacheAge = (forecastHours = 24) => {
+  const entry = getCacheEntry(forecastHours);
+  if (!entry?.populatedAt) {
+    return null;
+  }
+
+  return Date.now() - entry.populatedAt;
+};
+
+export const getCityWeatherCacheStats = () => {
+  const now = Date.now();
+  const entries = [];
+
+  for (const [forecastHours, entry] of cityWeatherCacheByHours) {
+    entries.push({
+      forecastHours,
+      size: entry.items.length,
+      isWarm: entry.expiresAt > now && entry.items.length > 0,
+      cacheAge: entry.populatedAt ? now - entry.populatedAt : null,
+      expiresAt: new Date(entry.expiresAt).toISOString()
+    });
+  }
+
+  return {
+    entryCount: entries.length,
+    entries
+  };
+};
+
 export const getCityWeather = async ({
   forecastHours = 24,
   forceRefresh = false,
@@ -96,10 +129,12 @@ export const getCityWeather = async ({
   offset
 } = {}) => {
   const now = Date.now();
+  const cached = getCacheEntry(forecastHours);
   const canUseCache =
     !forceRefresh &&
-    cityWeatherCache.items.length > 0 &&
-    cityWeatherCache.expiresAt > now;
+    cached &&
+    cached.items.length > 0 &&
+    cached.expiresAt > now;
 
   if (!canUseCache) {
     const workers = SWEDISH_CITIES.map(
@@ -107,18 +142,22 @@ export const getCityWeather = async ({
     );
     const items = await runWithConcurrency(workers);
 
-    cityWeatherCache.items = items;
-    cityWeatherCache.expiresAt = now + CITY_WEATHER_CACHE_TTL_MS;
+    cityWeatherCacheByHours.set(forecastHours, {
+      items,
+      expiresAt: now + CITY_WEATHER_CACHE_TTL_MS,
+      populatedAt: now
+    });
   }
 
+  const cacheEntry = getCacheEntry(forecastHours);
   const safeOffset = Math.max(0, offset ?? 0);
-  const safeLimit = Math.max(1, limit ?? cityWeatherCache.items.length);
+  const safeLimit = Math.max(1, limit ?? cacheEntry.items.length);
 
   return {
-    total: cityWeatherCache.items.length,
+    total: cacheEntry.items.length,
     limit: safeLimit,
     offset: safeOffset,
-    cachedUntil: new Date(cityWeatherCache.expiresAt).toISOString(),
-    cities: cityWeatherCache.items.slice(safeOffset, safeOffset + safeLimit)
+    cachedUntil: new Date(cacheEntry.expiresAt).toISOString(),
+    cities: cacheEntry.items.slice(safeOffset, safeOffset + safeLimit)
   };
 };

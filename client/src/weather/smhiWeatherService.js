@@ -5,8 +5,8 @@ import {
 
 const API_BASE = "/api";
 
-const fetchJson = async (url, { signal } = {}) => {
-  const response = await fetch(url, { signal });
+const fetchJson = async (url, { signal, fetchFn = fetch } = {}) => {
+  const response = await fetchFn(url, { signal });
   if (!response.ok) {
     throw new Error(`API ${response.status}: ${response.statusText}`);
   }

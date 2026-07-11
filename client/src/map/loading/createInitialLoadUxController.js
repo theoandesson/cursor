@@ -1,10 +1,10 @@
 const TRACKED_SOURCE_IDS = ["sweden_vector", "sweden-dem"];
 
 const LOADING_STEPS = Object.freeze([
-  { threshold: 0.3, message: "Laddar markresurser…" },
-  { threshold: 0.6, message: "Laddar infrastruktur…" },
-  { threshold: 0.9, message: "Laddar byggnader…" },
-  { threshold: 1, message: "Optimerar visualisering…" }
+  { threshold: 0.3, message: "Laddar markresurser…", milestone: "load-stage-30" },
+  { threshold: 0.6, message: "Laddar infrastruktur…", milestone: "load-stage-60" },
+  { threshold: 0.9, message: "Laddar byggnader…", milestone: "load-stage-90" },
+  { threshold: 1, message: "Optimerar visualisering…", milestone: "load-stage-100" }
 ]);
 
 const getStepMessage = (progress) =>
@@ -21,11 +21,25 @@ const calculateSourceProgress = (map) => {
   return loaded / available.length;
 };
 
-export const createInitialLoadUxController = ({ map, loadingOverlay }) => {
+export const createInitialLoadUxController = ({ map, loadingOverlay, perfTracker }) => {
   let rafId = null;
   let done = false;
   let progress = 0.06;
   let hideTimeoutId = null;
+  const recordedStages = new Set();
+
+  const recordStageIfNeeded = (sourceProgress) => {
+    LOADING_STEPS.forEach((step) => {
+      if (sourceProgress <= step.threshold || recordedStages.has(step.milestone)) {
+        return;
+      }
+      recordedStages.add(step.milestone);
+      perfTracker?.recordMilestone(step.milestone, {
+        sourceProgress,
+        progress
+      });
+    });
+  };
 
   const update = () => {
     if (done) return;
@@ -35,6 +49,7 @@ export const createInitialLoadUxController = ({ map, loadingOverlay }) => {
     progress = Math.max(progress, Math.min(raw, 0.97));
     loadingOverlay.setProgress(progress);
     loadingOverlay.setMessage(getStepMessage(src));
+    recordStageIfNeeded(src);
   };
 
   const scheduleUpdate = () => {
@@ -50,7 +65,10 @@ export const createInitialLoadUxController = ({ map, loadingOverlay }) => {
     done = true;
     loadingOverlay.setProgress(1);
     loadingOverlay.setMessage("Klart - kartan är redo.");
-    hideTimeoutId = setTimeout(() => loadingOverlay.hide(), 280);
+    hideTimeoutId = setTimeout(() => {
+      loadingOverlay.hide();
+      perfTracker?.recordMilestone("map-overlay-hidden", { progress: 1 });
+    }, 280);
   };
 
   const events = ["load", "data", "sourcedata"];

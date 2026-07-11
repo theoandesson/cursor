@@ -4,7 +4,8 @@ import { createTabBar } from "../navigation/createTabBar.js";
 import { createCitiesPanel } from "../panels/createCitiesPanel.js";
 import { createPanelHost } from "../panels/createPanelHost.js";
 import { createPerfPanel } from "../panels/createPerfPanel.js";
-import { fetchCities, fetchCityWeather } from "../weather/smhiWeatherService.js";
+import { fetchBootstrap } from "../api/bootstrapClient.js";
+import { extractBootstrapParts } from "../weather/applyCityWeather.js";
 
 const ROUTE_ORDER = [ROUTES.MAP, ROUTES.CITIES, ROUTES.PERF];
 
@@ -19,7 +20,7 @@ const buildWeatherMap = (cityWeather) => {
   return weatherMap;
 };
 
-export const createAppShell = ({ mapRootElement, perfTracker }) => {
+export const createAppShell = ({ mapRootElement, perfTracker, fetchFn = fetch }) => {
   const panelHost = createPanelHost({ mapRootElement });
   const perfPanel = createPerfPanel({ perfTracker });
 
@@ -32,10 +33,11 @@ export const createAppShell = ({ mapRootElement, perfTracker }) => {
       return citiesPrefetchPromise;
     }
 
-    citiesPrefetchPromise = Promise.all([fetchCities(), fetchCityWeather()])
-      .then(([cities, cityWeather]) => {
+    citiesPrefetchPromise = fetchBootstrap({ fetchFn })
+      .then((bootstrapData) => {
+        const { cities, weatherEntries } = extractBootstrapParts(bootstrapData);
         citiesCache = cities;
-        weatherCache = buildWeatherMap(cityWeather);
+        weatherCache = buildWeatherMap(weatherEntries);
         citiesPanel.updateCities(citiesCache, weatherCache);
       })
       .catch(() => {

@@ -17,11 +17,11 @@ const emitTiming = (onTiming, phase, startedAt, cacheStatus = null) => {
   });
 };
 
-export const fetchBootstrap = async ({ signal, onTiming } = {}) => {
+export const fetchBootstrap = async ({ signal, onTiming, fetchFn = fetch } = {}) => {
   const startedAt = performance.now();
 
   try {
-    const response = await fetch(BOOTSTRAP_URL, { signal });
+    const response = await fetchFn(BOOTSTRAP_URL, { signal });
     emitTiming(onTiming, "network", startedAt, response.headers.get("x-cache-status"));
 
     if (!response.ok) {
@@ -41,7 +41,8 @@ export const fetchBootstrapWithSwr = async ({
   onCached,
   onFresh,
   onTiming,
-  signal
+  signal,
+  fetchFn = fetch
 } = {}) => {
   let fromCache = false;
   let fromNetwork = false;
@@ -57,7 +58,7 @@ export const fetchBootstrapWithSwr = async ({
 
   try {
     const networkStartedAt = performance.now();
-    const freshData = await fetchBootstrap({ signal, onTiming });
+    const freshData = await fetchBootstrap({ signal, onTiming, fetchFn });
     fromNetwork = true;
     emitTiming(onTiming, "apply-fresh", networkStartedAt);
 

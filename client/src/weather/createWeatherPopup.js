@@ -44,7 +44,7 @@ const buildForecastHtml = (forecast) => {
   return `<div class="weather-popup__forecast">${items}</div>`;
 };
 
-export const createWeatherPopup = ({ map, maplibregl }) => {
+export const createWeatherPopup = ({ map, maplibregl, perfTracker, fetchFn }) => {
   const popup = new maplibregl.Popup({
     closeButton: true,
     closeOnClick: true,
@@ -58,13 +58,18 @@ export const createWeatherPopup = ({ map, maplibregl }) => {
     if (abortController) abortController.abort();
     abortController = new AbortController();
 
+    const endPointWeather = perfTracker?.startSpan("point-weather");
+
     popup
       .setLngLat(lngLat)
       .setHTML(`<div class="weather-popup"><p class="weather-popup__loading">Hämtar väder…</p></div>`)
       .addTo(map);
 
     try {
-      const data = await fetchWeatherAtPoint(lngLat.lng, lngLat.lat);
+      const data = await fetchWeatherAtPoint(lngLat.lng, lngLat.lat, {
+        signal: abortController.signal,
+        fetchFn
+      });
       if (abortController.signal.aborted) return;
 
       if (!data.current) {
@@ -79,9 +84,16 @@ export const createWeatherPopup = ({ map, maplibregl }) => {
           ${buildForecastHtml(data.forecast)}
         </div>`;
       popup.setHTML(html);
+      perfTracker?.recordMilestone("point-weather", {
+        cached: false,
+        lon: lngLat.lng,
+        lat: lngLat.lat
+      });
     } catch (err) {
       if (abortController.signal.aborted) return;
       popup.setHTML(`<div class="weather-popup"><p class="weather-popup__error">Kunde inte hämta väder.</p></div>`);
+    } finally {
+      endPointWeather?.();
     }
   };
 

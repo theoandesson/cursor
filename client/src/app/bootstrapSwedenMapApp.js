@@ -1,12 +1,9 @@
-import { fetchBootstrapWithSwr } from "../api/bootstrapClient.js";
 import { registerTileCacheServiceWorker } from "../cache/registerTileCacheServiceWorker.js";
 import { initSwedenMap } from "../map/bootstrap/initSwedenMap.js";
-import { createPerfDebugPanel } from "../perf/createPerfDebugPanel.js";
 import { createFetchWithTiming } from "../perf/fetchWithTiming.js";
 import { createCacheStatusPresenter } from "../ui/createCacheStatusPresenter.js";
 import { createLoadingOverlayPresenter } from "../ui/createLoadingOverlayPresenter.js";
 import { createMapStatusPresenter } from "../ui/createMapStatusPresenter.js";
-import { extractBootstrapParts } from "../weather/applyCityWeather.js";
 import { createAppShell } from "./createAppShell.js";
 
 const MAP_ROOT_ID = "map-root";
@@ -50,11 +47,7 @@ export const bootstrapSwedenMapApp = ({ maplibregl, perfTracker }) => {
   const endBootstrapApi = perfTracker?.startSpan("api-bootstrap");
   const onTiming = createBootstrapOnTiming(perfTracker);
 
-  const appShell = createAppShell({
-    mapRootElement,
-    onBootstrapTiming: onTiming,
-    perfTracker
-  });
+  const appShell = createAppShell({ mapRootElement, perfTracker, fetchFn: fetchWithTiming });
   perfTracker?.recordMilestone("app-shell-ready");
 
   const setStatus = createMapStatusPresenter({ mapRootElement });
@@ -87,7 +80,10 @@ export const bootstrapSwedenMapApp = ({ maplibregl, perfTracker }) => {
     perfTracker,
     onTiming,
     fetchFn: fetchWithTiming,
-    onBootstrapComplete: () => endBootstrapApi?.()
+    onBootstrapComplete: () => endBootstrapApi?.(),
+    onCitiesUpdate: ({ cities, weatherEntries }) => {
+      appShell.setCitiesData(cities, buildWeatherMap(weatherEntries));
+    }
   });
 
   mapRootElement.addEventListener("city:select", (event) => {
@@ -103,24 +99,6 @@ export const bootstrapSwedenMapApp = ({ maplibregl, perfTracker }) => {
       duration: 1700,
       essential: true
     });
-  });
-
-  appShell.setPerfContent((mountTarget) =>
-    createPerfDebugPanel({ perfTracker, container: mountTarget })
-  );
-
-  fetchBootstrapWithSwr({
-    onTiming,
-    onCached: (cachedData) => {
-      const { cities, weatherEntries } = extractBootstrapParts(cachedData);
-      appShell.setCitiesData(cities, buildWeatherMap(weatherEntries));
-    },
-    onFresh: (freshData) => {
-      const { cities, weatherEntries } = extractBootstrapParts(freshData);
-      appShell.setCitiesData(cities, buildWeatherMap(weatherEntries));
-    }
-  }).catch(() => {
-    /* panelen visar tomt tillstånd vid fel */
   });
 
   perfTracker?.recordMilestone("shell-ready");

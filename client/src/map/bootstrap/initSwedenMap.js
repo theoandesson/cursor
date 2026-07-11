@@ -35,7 +35,10 @@ export const initSwedenMap = ({
   onStatusChange,
   loadingOverlay,
   perfTracker,
-  fetchFn
+  onTiming,
+  fetchFn,
+  onBootstrapComplete,
+  onCitiesUpdate
 }) => {
   perfTracker?.mark("map-construct-start");
 
@@ -90,7 +93,15 @@ export const initSwedenMap = ({
     perfTracker?.recordMilestone("map-load");
     perfTracker?.measure("map-construct", "map-construct-start", "milestone:map-load");
 
-    createCityWeatherLayer({ map, maplibregl, perfTracker, fetchFn });
+    createCityWeatherLayer({
+      map,
+      maplibregl,
+      perfTracker,
+      onTiming,
+      fetchFn,
+      onBootstrapComplete,
+      onCitiesUpdate
+    });
     createWeatherPopup({ map, maplibregl, perfTracker, fetchFn });
     createAdaptiveLodController({ map, lodConfig: LOD_CONFIG, onStatusChange });
   });

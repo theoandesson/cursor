@@ -46,13 +46,30 @@ const buildHoverHtml = (props) => {
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export const createCityWeatherLayer = ({ map, maplibregl, onTiming }) => {
+export const createCityWeatherLayer = ({
+  map,
+  maplibregl,
+  perfTracker,
+  onTiming,
+  fetchFn,
+  onBootstrapComplete,
+  onCitiesUpdate
+}) => {
   let geojson = buildGeoJsonFromCities([]);
   let intervalId = null;
   let isDisposed = false;
   let cityIdToFeatureIndex = new Map();
   let currentCities = [];
   let smoothUpdateToken = 0;
+  let weatherVisibleRecorded = false;
+
+  const recordWeatherVisible = (cached) => {
+    if (weatherVisibleRecorded) {
+      return;
+    }
+    weatherVisibleRecorded = true;
+    perfTracker?.recordMilestone("weather-visible", { cached: Boolean(cached) });
+  };
 
   const updateFeature = createFeatureUpdater(getWeatherSymbol, getWindDirection);
 
@@ -167,26 +184,38 @@ export const createCityWeatherLayer = ({ map, maplibregl, onTiming }) => {
     runBatches().catch(() => undefined);
   };
 
-  const applyBootstrapPayload = (bootstrapData, { smooth = false } = {}) => {
+  const notifyCitiesUpdate = (bootstrapData) => {
+    const { cities, weatherEntries } = extractBootstrapParts(bootstrapData);
+    if (!cities.length) {
+      return;
+    }
+    onCitiesUpdate?.({ cities, weatherEntries });
+  };
+
+  const applyBootstrapPayload = (bootstrapData, { smooth = false, cached = false } = {}) => {
     const { cities, weatherEntries } = extractBootstrapParts(bootstrapData);
     if (!cities.length) {
       return;
     }
 
+    notifyCitiesUpdate(bootstrapData);
+
     if (!currentCities.length || !haveSameCityIds(currentCities, cities)) {
       applyCities(cities);
       applyWeather(weatherEntries, { smooth: false });
+      recordWeatherVisible(cached);
       return;
     }
 
     applyWeather(weatherEntries, { smooth });
+    recordWeatherVisible(cached);
   };
 
   const refreshWeather = async () => {
     try {
-      const freshData = await fetchBootstrap({ onTiming });
+      const freshData = await fetchBootstrap({ onTiming, fetchFn });
       if (!isDisposed) {
-        applyBootstrapPayload(freshData, { smooth: true });
+        applyBootstrapPayload(freshData, { smooth: true, cached: false });
         await saveBootstrapSnapshot(freshData);
       }
     } catch {
@@ -197,19 +226,22 @@ export const createCityWeatherLayer = ({ map, maplibregl, onTiming }) => {
   const bootstrap = async () => {
     try {
       await fetchBootstrapWithSwr({
+        fetchFn,
         onTiming,
         onCached: (cachedData) => {
           if (!isDisposed) {
-            applyBootstrapPayload(cachedData, { smooth: false });
+            applyBootstrapPayload(cachedData, { smooth: false, cached: true });
           }
         },
         onFresh: (freshData) => {
           if (!isDisposed) {
-            applyBootstrapPayload(freshData, { smooth: true });
+            applyBootstrapPayload(freshData, { smooth: true, cached: false });
           }
         }
       });
+      onBootstrapComplete?.();
     } catch {
+      onBootstrapComplete?.();
       /* ignore initial failures */
     }
 
