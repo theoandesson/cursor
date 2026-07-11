@@ -332,6 +332,16 @@ export const initSwedenMap = ({
           name: "lod-and-scheduler",
           priority: 3,
           mount: () => {
+            if (!disposePrefetcher) {
+              disposePrefetcher = createViewportPrefetcher(map, {
+                deferInitialPrefetch: true,
+                tileTemplates: currentMapMode
+                  ? getPrefetchableTileTemplatesForMode(currentMapMode)
+                  : undefined
+              });
+              disposePrefetcher.start();
+            }
+
             disposeLod = createAdaptiveLodController({
               map,
               lodConfig: LOD_CONFIG,
@@ -346,6 +356,9 @@ export const initSwedenMap = ({
               onStatusChange: (status) => {
                 latestTileStatus = status;
                 publishStatus(status);
+              },
+              onSchedule: (prioritizedTiles) => {
+                disposePrefetcher?.applyPrioritizedTileKeys(prioritizedTiles);
               }
             });
           }
@@ -375,12 +388,17 @@ export const initSwedenMap = ({
           name: "prefetcher",
           priority: 5,
           mount: () => {
-            disposePrefetcher = createViewportPrefetcher(map, {
-              deferInitialPrefetch: true,
-              tileTemplates: currentMapMode
-                ? getPrefetchableTileTemplatesForMode(currentMapMode)
-                : undefined
-            });
+            if (!disposePrefetcher) {
+              disposePrefetcher = createViewportPrefetcher(map, {
+                deferInitialPrefetch: true,
+                tileTemplates: currentMapMode
+                  ? getPrefetchableTileTemplatesForMode(currentMapMode)
+                  : undefined
+              });
+            }
+            if (currentMapMode) {
+              disposePrefetcher.setTileTemplates(getPrefetchableTileTemplatesForMode(currentMapMode));
+            }
             disposePrefetcher.start();
           }
         }
