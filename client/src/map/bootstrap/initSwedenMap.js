@@ -25,6 +25,7 @@ import {
   getPrefetchableTileTemplatesForMode,
   isSelfHostedTileMode
 } from "../tiles/swedenTileSources.js";
+import { createLazyLayerController } from "../style/createLazyLayerMount.js";
 import { createSwedenStyle } from "../style/createSwedenStyle.js";
 
 const enableInteraction = (handler) => {
@@ -154,6 +155,8 @@ export const initSwedenMap = ({
   let dayNightController = null;
   let disposeOverlaySystem = null;
   let disposeDeferredTerrain = null;
+  let disposeLazyLayers = null;
+  let unsubscribeLazyLayerUpdates = null;
   let cancelDeferredMount = null;
   let mapCoreMounted = false;
   let mapFeaturesMounted = false;
@@ -202,6 +205,10 @@ export const initSwedenMap = ({
     cancelDeferredMount = null;
     disposeDeferredTerrain?.();
     disposeDeferredTerrain = null;
+    unsubscribeLazyLayerUpdates?.();
+    unsubscribeLazyLayerUpdates = null;
+    disposeLazyLayers?.();
+    disposeLazyLayers = null;
 
     if (!mapFeaturesMounted && !mapCoreMounted) {
       return;
@@ -332,6 +339,13 @@ export const initSwedenMap = ({
     disposeMapClick = () => map.off("click", onMapClick);
 
     dayNightController.setMode(dayNightController.getMode());
+    const lazyLayersByZoom = map.getStyle()?.metadata?.lazyLayersByZoom;
+    const lazyLayerController = createLazyLayerController(map, lazyLayersByZoom);
+    disposeLazyLayers = lazyLayerController.destroy;
+    unsubscribeLazyLayerUpdates = lazyLayerController.subscribe(() => {
+      dayNightController?.reapplyMode();
+      trafficControl?.applyState();
+    });
     disposeDeferredTerrain = enableDeferredTerrain(map);
     mapCoreMounted = true;
   };
