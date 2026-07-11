@@ -114,10 +114,56 @@ const fetchWithTimeout = async (fetchImpl, url, options = {}) => {
   }
 };
 
+const resolveTilesRootDirectory = (config = {}) =>
+  path.resolve(config.tilesDataDirectory ?? tileConfig.tilesDataDirectory ?? path.resolve("data", "tiles"));
+
+const hasAnyVectorTilesOnDisk = async (tilesRootDirectory) => {
+  const vectorRoot = path.resolve(tilesRootDirectory, "vector");
+  const directories = [vectorRoot];
+
+  while (directories.length > 0) {
+    const currentDirectory = directories.pop();
+    if (!currentDirectory) {
+      continue;
+    }
+
+    let entries;
+    try {
+      entries = await fs.readdir(currentDirectory, { withFileTypes: true });
+    } catch (error) {
+      if (
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
+        (error.code === "ENOENT" || error.code === "ENOTDIR")
+      ) {
+        continue;
+      }
+      throw error;
+    }
+
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        directories.push(path.join(currentDirectory, entry.name));
+        continue;
+      }
+
+      if (entry.isFile() && entry.name.endsWith(".pbf")) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+};
+
+export const getTilesReadyStatus = async (config = {}) => {
+  const rootDirectory = resolveTilesRootDirectory(config);
+  return hasAnyVectorTilesOnDisk(rootDirectory);
+};
+
 export const createSelfHostedTileService = (config = {}) => {
-  const rootDirectory = path.resolve(
-    config.tilesDataDirectory ?? tileConfig.tilesDataDirectory ?? path.resolve("data", "tiles")
-  );
+  const rootDirectory = resolveTilesRootDirectory(config);
   const bounds = config.bounds ?? tileConfig.SWEDEN_TILE_BOUNDS ?? DEFAULT_BOUNDS;
   const vectorLimits = config.vectorTileLimits ?? tileConfig.vectorTileLimits ?? DEFAULT_VECTOR_LIMITS;
   const demLimits = config.demTileLimits ?? tileConfig.demTileLimits ?? DEFAULT_DEM_LIMITS;
@@ -285,6 +331,7 @@ export const createSelfHostedTileService = (config = {}) => {
   return {
     getVectorTileJson,
     getDemTileJson,
+    getTilesReadyStatus: () => getTilesReadyStatus({ tilesDataDirectory: rootDirectory }),
     getVectorTile: (z, x, y) => getTileFromDisk("vector", z, x, y),
     getDemTile: (z, x, y) => getTileFromDisk("dem", z, x, y),
     fetchWithFallback
