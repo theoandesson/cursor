@@ -1,6 +1,6 @@
 import { createDebouncedAction } from "./createDebouncedAction.js";
 import { createVisualBuildingHeightExpression } from "../style/expressions/buildingExpressions.js";
-import { TRAFFIC_LABEL_LAYER_IDS } from "../../traffic/createTrafficPaletteBindings.js";
+import { ROAD_NAME_LABEL_LAYER_IDS } from "../../overlays/constants/styleLayerIds.js";
 
 const BUILDING_LAYER_ID = "sweden-buildings";
 const WEATHER_LABEL_LAYER_ID = "city-weather-labels";
@@ -45,7 +45,13 @@ const resolveZoomTierProfile = ({ tier, lodConfig, isMoving, closeRange }) => {
 
 const lerp = (from, to, amount) => from + (to - from) * amount;
 
-export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) => {
+export const createAdaptiveLodController = ({
+  map,
+  lodConfig,
+  onStatusChange,
+  isRoadLabelsEnabled = () => true,
+  onReady
+}) => {
   let currentProfile = null;
   let currentZoomTier = null;
   let currentCloseRange = null;
@@ -55,7 +61,7 @@ export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) 
   let weatherLabelsVisible = true;
   let roadLabelsVisible = true;
   const roadLabelVisibility = new Map(
-    TRAFFIC_LABEL_LAYER_IDS.map((layerId) => [layerId, true])
+    ROAD_NAME_LABEL_LAYER_IDS.map((layerId) => [layerId, true])
   );
   let currentBuildingOpacity = null;
   let currentBuildingHeightScale = null;
@@ -166,15 +172,30 @@ export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) 
     setLayerVisibility({ map, layerId: WEATHER_LABEL_LAYER_ID, visible });
   };
 
-  const setRoadLabelVisibility = (visible) => {
+  const setRoadLabelVisibility = (lodVisible) => {
+    const visible = lodVisible && isRoadLabelsEnabled();
     if (roadLabelsVisible === visible) {
       return;
     }
     roadLabelsVisible = visible;
-    for (const layerId of TRAFFIC_LABEL_LAYER_IDS) {
+    for (const layerId of ROAD_NAME_LABEL_LAYER_IDS) {
       roadLabelVisibility.set(layerId, visible);
       setLayerVisibility({ map, layerId, visible });
     }
+  };
+
+  const refreshRoadLabels = () => {
+    const zoom = map.getZoom();
+    const zoomTier = resolveZoomTier(zoom, lodConfig);
+    const closeRange = isCloseRange();
+    const isMoving = currentProfile === "moving";
+    const tierProfile = resolveZoomTierProfile({
+      tier: zoomTier,
+      lodConfig,
+      isMoving,
+      closeRange
+    });
+    setRoadLabelVisibility(!tierProfile.hideRoadLabels);
   };
 
   const resolveStatusMessage = ({ profileName, zoomTier, closeRange }) => {
@@ -261,6 +282,7 @@ export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) 
   map.on("zoom", queueProfileRefresh);
 
   applyProfile("settled");
+  onReady?.({ refreshRoadLabels });
 
   return () => {
     if (rafId != null) {
@@ -277,7 +299,7 @@ export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) 
     map.off("zoom", queueProfileRefresh);
     setWeatherLabelVisibility(true);
     setRoadLabelVisibility(true);
-    for (const layerId of TRAFFIC_LABEL_LAYER_IDS) {
+    for (const layerId of ROAD_NAME_LABEL_LAYER_IDS) {
       roadLabelVisibility.set(layerId, true);
     }
     setMapPixelRatio(defaultPixelRatio);

@@ -1,3 +1,10 @@
+import { escapeHtml } from "../shared/escapeHtml.js";
+import {
+  OVERLAY_SOURCE_IDS,
+  STYLE_LAYER_IDS,
+  TRANSIT_LAYER_IDS as OVERLAY_TRANSIT_LAYER_IDS
+} from "../overlays/constants/styleLayerIds.js";
+
 const API_BASE = "/api";
 
 const fetchJson = async (url, { signal } = {}) => {
@@ -83,30 +90,16 @@ const buildStopsGeoJson = (stops) => ({
   }))
 });
 
-const LINES_SOURCE_ID = "swedish-transit-lines-source";
-const STOPS_SOURCE_ID = "swedish-transit-stops-source";
-const LINE_CASING_LAYER_ID = "swedish-transit-lines-casing";
-const LINE_LAYER_ID = "swedish-transit-lines";
-const STOP_HALO_LAYER_ID = "swedish-transit-stops-halo";
-const STOP_LAYER_ID = "swedish-transit-stops";
-const STOP_LABEL_LAYER_ID = "swedish-transit-stops-labels";
+const LINES_SOURCE_ID = OVERLAY_SOURCE_IDS.TRANSIT_LINES;
+const STOPS_SOURCE_ID = OVERLAY_SOURCE_IDS.TRANSIT_STOPS;
+const LINE_CASING_LAYER_ID = STYLE_LAYER_IDS.TRANSIT_LINE_CASING;
+const LINE_LAYER_ID = STYLE_LAYER_IDS.TRANSIT_LINES;
+const STOP_HALO_LAYER_ID = STYLE_LAYER_IDS.TRANSIT_STOP_HALO;
+const STOP_LAYER_ID = STYLE_LAYER_IDS.TRANSIT_STOPS;
+const STOP_LABEL_LAYER_ID = STYLE_LAYER_IDS.TRANSIT_STOP_LABELS;
 const STOP_MIN_ZOOM = 11;
 
-export const SWEDISH_TRANSIT_LAYER_IDS = Object.freeze([
-  LINE_CASING_LAYER_ID,
-  LINE_LAYER_ID,
-  STOP_HALO_LAYER_ID,
-  STOP_LAYER_ID,
-  STOP_LABEL_LAYER_ID
-]);
-
-const escapeHtml = (value) =>
-  String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
+export const SWEDISH_TRANSIT_LAYER_IDS = OVERLAY_TRANSIT_LAYER_IDS;
 
 const TYPE_LABELS = {
   tunnelbana: "Tunnelbana",

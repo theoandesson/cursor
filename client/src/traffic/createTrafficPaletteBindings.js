@@ -1,5 +1,7 @@
-import { TRAFFIC_LAYER_IDS } from "./config/trafficLayerConfig.js";
-import { SWEDISH_TRANSIT_LAYER_IDS } from "./createTransitLayer.js";
+import {
+  TRAFFIC_FLOW_LAYER_IDS,
+  TRANSIT_LAYER_IDS
+} from "../overlays/constants/styleLayerIds.js";
 import {
   createBridgeCasingColorExpression,
   createOnewayArrowColorExpression,
@@ -9,19 +11,7 @@ import {
   createTunnelCasingColorExpression,
   createTunnelFillColorExpression
 } from "./roadExpressions.js";
-import { createTrafficFlowColorExpression } from "./expressions/roadExpressions.js";
-
-const TRAFFIC_FLOW_SEGMENT_LAYER_IDS = Object.freeze([
-  "traffic-flow-segment-casing",
-  "traffic-flow-segment-lines",
-  "traffic-flow-segment-animated"
-]);
-
-const RUNTIME_TRAFFIC_LAYER_IDS = Object.freeze({
-  flowCasing: TRAFFIC_FLOW_SEGMENT_LAYER_IDS[0],
-  transitRoutes: SWEDISH_TRANSIT_LAYER_IDS[1],
-  transitStops: SWEDISH_TRANSIT_LAYER_IDS[3]
-});
+import { createTrafficFlowColorExpression } from "./trafficFlowExpressions.js";
 
 const ROAD_LINE_COLOR_BINDINGS = [
   ["roads-tunnel-casing", createTunnelCasingColorExpression],
@@ -68,67 +58,45 @@ export const createTrafficPaletteBindings = () => [
   createTextColorBinding("hybrid-roads-oneway", "text-color", createOnewayArrowColorExpression),
   createTextColorBinding("hybrid-roads-oneway", "text-halo-color", createRoadCasingColorExpression),
   {
-    layerId: TRAFFIC_LAYER_IDS.trafficFlow,
+    layerId: TRAFFIC_FLOW_LAYER_IDS[2],
+    property: "line-color",
+    resolve: (palette) => palette.trafficFlowCasing
+  },
+  {
+    layerId: TRAFFIC_FLOW_LAYER_IDS[1],
     property: "line-color",
     resolve: (palette) => createTrafficFlowColorExpression(palette),
     useTrafficPalette: true
   },
   {
-    layerId: TRAFFIC_LAYER_IDS.trafficFlow,
-    property: "line-opacity",
-    resolve: (palette) => palette.trafficFlowOpacity,
-    useTrafficPalette: true
-  },
-  {
-    layerId: RUNTIME_TRAFFIC_LAYER_IDS.flowCasing,
-    property: "line-color",
-    resolve: (palette) => palette.trafficFlowCasing
-  },
-  {
-    layerId: RUNTIME_TRAFFIC_LAYER_IDS.transitRoutes,
+    layerId: TRANSIT_LAYER_IDS[1],
     property: "line-color",
     resolve: () => createTransitRouteColorExpression()
   },
   {
-    layerId: RUNTIME_TRAFFIC_LAYER_IDS.transitStops,
-    property: "circle-color",
-    resolve: (palette) => palette.transitStop
-  },
-  {
-    layerId: RUNTIME_TRAFFIC_LAYER_IDS.transitStops,
-    property: "circle-stroke-color",
-    resolve: (palette) => palette.transitStopStroke
-  },
-  {
-    layerId: TRAFFIC_FLOW_SEGMENT_LAYER_IDS[0],
+    layerId: TRANSIT_LAYER_IDS[0],
     property: "line-color",
     resolve: (palette) => palette.trafficFlowCasing
   },
   {
-    layerId: TRAFFIC_FLOW_SEGMENT_LAYER_IDS[1],
-    property: "line-color",
-    resolve: (palette) => createTrafficFlowColorExpression(palette),
-    useTrafficPalette: true
-  },
-  {
-    layerId: SWEDISH_TRANSIT_LAYER_IDS[0],
-    property: "line-color",
-    resolve: (palette) => palette.trafficFlowCasing
-  },
-  {
-    layerId: SWEDISH_TRANSIT_LAYER_IDS[4],
+    layerId: TRANSIT_LAYER_IDS[4],
     property: "text-color",
     resolve: (palette) => palette.roadLabel
   },
   {
-    layerId: SWEDISH_TRANSIT_LAYER_IDS[4],
+    layerId: TRANSIT_LAYER_IDS[4],
     property: "text-halo-color",
     resolve: (palette) => palette.roadLabelHalo
+  },
+  {
+    layerId: TRANSIT_LAYER_IDS[3],
+    property: "circle-color",
+    resolve: (palette) => palette.transitStop
+  },
+  {
+    layerId: TRANSIT_LAYER_IDS[3],
+    property: "circle-stroke-color",
+    resolve: (palette) => palette.transitStopStroke
   }
 ];
 
-export const TRAFFIC_LABEL_LAYER_IDS = Object.freeze([
-  "road-labels",
-  "hybrid-road-labels",
-  "swedish-transit-stops-labels"
-]);

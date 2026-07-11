@@ -146,14 +146,11 @@ export const initSwedenMap = ({
   let disposeMapClick = null;
   let disposeWeatherLayer = null;
   let disposeWeatherPopup = null;
-  let disposeTrafficFlow = null;
-  let disposeTransitLayer = null;
-  let trafficFlowLayer = null;
-  let transitLayer = null;
-  let trafficControl = null;
-  let trafficControlAdded = false;
   let dayNightController = null;
   let disposeOverlaySystem = null;
+  let overlayManager = null;
+  let unsubscribeOverlayStatus = null;
+  let refreshRoadLabels = null;
   let disposeDeferredTerrain = null;
   let disposeLazyLayers = null;
   let unsubscribeLazyLayerUpdates = null;
@@ -218,12 +215,10 @@ export const initSwedenMap = ({
     disposeWeatherLayer = null;
     disposeWeatherPopup?.();
     disposeWeatherPopup = null;
-    disposeTrafficFlow?.();
-    disposeTrafficFlow = null;
-    trafficFlowLayer = null;
-    disposeTransitLayer?.();
-    disposeTransitLayer = null;
-    transitLayer = null;
+    unsubscribeOverlayStatus?.();
+    unsubscribeOverlayStatus = null;
+    refreshRoadLabels = null;
+    overlayManager = null;
     disposePrefetcher?.destroy();
     disposePrefetcher = null;
     disposeTileScheduler?.();
@@ -240,69 +235,17 @@ export const initSwedenMap = ({
     mapCoreMounted = false;
   };
 
-  const mountTrafficFeatures = async () => {
-    const [
-      { createTrafficFlowLayer },
-      { createTrafficControl },
-      { createTransitLayer }
-    ] = await Promise.all([
-      import("../../traffic/createTrafficFlowLayer.js"),
-      import("../../traffic/createTrafficControl.js"),
-      import("../../traffic/createTransitLayer.js")
-    ]);
+  const resolveOverlayMessage = (overlays) => {
+    const trafficFlow = overlays.find((overlay) => overlay.id === "traffic-flow");
+    const transit = overlays.find((overlay) => overlay.id === "transit");
 
-    if (!mapCoreMounted) {
-      return;
+    if (trafficFlow?.visible) {
+      return "Trafikflöde visas på kartan.";
     }
-
-    if (!trafficControl) {
-      trafficControl = createTrafficControl({
-        map,
-        onStateChange: (trafficState) => {
-          trafficFlowLayer?.setVisible(trafficState.trafficFlow);
-          transitLayer?.setVisible(trafficState.transit);
-          publishStatus({
-            trafficFlow: trafficState.trafficFlow,
-            transit: trafficState.transit,
-            roadLabels: trafficState.roadLabels,
-            trafficLegend: trafficState.legend,
-            message: trafficState.trafficFlow
-              ? "Trafikflöde visas på kartan."
-              : trafficState.transit
-                ? "Kollektivtrafik visas på kartan."
-                : latestLodStatus?.message ?? "Trafikflöde dolt."
-          });
-        },
-        onLegendChange: (visible) => {
-          trafficFlowLayer?.setLegendVisible?.(visible);
-        }
-      });
-
-      if (!trafficControlAdded) {
-        map.addControl(trafficControl.control, "bottom-left");
-        trafficControlAdded = true;
-      }
+    if (transit?.visible) {
+      return "Kollektivtrafik visas på kartan.";
     }
-
-    const trafficState = trafficControl.getState();
-
-    trafficFlowLayer = createTrafficFlowLayer({
-      map,
-      maplibregl,
-      initialVisible: trafficState.trafficFlow,
-      legend: trafficControl.getLegend()
-    });
-    disposeTrafficFlow = trafficFlowLayer.destroy;
-    trafficFlowLayer.setLegendVisible(trafficState.legend);
-
-    transitLayer = createTransitLayer({
-      map,
-      maplibregl,
-      initialVisible: trafficState.transit
-    });
-    disposeTransitLayer = transitLayer.destroy;
-    trafficControl.setTransitLayer(transitLayer);
-    trafficControl.applyState();
+    return latestLodStatus?.message ?? "Kartlager uppdaterade.";
   };
 
   const mountCoreMapFeatures = () => {
@@ -372,6 +315,27 @@ export const initSwedenMap = ({
           }
         },
         {
+          name: "overlays",
+          priority: 2,
+          mount: () => {
+            const overlaySystem = createOverlaySystem({ map, maplibregl });
+            overlayManager = overlaySystem.overlayManager;
+            void overlaySystem.mount();
+            disposeOverlaySystem = () => {
+              void overlaySystem.dispose();
+            };
+            unsubscribeOverlayStatus = overlaySystem.onStatusChange(({ overlays }) => {
+              refreshRoadLabels?.();
+              publishStatus({
+                trafficFlow: overlays.find((overlay) => overlay.id === "traffic-flow")?.visible ?? false,
+                transit: overlays.find((overlay) => overlay.id === "transit")?.visible ?? false,
+                roadLabels: overlays.find((overlay) => overlay.id === "road-labels")?.visible ?? true,
+                message: resolveOverlayMessage(overlays)
+              });
+            });
+          }
+        },
+        {
           name: "lod-and-scheduler",
           priority: 3,
           mount: () => {
@@ -386,9 +350,16 @@ export const initSwedenMap = ({
             disposeLod = createAdaptiveLodController({
               map,
               lodConfig: LOD_CONFIG,
+              isRoadLabelsEnabled: () =>
+                overlayManager?.getState().overlays.find((overlay) => overlay.id === "road-labels")
+                  ?.visible ?? true,
               onStatusChange: (status) => {
                 latestLodStatus = status;
                 publishStatus(status);
+              },
+              onReady: ({ refreshRoadLabels: refreshLabels }) => {
+                refreshRoadLabels = refreshLabels;
+                refreshRoadLabels?.();
               }
             });
 
@@ -405,24 +376,10 @@ export const initSwedenMap = ({
           }
         },
         {
-          name: "overlays",
-          priority: 2,
-          mount: () => {
-            const overlaySystem = createOverlaySystem({ map });
-            void overlaySystem.mount();
-            disposeOverlaySystem = () => {
-              void overlaySystem.dispose();
-            };
-          }
-        },
-        {
-          name: "landmarks-and-traffic",
+          name: "landmarks",
           priority: 4,
           mount: () => {
             disposeLandmarks = createLandmarkLayer({ map, maplibregl });
-            mountTrafficFeatures().catch((error) => {
-              console.warn("[initSwedenMap] Traffic features failed to mount", error);
-            });
           }
         },
         {
@@ -499,8 +456,6 @@ export const initSwedenMap = ({
   const originalRemove = map.remove.bind(map);
   map.remove = () => {
     teardownMapFeatures();
-    trafficControl?.destroy();
-    trafficControl = null;
     disposeLoadUx?.();
     disposeLoadUx = null;
     placeCard?.destroy();

@@ -1,17 +1,10 @@
+import { escapeHtml } from "../../shared/escapeHtml.js";
 import { buildLandmarksGeoJson, SWEDISH_LANDMARKS } from "./swedishLandmarks.js";
 
 const SOURCE_ID = "swedish-landmarks-source";
 const HALO_LAYER_ID = "swedish-landmarks-halo";
 const MARKER_LAYER_ID = "swedish-landmarks-markers";
 const LABEL_LAYER_ID = "swedish-landmarks-labels";
-
-const escapeHtml = (value) =>
-  String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
 
 const buildPopupHtml = ({ name, city, description, icon }) => `
   <div class="landmark-popup">

@@ -1,4 +1,9 @@
-import { OVERLAY_SOURCE_IDS, STYLE_LAYER_IDS } from "../constants/styleLayerIds.js";
+import {
+  ROAD_NAME_LABEL_LAYER_IDS,
+  STYLE_LAYER_IDS,
+  TRAFFIC_FLOW_LAYER_IDS,
+  TRANSIT_LAYER_IDS
+} from "../constants/styleLayerIds.js";
 
 export const OVERLAY_CONTROL_TYPES = Object.freeze({
   TOGGLE: "toggle",
@@ -13,7 +18,7 @@ export const createOverlayDefinitions = () => [
     description: "SMHI regnradar med animation (senaste timmen).",
     controlType: OVERLAY_CONTROL_TYPES.RADAR,
     layerIds: [STYLE_LAYER_IDS.SMHI_RADAR],
-    sourceId: OVERLAY_SOURCE_IDS.SMHI_RADAR,
+    sourceId: "overlay-smhi-radar-source",
     beforeLayerId: STYLE_LAYER_IDS.BUILDINGS,
     opacityProperty: "raster-opacity",
     defaultVisible: false,
@@ -35,6 +40,58 @@ export const createOverlayDefinitions = () => [
     defaultVisible: true,
     defaultOpacity: 1,
     minOpacity: 0.15,
+    maxOpacity: 1
+  },
+  {
+    id: "traffic-flow",
+    label: "Trafikflöde",
+    section: "Trafik",
+    description: "Live trafikflöde med färgkodade vägsegment.",
+    controlType: OVERLAY_CONTROL_TYPES.TOGGLE,
+    layerIds: TRAFFIC_FLOW_LAYER_IDS,
+    opacityBindings: [
+      { layerId: STYLE_LAYER_IDS.TRAFFIC_FLOW_CASING, property: "line-opacity" },
+      { layerId: STYLE_LAYER_IDS.TRAFFIC_FLOW_LINES, property: "line-opacity" },
+      { layerId: STYLE_LAYER_IDS.TRAFFIC_FLOW_ANIMATED, property: "line-opacity" }
+    ],
+    defaultVisible: false,
+    defaultOpacity: 0.94,
+    minOpacity: 0.2,
+    maxOpacity: 1
+  },
+  {
+    id: "transit",
+    label: "Kollektivtrafik",
+    section: "Trafik",
+    description: "Linjer och hållplatser i Stockholm, Göteborg och Malmö.",
+    controlType: OVERLAY_CONTROL_TYPES.TOGGLE,
+    layerIds: TRANSIT_LAYER_IDS,
+    opacityBindings: [
+      { layerId: STYLE_LAYER_IDS.TRANSIT_LINE_CASING, property: "line-opacity" },
+      { layerId: STYLE_LAYER_IDS.TRANSIT_LINES, property: "line-opacity" },
+      { layerId: STYLE_LAYER_IDS.TRANSIT_STOP_HALO, property: "circle-opacity" },
+      { layerId: STYLE_LAYER_IDS.TRANSIT_STOPS, property: "circle-opacity" },
+      { layerId: STYLE_LAYER_IDS.TRANSIT_STOP_LABELS, property: "text-opacity" }
+    ],
+    defaultVisible: false,
+    defaultOpacity: 0.95,
+    minOpacity: 0.15,
+    maxOpacity: 1
+  },
+  {
+    id: "road-labels",
+    label: "Vägnamn",
+    section: "Trafik",
+    description: "Vägnamn längs större vägar (döljs automatiskt vid snabb panorering).",
+    controlType: OVERLAY_CONTROL_TYPES.TOGGLE,
+    layerIds: ROAD_NAME_LABEL_LAYER_IDS,
+    opacityBindings: [
+      { layerId: STYLE_LAYER_IDS.ROAD_LABELS, property: "text-opacity" },
+      { layerId: STYLE_LAYER_IDS.HYBRID_ROAD_LABELS, property: "text-opacity" }
+    ],
+    defaultVisible: true,
+    defaultOpacity: 1,
+    minOpacity: 0.2,
     maxOpacity: 1
   }
 ];

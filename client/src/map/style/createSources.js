@@ -12,9 +12,5 @@ export const createSources = ({ mode } = {}) => ({
   ...createSwedenTileSources({
     mode,
     useSelfHostedVector: SWEDEN_TILE_MODE === SELF_HOSTED_TILE_MODE
-  }),
-  traffic_flow: {
-    type: "geojson",
-    data: { type: "FeatureCollection", features: [] }
-  }
+  })
 });
