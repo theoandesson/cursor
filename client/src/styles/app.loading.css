@@ -1,7 +1,7 @@
 #loading-overlay {
   position: absolute;
   inset: 0;
-  z-index: 8;
+  z-index: var(--z-overlay);
   display: grid;
   place-items: center;
   padding: 1rem;
@@ -68,30 +68,4 @@
   text-transform: uppercase;
   color: var(--app-accent);
   justify-self: end;
-}
-
-#lod-badge {
-  position: absolute;
-  bottom: 16px;
-  left: 16px;
-  z-index: 5;
-  padding: 0.42rem 0.7rem;
-  border-radius: 999px;
-  font-size: 0.77rem;
-  font-weight: 650;
-  background: linear-gradient(180deg, #ffffffb0, #f0f5fac8);
-  border: 1px solid #b8cde058;
-  color: #3a5068;
-  box-shadow: 0 6px 16px -10px #1a2d4218;
-  transition: color 0.15s ease, border-color 0.15s ease;
-}
-
-#lod-badge[data-profile="moving"] {
-  color: var(--app-warning);
-  border-color: #e0a55088;
-}
-
-#lod-badge[data-profile="settled"] {
-  color: var(--app-success);
-  border-color: #60c6947c;
 }
