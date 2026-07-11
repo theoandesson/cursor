@@ -1,9 +1,9 @@
 import { createDebouncedAction } from "./createDebouncedAction.js";
 import { createVisualBuildingHeightExpression } from "../style/expressions/buildingExpressions.js";
+import { TRAFFIC_LABEL_LAYER_IDS } from "../../traffic/createTrafficPaletteBindings.js";
 
 const BUILDING_LAYER_ID = "sweden-buildings";
 const WEATHER_LABEL_LAYER_ID = "city-weather-labels";
-const ROAD_LABEL_LAYER_ID = "road-labels";
 
 const PAINT_TRANSITION = { duration: 320, delay: 0 };
 const INSTANT_TRANSITION = { duration: 0, delay: 0 };
@@ -54,6 +54,9 @@ export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) 
   let pixelRatio = null;
   let weatherLabelsVisible = true;
   let roadLabelsVisible = true;
+  const roadLabelVisibility = new Map(
+    TRAFFIC_LABEL_LAYER_IDS.map((layerId) => [layerId, true])
+  );
   let currentBuildingOpacity = null;
   let currentBuildingHeightScale = null;
   let animatedBuildingOpacity = null;
@@ -168,7 +171,10 @@ export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) 
       return;
     }
     roadLabelsVisible = visible;
-    setLayerVisibility({ map, layerId: ROAD_LABEL_LAYER_ID, visible });
+    for (const layerId of TRAFFIC_LABEL_LAYER_IDS) {
+      roadLabelVisibility.set(layerId, visible);
+      setLayerVisibility({ map, layerId, visible });
+    }
   };
 
   const resolveStatusMessage = ({ profileName, zoomTier, closeRange }) => {
@@ -271,6 +277,9 @@ export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) 
     map.off("zoom", queueProfileRefresh);
     setWeatherLabelVisibility(true);
     setRoadLabelVisibility(true);
+    for (const layerId of TRAFFIC_LABEL_LAYER_IDS) {
+      roadLabelVisibility.set(layerId, true);
+    }
     setMapPixelRatio(defaultPixelRatio);
     if (map.getLayer(BUILDING_LAYER_ID)) {
       setBuildingStyle({

@@ -11,6 +11,12 @@ import { GeocodeNotFoundError, reverseGeocode, searchPlaces } from "../services/
 import { POI_CATEGORY_BY_ID } from "../data/poiCategories.js";
 import { getPoiById, getPoisNearPoint, listPois, toPoiDto } from "../services/poiService.js";
 import { fetchWeatherByPoint } from "../services/smhiWeatherService.js";
+import { getStopsNearPoint, listLines, listStops, listTransit } from "../services/transitService.js";
+import {
+  getTrafficNearPoint,
+  listTrafficGeoJson,
+  listTrafficSegments
+} from "../services/trafficService.js";
 import { createTileProxyService } from "../services/tileProxyService.js";
 
 const tileProxy = createTileProxyService();
@@ -20,6 +26,12 @@ const MAX_FORECAST_HOURS = 48;
 const MAX_POI_RADIUS_KM = 100;
 const DEFAULT_POI_RADIUS_KM = 5;
 const DEFAULT_NEAR_POI_LIMIT = 20;
+const DEFAULT_NEAR_TRANSIT_LIMIT = 20;
+const MAX_TRANSIT_RADIUS_KM = 50;
+const DEFAULT_TRANSIT_RADIUS_KM = 2;
+const MAX_TRAFFIC_RADIUS_KM = 100;
+const DEFAULT_TRAFFIC_RADIUS_KM = 10;
+const DEFAULT_NEAR_TRAFFIC_LIMIT = 20;
 const MAX_SEARCH_LIMIT = 20;
 const DEFAULT_SEARCH_LIMIT = 8;
 const MAX_SEARCH_QUERY_LENGTH = 200;
@@ -92,6 +104,39 @@ const parseSwedenCoordinates = (request) => {
   return { lon, lat };
 };
 
+const parseSwedenBbox = (request) => {
+  const minLon = parseFloatInRange(request.query.minLon, {
+    min: SWEDEN_BOUNDS.minLon,
+    max: SWEDEN_BOUNDS.maxLon
+  });
+  const minLat = parseFloatInRange(request.query.minLat, {
+    min: SWEDEN_BOUNDS.minLat,
+    max: SWEDEN_BOUNDS.maxLat
+  });
+  const maxLon = parseFloatInRange(request.query.maxLon, {
+    min: SWEDEN_BOUNDS.minLon,
+    max: SWEDEN_BOUNDS.maxLon
+  });
+  const maxLat = parseFloatInRange(request.query.maxLat, {
+    min: SWEDEN_BOUNDS.minLat,
+    max: SWEDEN_BOUNDS.maxLat
+  });
+
+  if (minLon == null && minLat == null && maxLon == null && maxLat == null) {
+    return null;
+  }
+
+  if (minLon == null || minLat == null || maxLon == null || maxLat == null) {
+    return { invalid: true };
+  }
+
+  if (minLon >= maxLon || minLat >= maxLat) {
+    return { invalid: true };
+  }
+
+  return { minLon, minLat, maxLon, maxLat };
+};
+
 export const createApiRouter = () => {
   const router = Router();
 
@@ -115,7 +160,22 @@ export const createApiRouter = () => {
         { method: "GET", path: "/api/search/reverse?lon=&lat=", description: "Omvänd geokodning för koordinater i Sverige" },
         { method: "GET", path: "/api/pois?search=&category=&limit=&offset=", description: "Lista POI (sökbar + pagination)" },
         { method: "GET", path: "/api/pois/near?lon=&lat=&radiusKm=5&limit=20", description: "POI nära en punkt" },
-        { method: "GET", path: "/api/pois/:poiId", description: "Hämta en POI via id" }
+        { method: "GET", path: "/api/pois/:poiId", description: "Hämta en POI via id" },
+        {
+          method: "GET",
+          path: "/api/traffic/segments?minLon=&minLat=&maxLon=&maxLat=&limit=",
+          description: "Lista trafiksegment inom bbox"
+        },
+        {
+          method: "GET",
+          path: "/api/traffic/near?lon=&lat=&radiusKm=10&limit=20",
+          description: "Trafiksegment nära en punkt"
+        },
+        { method: "GET", path: "/api/traffic?level=&minLon=&minLat=&maxLon=&maxLat=", description: "Trafikflöde som GeoJSON" },
+        { method: "GET", path: "/api/transit?mode=&minLon=&minLat=&maxLon=&maxLat=", description: "Kollektivtrafiklinjer och hållplatser som GeoJSON" },
+        { method: "GET", path: "/api/transit/lines?cityId=&type=&limit=&offset=", description: "Lista kollektivtrafiklinjer" },
+        { method: "GET", path: "/api/transit/stops?cityId=&type=&lineId=&search=&limit=&offset=", description: "Lista hållplatser/stationer" },
+        { method: "GET", path: "/api/transit/stops/near?lon=&lat=&radiusKm=2&limit=20", description: "Hållplatser nära en punkt" }
       ]
     });
   });
@@ -297,6 +357,137 @@ export const createApiRouter = () => {
     response.status(200).json(getPoisNearPoint({ lon, lat, radiusKm, limit }));
   });
 
+  router.get("/traffic/segments", (request, response) => {
+    const bbox = parseSwedenBbox(request);
+    if (bbox?.invalid) {
+      response.status(400).json({
+        error:
+          "Ogiltig bbox. Ange alla query-parametrar minLon, minLat, maxLon och maxLat inom Sveriges gränser."
+      });
+      return;
+    }
+
+    const limitResult = parseIntegerInRangeOrReject(request.query.limit, {
+      min: 1,
+      max: MAX_PAGE_SIZE
+    });
+    if (!limitResult.ok) {
+      response.status(400).json({
+        error: `Ogiltig limit. Ange ett heltal mellan 1 och ${MAX_PAGE_SIZE}.`
+      });
+      return;
+    }
+
+    response.status(200).json(
+      listTrafficSegments({
+        bbox,
+        limit: limitResult.value ?? undefined
+      })
+    );
+  });
+
+  router.get("/traffic/near", (request, response) => {
+    const { lon, lat } = parseSwedenCoordinates(request);
+    const radiusResult = parseFloatInRangeOrReject(request.query.radiusKm, {
+      min: 0.1,
+      max: MAX_TRAFFIC_RADIUS_KM
+    });
+    if (!radiusResult.ok) {
+      response.status(400).json({
+        error: `Ogiltig radiusKm. Ange ett värde mellan 0.1 och ${MAX_TRAFFIC_RADIUS_KM}.`
+      });
+      return;
+    }
+
+    const limitResult = parseIntegerInRangeOrReject(request.query.limit, {
+      min: 1,
+      max: MAX_PAGE_SIZE
+    });
+    if (!limitResult.ok) {
+      response.status(400).json({
+        error: `Ogiltig limit. Ange ett heltal mellan 1 och ${MAX_PAGE_SIZE}.`
+      });
+      return;
+    }
+
+    const radiusKm = radiusResult.value ?? DEFAULT_TRAFFIC_RADIUS_KM;
+    const limit = limitResult.value ?? DEFAULT_NEAR_TRAFFIC_LIMIT;
+
+    if (lon == null || lat == null) {
+      response.status(400).json({
+        error: "Ogiltiga koordinater. Ange query-parametrar lon och lat inom Sveriges gränser."
+      });
+      return;
+    }
+
+    response.status(200).json(getTrafficNearPoint({ lon, lat, radiusKm, limit }));
+  });
+
+  router.get("/transit/lines", (request, response) => {
+    const pageQuery = parsePageQuery(request, response);
+    if (!pageQuery) {
+      return;
+    }
+
+    const { limit, offset } = pageQuery;
+    const cityId = String(request.query.cityId ?? "").trim();
+    const type = String(request.query.type ?? "").trim();
+
+    response.status(200).json(listLines({ cityId, type, limit, offset }));
+  });
+
+  router.get("/transit/stops/near", (request, response) => {
+    const { lon, lat } = parseSwedenCoordinates(request);
+    const radiusResult = parseFloatInRangeOrReject(request.query.radiusKm, {
+      min: 0.1,
+      max: MAX_TRANSIT_RADIUS_KM
+    });
+    if (!radiusResult.ok) {
+      response.status(400).json({
+        error: `Ogiltig radiusKm. Ange ett värde mellan 0.1 och ${MAX_TRANSIT_RADIUS_KM}.`
+      });
+      return;
+    }
+
+    const limitResult = parseIntegerInRangeOrReject(request.query.limit, {
+      min: 1,
+      max: MAX_PAGE_SIZE
+    });
+    if (!limitResult.ok) {
+      response.status(400).json({
+        error: `Ogiltig limit. Ange ett heltal mellan 1 och ${MAX_PAGE_SIZE}.`
+      });
+      return;
+    }
+
+    const radiusKm = radiusResult.value ?? DEFAULT_TRANSIT_RADIUS_KM;
+    const limit = limitResult.value ?? DEFAULT_NEAR_TRANSIT_LIMIT;
+
+    if (lon == null || lat == null) {
+      response.status(400).json({
+        error: "Ogiltiga koordinater. Ange query-parametrar lon och lat inom Sveriges gränser."
+      });
+      return;
+    }
+
+    response.status(200).json(getStopsNearPoint({ lon, lat, radiusKm, limit }));
+  });
+
+  router.get("/transit/stops", (request, response) => {
+    const pageQuery = parsePageQuery(request, response);
+    if (!pageQuery) {
+      return;
+    }
+
+    const { limit, offset } = pageQuery;
+    const cityId = String(request.query.cityId ?? "").trim();
+    const type = String(request.query.type ?? "").trim();
+    const lineId = String(request.query.lineId ?? "").trim();
+    const search = String(request.query.search ?? "").trim();
+
+    response.status(200).json(listStops({ cityId, type, lineId, search, limit, offset }));
+  });
+
   router.get("/pois/:poiId", (request, response) => {
     const poi = getPoiById(request.params.poiId);
     if (!poi) {
@@ -332,6 +523,48 @@ export const createApiRouter = () => {
         error: error instanceof Error ? error.message : "Kunde inte hämta stadsväder."
       });
     }
+  });
+
+  router.get("/traffic", (request, response) => {
+    const bbox = parseSwedenBbox(request);
+    if (bbox?.invalid) {
+      response.status(400).json({
+        error: "Ogiltig bbox. Ange minLon, minLat, maxLon och maxLat inom Sveriges gränser."
+      });
+      return;
+    }
+
+    const level = String(request.query.level ?? "").trim().toLowerCase();
+    const validLevels = new Set(["free", "moderate", "heavy", "severe"]);
+    if (level && !validLevels.has(level)) {
+      response.status(400).json({
+        error: "Ogiltig trafiknivå. Ange free, moderate, heavy eller severe."
+      });
+      return;
+    }
+
+    response.status(200).json(listTrafficGeoJson({ bbox, level: level || undefined }));
+  });
+
+  router.get("/transit", (request, response) => {
+    const bbox = parseSwedenBbox(request);
+    if (bbox?.invalid) {
+      response.status(400).json({
+        error: "Ogiltig bbox. Ange minLon, minLat, maxLon och maxLat inom Sveriges gränser."
+      });
+      return;
+    }
+
+    const mode = String(request.query.mode ?? "").trim().toLowerCase();
+    const validModes = new Set(["metro", "tram", "rail", "bus"]);
+    if (mode && !validModes.has(mode)) {
+      response.status(400).json({
+        error: "Ogiltigt färdsätt. Ange metro, tram, rail eller bus."
+      });
+      return;
+    }
+
+    response.status(200).json(listTransit({ bbox, mode: mode || undefined }));
   });
 
   router.get("/tiles/proxy/stats", (_request, response) => {

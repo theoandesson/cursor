@@ -1,3 +1,5 @@
+import { createTrafficPaletteBindings } from "../../traffic/createTrafficPaletteBindings.js";
+import { TRAFFIC_PALETTES } from "../../traffic/trafficPalette.js";
 import { createBuildingVisualColorExpression } from "../style/expressions/buildingExpressions.js";
 import { MAP_PALETTES } from "../style/palette/swedenPalette.js";
 
@@ -27,6 +29,7 @@ const createRoadColorExpression = (palette) => [
 ];
 
 const LAYER_PAINT_BINDINGS = [
+  ...createTrafficPaletteBindings(),
   { layerId: "bg", property: "background-color", resolve: (palette) => palette.background },
   {
     layerId: "sweden-area",
@@ -41,12 +44,6 @@ const LAYER_PAINT_BINDINGS = [
   { layerId: "landuse-urban", property: "fill-color", resolve: (palette) => palette.landuseUrban },
   { layerId: "water", property: "fill-color", resolve: (palette) => palette.waterFill },
   { layerId: "waterway", property: "line-color", resolve: (palette) => palette.waterwayLine },
-  { layerId: "roads-casing", property: "line-color", resolve: (palette) => palette.roadsCasing },
-  {
-    layerId: "roads",
-    property: "line-color",
-    resolve: (palette) => createRoadColorExpression(palette)
-  },
   { layerId: "road-labels", property: "text-color", resolve: (palette) => palette.roadLabel },
   {
     layerId: "road-labels",
@@ -133,14 +130,17 @@ const applyRasterPalette = (map, palette) => {
 };
 
 export const applyMapPalette = (map, mode) => {
-  const palette = MAP_PALETTES[mode === "night" ? "night" : "day"];
+  const paletteKey = mode === "night" ? "night" : "day";
+  const palette = MAP_PALETTES[paletteKey];
+  const trafficPalette = TRAFFIC_PALETTES[paletteKey];
   map.getContainer()?.setAttribute("data-daynight", mode);
 
   for (const binding of LAYER_PAINT_BINDINGS) {
     if (!map.getLayer(binding.layerId)) {
       continue;
     }
-    map.setPaintProperty(binding.layerId, binding.property, binding.resolve(palette));
+    const resolvePalette = binding.useTrafficPalette ? trafficPalette : palette;
+    map.setPaintProperty(binding.layerId, binding.property, binding.resolve(resolvePalette));
   }
 
   applyRasterPalette(map, palette);

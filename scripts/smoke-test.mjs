@@ -21,7 +21,14 @@ const EXPECTED_ENDPOINT_PATHS = [
   "/api/search/reverse?lon=&lat=",
   "/api/pois?search=&category=&limit=&offset=",
   "/api/pois/near?lon=&lat=&radiusKm=5&limit=20",
-  "/api/pois/:poiId"
+  "/api/pois/:poiId",
+  "/api/traffic/segments?minLon=&minLat=&maxLon=&maxLat=&limit=",
+  "/api/traffic/near?lon=&lat=&radiusKm=10&limit=20",
+  "/api/traffic?level=&minLon=&minLat=&maxLon=&maxLat=",
+  "/api/transit?mode=&minLon=&minLat=&maxLon=&maxLat=",
+  "/api/transit/lines?cityId=&type=&limit=&offset=",
+  "/api/transit/stops?cityId=&type=&lineId=&search=&limit=&offset=",
+  "/api/transit/stops/near?lon=&lat=&radiusKm=2&limit=20"
 ];
 
 const NEW_CLIENT_ASSETS = [
@@ -34,7 +41,11 @@ const NEW_CLIENT_ASSETS = [
   "/src/map/modes/mapModes.js",
   "/src/cache/tileCachePolicy.js",
   "/src/styles/search.css",
-  "/src/styles/place-card.css"
+  "/src/styles/place-card.css",
+  "/src/traffic/createTrafficFlowLayer.js",
+  "/src/traffic/createTransitLayer.js",
+  "/src/traffic/trafficService.js",
+  "/src/traffic/createTrafficControl.js"
 ];
 
 const assert = (condition, message) => {
@@ -218,6 +229,59 @@ const testPoisEndpoints = async (baseUrl) => {
   await expectJsonError(baseUrl, "/api/pois/near?lon=18&lat=59&limit=0", 400, "Ogiltig limit");
 };
 
+const testTrafficEndpoints = async (baseUrl) => {
+  const { response: listResponse, body: listPayload } = await request(
+    baseUrl,
+    "/api/traffic/segments?limit=5"
+  );
+  assert(listResponse.ok, `/api/traffic/segments svarade ${listResponse.status}`);
+  assert(Array.isArray(listPayload.segments), "/api/traffic/segments saknar segments-array.");
+  assert(listPayload.segments.length === 5, "/api/traffic/segments?limit=5 returnerade fel antal.");
+  assert(listPayload.segments[0]?.roadName, "/api/traffic/segments returnerade segment utan roadName.");
+
+  const { response: nearResponse, body: nearPayload } = await request(
+    baseUrl,
+    "/api/traffic/near?lon=18.06&lat=59.32&radiusKm=20&limit=3"
+  );
+  assert(nearResponse.ok, `/api/traffic/near svarade ${nearResponse.status}`);
+  assert(Array.isArray(nearPayload.segments), "/api/traffic/near saknar segments-array.");
+  assert(nearPayload.segments.length >= 1, "/api/traffic/near returnerade inga träffar.");
+  assert(
+    nearPayload.segments.every((segment) => typeof segment.distanceKm === "number"),
+    "/api/traffic/near saknar distanceKm på träffar."
+  );
+
+  const { response: geoResponse, body: geoPayload } = await request(baseUrl, "/api/traffic?limit=5");
+  assert(geoResponse.ok, `/api/traffic svarade ${geoResponse.status}`);
+  assert(geoPayload.geojson?.type === "FeatureCollection", "/api/traffic saknar geojson FeatureCollection.");
+};
+
+const testTransitEndpoints = async (baseUrl) => {
+  const { response: geoResponse, body: geoPayload } = await request(baseUrl, "/api/transit");
+  assert(geoResponse.ok, `/api/transit svarade ${geoResponse.status}`);
+  assert(geoPayload.type === "FeatureCollection", "/api/transit saknar FeatureCollection.");
+  assert(Array.isArray(geoPayload.features), "/api/transit saknar features-array.");
+
+  const { response: linesResponse, body: linesPayload } = await request(
+    baseUrl,
+    "/api/transit/lines?limit=5&offset=0"
+  );
+  assert(linesResponse.ok, `/api/transit/lines svarade ${linesResponse.status}`);
+  assert(Array.isArray(linesPayload.lines), "/api/transit/lines saknar lines-array.");
+  assert(linesPayload.lines.length >= 1, "/api/transit/lines returnerade inga linjer.");
+
+  const { response: stopsResponse, body: stopsPayload } = await request(
+    baseUrl,
+    "/api/transit/stops?limit=5&offset=0"
+  );
+  assert(stopsResponse.ok, `/api/transit/stops svarade ${stopsResponse.status}`);
+  assert(Array.isArray(stopsPayload.stops), "/api/transit/stops saknar stops-array.");
+  assert(stopsPayload.stops.length >= 1, "/api/transit/stops returnerade inga hållplatser.");
+
+  await expectJsonError(baseUrl, "/api/transit?mode=invalid", 400, "färdsätt");
+  await expectJsonError(baseUrl, "/api/traffic?level=invalid", 400, "trafiknivå");
+};
+
 const testTileProxySecurity = async (baseUrl) => {
   await expectJsonError(baseUrl, "/api/tiles/proxy", 400, "url");
   await expectJsonError(baseUrl, "/api/tiles/proxy?url=not-a-url", 400, "Ogiltig url");
@@ -292,6 +356,8 @@ const run = async () => {
     await testEndpointsCatalog(baseUrl);
     await testSearchValidation(baseUrl);
     await testPoisEndpoints(baseUrl);
+    await testTrafficEndpoints(baseUrl);
+    await testTransitEndpoints(baseUrl);
     await testTileProxySecurity(baseUrl);
     await testClientAssets(baseUrl);
     await testExistingApis(baseUrl);

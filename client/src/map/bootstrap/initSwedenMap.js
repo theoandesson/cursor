@@ -5,6 +5,7 @@ import {
 } from "../../config/swedenMapConfig.js";
 import { createPlaceCard, shouldIgnoreMapPlaceClick } from "../../places/createPlaceCard.js";
 import { createSearchControl } from "../../search/createSearchControl.js";
+import { createTrafficFlowLayer } from "../../traffic/createTrafficFlowLayer.js";
 import { createCityWeatherLayer } from "../../weather/createCityWeatherLayer.js";
 import { createWeatherPopup } from "../../weather/createWeatherPopup.js";
 import { createDayNightController } from "../lighting/createDayNightController.js";
@@ -16,6 +17,8 @@ import { createOrientationControl } from "../navigation/createOrientationControl
 import { createMapModeControl } from "../modes/createMapModeControl.js";
 import { getMapModeLabel } from "../modes/applyMapMode.js";
 import { createViewportPrefetcher } from "../tiles/createViewportPrefetcher.js";
+import { createTrafficControl } from "../../traffic/createTrafficControl.js";
+import { createTransitLayer } from "../../traffic/createTransitLayer.js";
 import { createSwedenStyle } from "../style/createSwedenStyle.js";
 
 const enableInteraction = (handler) => {
@@ -96,13 +99,17 @@ export const initSwedenMap = ({
   let placeCard = null;
   let disposeLoadUx = null;
   let disposeLandmarks = null;
-  let landmarkControl = null;
   let disposeLod = null;
   let disposeTileScheduler = null;
   let disposePrefetcher = null;
   let disposeMapClick = null;
   let disposeWeatherLayer = null;
   let disposeWeatherPopup = null;
+  let disposeTrafficFlow = null;
+  let disposeTransitLayer = null;
+  let trafficFlowLayer = null;
+  let transitLayer = null;
+  let trafficControl = null;
   let dayNightController = null;
   let mapFeaturesMounted = false;
 
@@ -145,6 +152,26 @@ export const initSwedenMap = ({
   });
   map.addControl(dayNightController.control, "top-right");
 
+  trafficControl = createTrafficControl({
+    map,
+    onStateChange: (trafficState) => {
+      trafficFlowLayer?.setVisible(trafficState.trafficFlow);
+      transitLayer?.setVisible(trafficState.transit);
+      publishStatus({
+        trafficFlow: trafficState.trafficFlow,
+        transit: trafficState.transit,
+        roadLabels: trafficState.roadLabels,
+        trafficLegend: trafficState.legend,
+        message: trafficState.trafficFlow
+          ? "Trafikflöde visas på kartan."
+          : trafficState.transit
+            ? "Kollektivtrafik visas på kartan."
+            : latestLodStatus?.message ?? "Trafikflöde dolt."
+      });
+    }
+  });
+  map.addControl(trafficControl.control, "bottom-left");
+
   const teardownMapFeatures = () => {
     if (!mapFeaturesMounted) {
       return;
@@ -154,6 +181,12 @@ export const initSwedenMap = ({
     disposeWeatherLayer = null;
     disposeWeatherPopup?.();
     disposeWeatherPopup = null;
+    disposeTrafficFlow?.();
+    disposeTrafficFlow = null;
+    trafficFlowLayer = null;
+    disposeTransitLayer?.();
+    disposeTransitLayer = null;
+    transitLayer = null;
     disposePrefetcher?.destroy();
     disposePrefetcher = null;
     disposeTileScheduler?.();
@@ -162,10 +195,6 @@ export const initSwedenMap = ({
     disposeLod = null;
     disposeLandmarks?.();
     disposeLandmarks = null;
-    if (landmarkControl) {
-      map.removeControl(landmarkControl);
-      landmarkControl = null;
-    }
     disposeMapClick?.();
     disposeMapClick = null;
     mapFeaturesMounted = false;
@@ -202,11 +231,25 @@ export const initSwedenMap = ({
     disposeMapClick = () => map.off("click", onMapClick);
 
     dayNightController.setMode(dayNightController.getMode());
+    trafficControl.applyState();
 
-    const landmarkLayer = createLandmarkLayer({ map, maplibregl });
-    disposeLandmarks = landmarkLayer.destroy;
-    landmarkControl = landmarkLayer.control;
-    map.addControl(landmarkControl, "top-right");
+    disposeLandmarks = createLandmarkLayer({ map, maplibregl });
+
+    const trafficState = trafficControl.getState();
+
+    trafficFlowLayer = createTrafficFlowLayer({
+      map,
+      maplibregl,
+      initialVisible: trafficState.trafficFlow
+    });
+    disposeTrafficFlow = trafficFlowLayer.destroy;
+
+    transitLayer = createTransitLayer({
+      map,
+      maplibregl,
+      initialVisible: trafficState.transit
+    });
+    disposeTransitLayer = transitLayer.destroy;
 
     disposeLod = createAdaptiveLodController({
       map,
@@ -257,10 +300,13 @@ export const initSwedenMap = ({
   const originalRemove = map.remove.bind(map);
   map.remove = () => {
     teardownMapFeatures();
+    trafficControl?.destroy();
+    trafficControl = null;
     disposeLoadUx?.();
     disposeLoadUx = null;
     placeCard?.destroy();
     placeCard = null;
+    dayNightController?.destroy();
     dayNightController = null;
     return originalRemove();
   };

@@ -6,14 +6,7 @@ import {
 } from "../tiles/swedenTileSources.js";
 import { SWEDEN_BOUNDARY_FEATURE } from "../../data/swedenBoundary.js";
 import { SWEDEN_MAP_PALETTE } from "../style/palette/swedenPalette.js";
-
-const HYBRID_ROAD_FILTER = [
-  "match",
-  ["get", "class"],
-  ["motorway", "trunk", "primary", "secondary", "tertiary"],
-  true,
-  false
-];
+import { createHybridRoadLayers } from "../../traffic/createRoadLayers.js";
 
 const createSatelliteSources = ({ includeVector = false } = {}) => ({
   [DEFAULT_SATELLITE_SOURCE.id]: {
@@ -73,119 +66,30 @@ const createSwedenBorderLayer = () => ({
   }
 });
 
-const createHybridOverlayLayers = () => [
-  {
-    id: "hybrid-roads-casing",
-    source: "sweden_vector",
-    "source-layer": "transportation",
-    type: "line",
-    filter: HYBRID_ROAD_FILTER,
-    layout: {
-      "line-cap": "round",
-      "line-join": "round"
-    },
-    paint: {
-      "line-color": "#ffffff",
-      "line-width": [
-        "interpolate",
-        ["linear"],
-        ["zoom"],
-        5,
-        1.2,
-        10,
-        3.4,
-        14,
-        6.4
-      ],
-      "line-opacity": 0.82,
-      "line-blur": 0.35
-    }
+const createHybridPlaceLabelsLayer = () => ({
+  id: "hybrid-place-labels",
+  source: "sweden_vector",
+  "source-layer": "place",
+  type: "symbol",
+  filter: ["match", ["get", "class"], ["city", "town", "village"], true, false],
+  layout: {
+    "text-field": ["coalesce", ["get", "name:sv"], ["get", "name"], ""],
+    "text-font": ["Noto Sans Regular"],
+    "text-size": ["interpolate", ["linear"], ["zoom"], 4, 10, 8, 12, 12, 15],
+    "text-anchor": "center",
+    "text-allow-overlap": false
   },
-  {
-    id: "hybrid-roads",
-    source: "sweden_vector",
-    "source-layer": "transportation",
-    type: "line",
-    filter: HYBRID_ROAD_FILTER,
-    layout: {
-      "line-cap": "round",
-      "line-join": "round"
-    },
-    paint: {
-      "line-color": [
-        "match",
-        ["get", "class"],
-        ["motorway", "trunk"],
-        "#ffd166",
-        ["primary", "secondary"],
-        "#ffe08a",
-        "#f4f7fb"
-      ],
-      "line-width": [
-        "interpolate",
-        ["linear"],
-        ["zoom"],
-        5,
-        0.5,
-        10,
-        1.9,
-        14,
-        4.1
-      ],
-      "line-opacity": 0.94,
-      "line-blur": 0.15
-    }
-  },
-  {
-    id: "hybrid-road-labels",
-    source: "sweden_vector",
-    "source-layer": "transportation_name",
-    type: "symbol",
-    minzoom: 10,
-    layout: {
-      "symbol-placement": "line",
-      "text-field": ["coalesce", ["get", "name:sv"], ["get", "name"], ""],
-      "text-font": ["Noto Sans Regular"],
-      "text-size": ["interpolate", ["linear"], ["zoom"], 10, 10, 13, 12, 16, 14],
-      "text-letter-spacing": 0.02
-    },
-    paint: {
-      "text-color": "#ffffff",
-      "text-halo-color": "#1a2d42cc",
-      "text-halo-width": 1.5,
-      "text-halo-blur": 0.35
-    }
-  },
-  {
-    id: "hybrid-place-labels",
-    source: "sweden_vector",
-    "source-layer": "place",
-    type: "symbol",
-    filter: ["match", ["get", "class"], ["city", "town", "village"], true, false],
-    layout: {
-      "text-field": ["coalesce", ["get", "name:sv"], ["get", "name"], ""],
-      "text-font": ["Noto Sans Regular"],
-      "text-size": [
-        "interpolate",
-        ["linear"],
-        ["zoom"],
-        4,
-        10,
-        8,
-        12,
-        12,
-        15
-      ],
-      "text-anchor": "center",
-      "text-allow-overlap": false
-    },
-    paint: {
-      "text-color": "#ffffff",
-      "text-halo-color": "#1a2d42d9",
-      "text-halo-width": 1.6,
-      "text-halo-blur": 0.4
-    }
+  paint: {
+    "text-color": "#ffffff",
+    "text-halo-color": "#1a2d42d9",
+    "text-halo-width": 1.6,
+    "text-halo-blur": 0.4
   }
+});
+
+const createHybridOverlayLayers = () => [
+  ...createHybridRoadLayers(SWEDEN_MAP_PALETTE),
+  createHybridPlaceLabelsLayer()
 ];
 
 export const createSatelliteStyle = () => ({
