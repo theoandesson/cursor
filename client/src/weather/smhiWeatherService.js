@@ -25,12 +25,12 @@ export const fetchCityWeather = async (options = {}) => {
   return payload.cities ?? [];
 };
 
-export const fetchWeatherAtPoint = async (lon, lat, options = {}) => {
+export const fetchWeatherAtPoint = async (lon, lat, { signal, fetchFn = fetch } = {}) => {
   const params = new URLSearchParams({
     lon: String(lon),
     lat: String(lat)
   });
-  return fetchJson(`${API_BASE}/weather/point?${params.toString()}`, options);
+  return fetchJson(`${API_BASE}/weather/point?${params.toString()}`, { signal, fetchFn });
 };
 
 const emitTiming = (perfTracker, phase, startedAt, cacheStatus = null) => {
@@ -41,9 +41,9 @@ const emitTiming = (perfTracker, phase, startedAt, cacheStatus = null) => {
   });
 };
 
-export const fetchBootstrapWithPerf = async ({ perfTracker, signal } = {}) => {
+export const fetchBootstrapWithPerf = async ({ perfTracker, signal, fetchFn = fetch } = {}) => {
   const startedAt = performance.now();
-  const data = await fetchBootstrap({ signal, onTiming: perfTracker?.onTiming });
+  const data = await fetchBootstrap({ signal, onTiming: perfTracker?.onTiming, fetchFn });
   emitTiming(perfTracker, "bootstrap-complete", startedAt);
   return data;
 };
