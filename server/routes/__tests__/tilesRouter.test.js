@@ -19,7 +19,7 @@ const request = async (requestPath) => {
 
 const startServer = async () => {
   const app = express();
-  app.use(createTilesRouter());
+  app.use("/tiles", createTilesRouter());
 
   server = http.createServer(app);
   server.listen(0, "127.0.0.1");
