@@ -20,12 +20,46 @@ export const enableDeferredTerrain = (map, {
   let cancelled = false;
   let idleHandle = null;
   let delayHandle = null;
+  let retryHandle = null;
+  let sourcedataListener = null;
+  let retryCount = 0;
+  const MAX_RETRIES = 5;
+
+  const clearRetry = () => {
+    if (retryHandle != null) {
+      clearTimeout(retryHandle);
+      retryHandle = null;
+    }
+    if (sourcedataListener) {
+      map.off("sourcedata", sourcedataListener);
+      sourcedataListener = null;
+    }
+  };
 
   const enable = () => {
-    if (cancelled || map.getTerrain() || !map.getSource(TERRAIN_CONFIG.source)) {
+    if (cancelled || map.getTerrain()) {
       return;
     }
 
+    if (!map.getSource(TERRAIN_CONFIG.source)) {
+      if (retryCount < MAX_RETRIES) {
+        retryCount++;
+        sourcedataListener = (e) => {
+          if (e.sourceId === TERRAIN_CONFIG.source) {
+            clearRetry();
+            enable();
+          }
+        };
+        map.on("sourcedata", sourcedataListener);
+        retryHandle = setTimeout(() => {
+          clearRetry();
+          enable();
+        }, 500);
+      }
+      return;
+    }
+
+    clearRetry();
     map.setTerrain({
       source: TERRAIN_CONFIG.source,
       exaggeration
@@ -44,6 +78,7 @@ export const enableDeferredTerrain = (map, {
 
   return () => {
     cancelled = true;
+    clearRetry();
     if (delayHandle) {
       clearTimeout(delayHandle);
       delayHandle = null;
