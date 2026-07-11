@@ -6,7 +6,7 @@ import {
 } from "../tiles/swedenTileSources.js";
 import {
   baseBuildingMinHeightExpression,
-  createBuildingTypeColorExpression,
+  createBuildingVisualColorExpression,
   createVisualBuildingHeightExpression
 } from "./expressions/buildingExpressions.js";
 
@@ -194,12 +194,22 @@ export const createLayers = ({ mode = SWEDEN_MAP_MODES.vector } = {}) => {
     type: "fill-extrusion",
     minzoom: 13,
     paint: {
-      "fill-extrusion-color": createBuildingTypeColorExpression(SWEDEN_MAP_PALETTE),
+      "fill-extrusion-color": createBuildingVisualColorExpression(SWEDEN_MAP_PALETTE),
       "fill-extrusion-height": createVisualBuildingHeightExpression(
         LOD_CONFIG.defaultBuildingHeightScale
       ),
       "fill-extrusion-base": baseBuildingMinHeightExpression,
-      "fill-extrusion-opacity": 0.88,
+      "fill-extrusion-opacity": [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        13,
+        0.74,
+        15,
+        0.9,
+        17,
+        0.94
+      ],
       "fill-extrusion-vertical-gradient": true
     }
   }

@@ -1,23 +1,42 @@
-import { createBuildingTypeColorExpression } from "../style/expressions/buildingExpressions.js";
+import { createBuildingVisualColorExpression } from "../style/expressions/buildingExpressions.js";
 import { MAP_PALETTES } from "../style/palette/swedenPalette.js";
 
 const CONTROL_CLASS = "map-daynight-control maplibregl-ctrl";
 const BUTTON_CLASS = "map-daynight-control__button";
 
+const SATELLITE_RASTER_LAYER_IDS = ["satellite-imagery", "satellite-base"];
+
+const createLandcoverColorExpression = (palette) => [
+  "match",
+  ["get", "class"],
+  ["wood", "forest"],
+  palette.landcoverForest,
+  ["grass", "park"],
+  palette.landcoverPark,
+  palette.landcoverBase
+];
+
+const createRoadColorExpression = (palette) => [
+  "match",
+  ["get", "class"],
+  ["motorway", "trunk"],
+  palette.roadsMotorway,
+  ["primary", "secondary"],
+  palette.roadsPrimary,
+  palette.roadsLocal
+];
+
 const LAYER_PAINT_BINDINGS = [
   { layerId: "bg", property: "background-color", resolve: (palette) => palette.background },
   {
+    layerId: "sweden-area",
+    property: "fill-color",
+    resolve: (palette) => palette.swedenAreaFill
+  },
+  {
     layerId: "landcover",
     property: "fill-color",
-    resolve: (palette) => [
-      "match",
-      ["get", "class"],
-      ["wood", "forest"],
-      palette.landcoverForest,
-      ["grass", "park"],
-      palette.landcoverPark,
-      palette.landcoverBase
-    ]
+    resolve: (palette) => createLandcoverColorExpression(palette)
   },
   { layerId: "landuse-urban", property: "fill-color", resolve: (palette) => palette.landuseUrban },
   { layerId: "water", property: "fill-color", resolve: (palette) => palette.waterFill },
@@ -26,33 +45,66 @@ const LAYER_PAINT_BINDINGS = [
   {
     layerId: "roads",
     property: "line-color",
-    resolve: (palette) => [
-      "match",
-      ["get", "class"],
-      ["motorway", "trunk"],
-      palette.roadsMotorway,
-      ["primary", "secondary"],
-      palette.roadsPrimary,
-      palette.roadsLocal
-    ]
+    resolve: (palette) => createRoadColorExpression(palette)
   },
   { layerId: "road-labels", property: "text-color", resolve: (palette) => palette.roadLabel },
-  { layerId: "road-labels", property: "text-halo-color", resolve: (palette) => palette.roadLabelHalo },
+  {
+    layerId: "road-labels",
+    property: "text-halo-color",
+    resolve: (palette) => palette.roadLabelHalo
+  },
+  {
+    layerId: "hybrid-roads-casing",
+    property: "line-color",
+    resolve: (palette) => palette.roadsCasing
+  },
+  {
+    layerId: "hybrid-roads",
+    property: "line-color",
+    resolve: (palette) => createRoadColorExpression(palette)
+  },
+  {
+    layerId: "hybrid-road-labels",
+    property: "text-color",
+    resolve: (palette) => palette.roadLabel
+  },
+  {
+    layerId: "hybrid-road-labels",
+    property: "text-halo-color",
+    resolve: (palette) => palette.roadLabelHalo
+  },
+  {
+    layerId: "hybrid-place-labels",
+    property: "text-color",
+    resolve: (palette) => palette.placeLabel
+  },
+  {
+    layerId: "hybrid-place-labels",
+    property: "text-halo-color",
+    resolve: (palette) => palette.placeLabelHalo
+  },
+  { layerId: "sweden-border", property: "line-color", resolve: (palette) => palette.swedenBorder },
   {
     layerId: "sweden-buildings",
     property: "fill-extrusion-color",
-    resolve: (palette) => createBuildingTypeColorExpression(palette)
+    resolve: (palette) => createBuildingVisualColorExpression(palette)
+  },
+  {
+    layerId: "terrain-hillshade",
+    property: "hillshade-shadow-color",
+    resolve: (palette) => palette.hillshadeShadowColor
+  },
+  {
+    layerId: "terrain-hillshade",
+    property: "hillshade-highlight-color",
+    resolve: (palette) => palette.hillshadeHighlightColor
+  },
+  {
+    layerId: "terrain-hillshade",
+    property: "hillshade-accent-color",
+    resolve: (palette) => palette.hillshadeAccentColor
   }
 ];
-
-const applyPaletteToLayers = (map, palette) => {
-  for (const binding of LAYER_PAINT_BINDINGS) {
-    if (!map.getLayer(binding.layerId)) {
-      continue;
-    }
-    map.setPaintProperty(binding.layerId, binding.property, binding.resolve(palette));
-  }
-};
 
 const applySkyPalette = (map, palette) => {
   if (typeof map.setSky !== "function") {
@@ -60,12 +112,39 @@ const applySkyPalette = (map, palette) => {
   }
   map.setSky({
     "sky-color": palette.skyColor,
-    "sky-horizon-blend": 0.3,
+    "sky-horizon-blend": 0.42,
     "horizon-color": palette.skyHorizonColor,
-    "horizon-fog-blend": 0.3,
+    "horizon-fog-blend": 0.42,
     "fog-color": palette.fogColor,
-    "fog-ground-blend": 0.3
+    "fog-ground-blend": 0.48
   });
+};
+
+const applyRasterPalette = (map, palette) => {
+  for (const layerId of SATELLITE_RASTER_LAYER_IDS) {
+    if (!map.getLayer(layerId)) {
+      continue;
+    }
+    map.setPaintProperty(layerId, "raster-brightness-min", palette.satelliteRasterBrightnessMin);
+    map.setPaintProperty(layerId, "raster-brightness-max", palette.satelliteRasterBrightnessMax);
+    map.setPaintProperty(layerId, "raster-saturation", palette.satelliteRasterSaturation);
+    map.setPaintProperty(layerId, "raster-contrast", palette.satelliteRasterContrast);
+  }
+};
+
+export const applyMapPalette = (map, mode) => {
+  const palette = MAP_PALETTES[mode === "night" ? "night" : "day"];
+  map.getContainer()?.setAttribute("data-daynight", mode);
+
+  for (const binding of LAYER_PAINT_BINDINGS) {
+    if (!map.getLayer(binding.layerId)) {
+      continue;
+    }
+    map.setPaintProperty(binding.layerId, binding.property, binding.resolve(palette));
+  }
+
+  applyRasterPalette(map, palette);
+  applySkyPalette(map, palette);
 };
 
 const setToggleButtonState = ({ button, mode }) => {
@@ -76,7 +155,9 @@ const setToggleButtonState = ({ button, mode }) => {
   button.title = isNight ? "Växla till dagläge" : "Växla till nattläge";
   button.setAttribute(
     "aria-label",
-    isNight ? "Växla till dagläge" : "Växla till nattläge"
+    isNight
+      ? "Nattläge är aktivt. Växla till dagläge."
+      : "Dagläge är aktivt. Växla till nattläge."
   );
 };
 
@@ -86,20 +167,31 @@ export const createDayNightController = ({ map, initialMode = "day", onModeChang
   let toggleButton = null;
   const listeners = [];
 
-  const applyMode = (nextMode) => {
+  const applyMode = (nextMode, { notify = true } = {}) => {
     mode = nextMode === "night" ? "night" : "day";
-    const palette = MAP_PALETTES[mode];
-    applyPaletteToLayers(map, palette);
-    applySkyPalette(map, palette);
+    applyMapPalette(map, mode);
     if (toggleButton) {
       setToggleButtonState({ button: toggleButton, mode });
     }
-    onModeChange?.(mode);
+    if (notify) {
+      onModeChange?.(mode);
+    }
+  };
+
+  const reapplyMode = () => {
+    applyMode(mode, { notify: false });
   };
 
   const toggleMode = () => {
     applyMode(mode === "day" ? "night" : "day");
   };
+
+  const onStyleLoad = () => {
+    reapplyMode();
+  };
+
+  map.on("style.load", onStyleLoad);
+  listeners.push(() => map.off("style.load", onStyleLoad));
 
   const control = {
     onAdd: () => {
@@ -133,12 +225,13 @@ export const createDayNightController = ({ map, initialMode = "day", onModeChang
     }
   };
 
-  applyMode(mode);
+  reapplyMode();
 
   return {
     control,
     getMode: () => mode,
-    setMode: applyMode,
+    setMode: (nextMode) => applyMode(nextMode),
+    reapplyMode,
     toggleMode,
     destroy: () => {
       control.onRemove();

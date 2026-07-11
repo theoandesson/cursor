@@ -1,13 +1,19 @@
 import {
   DEFAULT_SATELLITE_SOURCE,
-  DEM_TILE_SOURCE,
   GLYPHS_URL,
   SWEDEN_TILE_BOUNDS,
   VECTOR_TILE_SOURCE
 } from "../tiles/swedenTileSources.js";
 import { SWEDEN_BOUNDARY_FEATURE } from "../../data/swedenBoundary.js";
-import { TERRAIN_CONFIG } from "../../config/swedenMapConfig.js";
 import { SWEDEN_MAP_PALETTE } from "../style/palette/swedenPalette.js";
+
+const HYBRID_ROAD_FILTER = [
+  "match",
+  ["get", "class"],
+  ["motorway", "trunk", "primary", "secondary", "tertiary"],
+  true,
+  false
+];
 
 const createSatelliteSources = ({ includeVector = false } = {}) => ({
   [DEFAULT_SATELLITE_SOURCE.id]: {
@@ -22,15 +28,6 @@ const createSatelliteSources = ({ includeVector = false } = {}) => ({
   sweden_boundary: {
     type: "geojson",
     data: SWEDEN_BOUNDARY_FEATURE
-  },
-  [DEM_TILE_SOURCE.id]: {
-    type: DEM_TILE_SOURCE.type,
-    tiles: DEM_TILE_SOURCE.tiles,
-    encoding: DEM_TILE_SOURCE.encoding,
-    tileSize: DEM_TILE_SOURCE.tileSize,
-    bounds: SWEDEN_TILE_BOUNDS,
-    minzoom: DEM_TILE_SOURCE.minzoom,
-    maxzoom: DEM_TILE_SOURCE.maxzoom
   },
   ...(includeVector
     ? {
@@ -47,12 +44,12 @@ const createSatelliteSources = ({ includeVector = false } = {}) => ({
 
 const createSky = () => ({
   "sky-color": SWEDEN_MAP_PALETTE.skyColor,
-  "sky-horizon-blend": 0.3,
+  "sky-horizon-blend": 0.42,
   "horizon-color": SWEDEN_MAP_PALETTE.skyHorizonColor,
-  "horizon-fog-blend": 0.3,
+  "horizon-fog-blend": 0.42,
   "fog-color": SWEDEN_MAP_PALETTE.fogColor,
-  "fog-ground-blend": 0.3,
-  "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 4, 0.08, 9, 0.2]
+  "fog-ground-blend": 0.48,
+  "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 4, 0.1, 9, 0.28, 14, 0.36]
 });
 
 const createSatelliteRasterLayer = () => ({
@@ -82,6 +79,11 @@ const createHybridOverlayLayers = () => [
     source: "sweden_vector",
     "source-layer": "transportation",
     type: "line",
+    filter: HYBRID_ROAD_FILTER,
+    layout: {
+      "line-cap": "round",
+      "line-join": "round"
+    },
     paint: {
       "line-color": "#ffffff",
       "line-width": [
@@ -104,6 +106,11 @@ const createHybridOverlayLayers = () => [
     source: "sweden_vector",
     "source-layer": "transportation",
     type: "line",
+    filter: HYBRID_ROAD_FILTER,
+    layout: {
+      "line-cap": "round",
+      "line-join": "round"
+    },
     paint: {
       "line-color": [
         "match",
@@ -187,10 +194,6 @@ export const createSatelliteStyle = () => ({
   glyphs: GLYPHS_URL,
   sources: createSatelliteSources(),
   layers: [createSatelliteRasterLayer(), createSwedenBorderLayer()],
-  terrain: {
-    source: TERRAIN_CONFIG.source,
-    exaggeration: TERRAIN_CONFIG.exaggeration
-  },
   sky: createSky()
 });
 
@@ -204,9 +207,5 @@ export const createHybridStyle = () => ({
     ...createHybridOverlayLayers(),
     createSwedenBorderLayer()
   ],
-  terrain: {
-    source: TERRAIN_CONFIG.source,
-    exaggeration: TERRAIN_CONFIG.exaggeration
-  },
   sky: createSky()
 });

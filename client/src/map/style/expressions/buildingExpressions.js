@@ -1,4 +1,6 @@
-const LEVELS_PER_FLOOR_METERS = 3.2;
+const LEVELS_PER_FLOOR_METERS = 3.1;
+const MIN_FALLBACK_HEIGHT_METERS = 4.5;
+const MIN_LEVEL_HEIGHT_METERS = 4;
 
 const buildingLevelsValue = [
   "coalesce",
@@ -7,14 +9,16 @@ const buildingLevelsValue = [
   0
 ];
 
+export const buildingHeightValue = [
+  "to-number",
+  ["coalesce", ["get", "render_height"], ["get", "height"], 0],
+  0
+];
+
 export const baseBuildingHeightExpression = [
   "max",
-  9,
-  [
-    "to-number",
-    ["coalesce", ["get", "render_height"], ["get", "height"], 0],
-    9
-  ]
+  MIN_FALLBACK_HEIGHT_METERS,
+  buildingHeightValue
 ];
 
 export const baseBuildingMinHeightExpression = [
@@ -30,7 +34,7 @@ export const baseBuildingMinHeightExpression = [
 export const buildingHeightFromLevelsExpression = [
   "case",
   [">", buildingLevelsValue, 0],
-  ["max", 6, ["*", buildingLevelsValue, LEVELS_PER_FLOOR_METERS]],
+  ["max", MIN_LEVEL_HEIGHT_METERS, ["*", buildingLevelsValue, LEVELS_PER_FLOOR_METERS]],
   baseBuildingHeightExpression
 ];
 
@@ -50,6 +54,8 @@ const buildingTypeKey = [
     "residential"
   ]
 ];
+
+const isBuildingType = (types) => ["match", buildingTypeKey, types, true, false];
 
 export const createBuildingTypeColorExpression = (palette) => [
   "match",
@@ -89,4 +95,46 @@ export const createBuildingTypeColorExpression = (palette) => [
   ],
   palette.buildingsPublic,
   palette.buildingsResidential
+];
+
+const createResidentialHeightColorExpression = (palette) => [
+  "interpolate",
+  ["linear"],
+  buildingHeightFromLevelsExpression,
+  4,
+  palette.buildingsLow,
+  14,
+  palette.buildingsHighLow,
+  28,
+  palette.buildingsHighMid,
+  55,
+  palette.buildingsHighTall
+];
+
+export const createBuildingVisualColorExpression = (palette) => [
+  "case",
+  isBuildingType(["industrial", "warehouse", "factory", "manufacture", "storage", "garage"]),
+  palette.buildingsIndustrial,
+  isBuildingType(["commercial", "retail", "office", "shop", "mall", "hotel", "supermarket"]),
+  palette.buildingsCommercial,
+  isBuildingType([
+    "public",
+    "school",
+    "university",
+    "college",
+    "hospital",
+    "civic",
+    "government",
+    "church",
+    "cathedral",
+    "mosque",
+    "synagogue",
+    "chapel",
+    "museum",
+    "library",
+    "theatre",
+    "stadium"
+  ]),
+  palette.buildingsPublic,
+  createResidentialHeightColorExpression(palette)
 ];
