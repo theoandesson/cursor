@@ -14,6 +14,36 @@ const setTileSourceHeader = (response, source) => {
   response.setHeader("X-Tile-Source", tileSource);
 };
 
+const getTileSource = (result) => {
+  if (result?.source === "local" || result?.source === "upstream") {
+    return result.source;
+  }
+  if (typeof result?.cache === "string") {
+    const normalized = result.cache.trim().toLowerCase();
+    if (normalized === "upstream") {
+      return "upstream";
+    }
+    if (normalized === "local") {
+      return "local";
+    }
+  }
+  return "local";
+};
+
+const callTileGetter = async (service, type, z, x, y) => {
+  if (typeof service.fetchWithFallback === "function") {
+    return service.fetchWithFallback(type, z, x, y);
+  }
+
+  const methodName = type === "vector" ? "getVectorTile" : "getDemTile";
+  const method = service[methodName];
+  if (typeof method !== "function") {
+    return null;
+  }
+
+  return method.length >= 3 ? method(z, x, y) : method({ z, x, y });
+};
+
 const getErrorMessage = (fallbackMessage, details) => {
   if (!details) {
     return fallbackMessage;
@@ -85,11 +115,10 @@ const resolveTileJsonPayload = (result) => {
 };
 
 export const createTilesRouter = () => {
-  const rootRouter = Router();
-  const tilesRouter = Router();
+  const router = Router();
   const tileService = createSelfHostedTileService(tileConfig);
 
-  tilesRouter.get("/vector/tilejson.json", async (_request, response) => {
+  router.get("/vector/tilejson.json", async (_request, response) => {
     try {
       const result = await tileService.getVectorTileJson();
       if (result?.ok === false) {
@@ -113,7 +142,7 @@ export const createTilesRouter = () => {
     }
   });
 
-  tilesRouter.get("/vector/:z/:x/:y.pbf", async (request, response) => {
+  router.get("/vector/:z/:x/:y.pbf", async (request, response) => {
     const z = parseCoordinate(request.params.z);
     const x = parseCoordinate(request.params.x);
     const y = parseCoordinate(request.params.y);
@@ -123,7 +152,7 @@ export const createTilesRouter = () => {
     }
 
     try {
-      const result = await tileService.getVectorTile({ z, x, y });
+      const result = await callTileGetter(tileService, "vector", z, x, y);
       if (!result || result?.notFound === true || result?.status === 404) {
         sendNotFound(response);
         return;
@@ -141,7 +170,7 @@ export const createTilesRouter = () => {
 
       response.setHeader("Content-Type", "application/x-protobuf");
       response.setHeader("Cache-Control", "public, max-age=86400, immutable");
-      setTileSourceHeader(response, payload.source);
+      setTileSourceHeader(response, getTileSource(result) ?? payload.source);
       response.status(payload.status).send(payload.buffer);
     } catch (error) {
       response.status(502).json({
@@ -150,7 +179,7 @@ export const createTilesRouter = () => {
     }
   });
 
-  tilesRouter.get("/dem/tilejson.json", async (_request, response) => {
+  router.get("/dem/tilejson.json", async (_request, response) => {
     try {
       const result = await tileService.getDemTileJson();
       if (result?.ok === false) {
@@ -174,7 +203,7 @@ export const createTilesRouter = () => {
     }
   });
 
-  tilesRouter.get("/dem/:z/:x/:y.png", async (request, response) => {
+  router.get("/dem/:z/:x/:y.png", async (request, response) => {
     const z = parseCoordinate(request.params.z);
     const x = parseCoordinate(request.params.x);
     const y = parseCoordinate(request.params.y);
@@ -184,7 +213,7 @@ export const createTilesRouter = () => {
     }
 
     try {
-      const result = await tileService.getDemTile({ z, x, y });
+      const result = await callTileGetter(tileService, "dem", z, x, y);
       if (!result || result?.notFound === true || result?.status === 404) {
         sendNotFound(response);
         return;
@@ -202,7 +231,7 @@ export const createTilesRouter = () => {
 
       response.setHeader("Content-Type", "image/png");
       response.setHeader("Cache-Control", "public, max-age=86400, immutable");
-      setTileSourceHeader(response, payload.source);
+      setTileSourceHeader(response, getTileSource(result) ?? payload.source);
       response.status(payload.status).send(payload.buffer);
     } catch (error) {
       response.status(502).json({
@@ -211,25 +240,8 @@ export const createTilesRouter = () => {
     }
   });
 
-  tilesRouter.use((_request, response) => {
+  router.use((_request, response) => {
     response.status(404).json({ error: "Tile-endpoint hittades inte." });
-  });
-
-  rootRouter.use("/tiles", tilesRouter);
-  return rootRouter;
-};
-import { Router } from "express";
-
-const TILES_SYNC_HINT = "Tiles är inte synkade än. Kör `npm run tiles:sync` och försök igen.";
-
-export const createTilesRouter = () => {
-  const router = Router();
-
-  router.all(/.*/, (_request, response) => {
-    response.status(503).json({
-      error: "Tile-infrastrukturen är inte redo.",
-      message: TILES_SYNC_HINT
-    });
   });
 
   return router;
