@@ -1,0 +1,84 @@
+#map-root #tile-badge {
+  position: absolute;
+  z-index: 5;
+  left: 16px;
+  bottom: 52px;
+  margin: 0;
+  padding: 0.3rem 0.62rem;
+  border-radius: 999px;
+  border: 1px solid #b8cde058;
+  background: linear-gradient(180deg, #ffffffb0, #f0f5fac8);
+  color: #3a5068;
+  font-size: 0.7rem;
+  font-weight: 650;
+  box-shadow: 0 6px 16px -10px #1a2d4218;
+  pointer-events: none;
+}
+
+#map-root #lod-badge {
+  bottom: 16px;
+}
+
+#map-root .map-daynight-control {
+  margin-top: 0.45rem;
+}
+
+#map-root .map-daynight-control__button {
+  min-height: 34px;
+  border: 1px solid #b8cde060;
+  border-radius: 999px;
+  padding: 0.3rem 0.72rem;
+  background: linear-gradient(180deg, #ffffffee, #edf3f9e8);
+  color: #2a3e52;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 16px -10px #1a2d4220;
+}
+
+#map-root .map-daynight-control__button[data-mode="night"] {
+  color: #e8f0ff;
+  border-color: #4a6890aa;
+  background: linear-gradient(180deg, #2a3f58, #1a2a40);
+}
+
+#map-root .map-daynight-control__button:hover {
+  filter: brightness(1.03);
+}
+
+#map-root .landmark-popup-container .maplibregl-popup-content {
+  border-radius: 0.85rem;
+  border: 1px solid #d8b06070;
+  background: linear-gradient(180deg, #fffaf0, #fff4e0);
+  box-shadow: 0 10px 24px -12px #4a301040;
+  padding: 0.85rem 0.95rem;
+}
+
+#map-root .landmark-popup__kicker {
+  margin: 0 0 0.2rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #8a5a18;
+  font-weight: 700;
+}
+
+#map-root .landmark-popup__title {
+  margin: 0;
+  font-size: 1rem;
+  color: #3a2810;
+}
+
+#map-root .landmark-popup__city {
+  margin: 0.2rem 0 0.45rem;
+  font-size: 0.74rem;
+  color: #6a5030;
+  font-weight: 650;
+}
+
+#map-root .landmark-popup__description {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #4a3828;
+}

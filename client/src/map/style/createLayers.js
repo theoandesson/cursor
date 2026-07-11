@@ -1,8 +1,12 @@
 import { SWEDEN_MAP_PALETTE } from "./palette/swedenPalette.js";
 import { LOD_CONFIG } from "../../config/swedenMapConfig.js";
 import {
-  baseBuildingHeightExpression,
+  DEFAULT_SATELLITE_SOURCE,
+  SWEDEN_MAP_MODES
+} from "../tiles/swedenTileSources.js";
+import {
   baseBuildingMinHeightExpression,
+  createBuildingTypeColorExpression,
   createVisualBuildingHeightExpression
 } from "./expressions/buildingExpressions.js";
 
@@ -14,7 +18,24 @@ const urbanLanduseFilter = [
   false
 ];
 
-export const createLayers = () => [
+export const createLayers = ({ mode = SWEDEN_MAP_MODES.vector } = {}) => {
+  const satelliteActive =
+    mode === SWEDEN_MAP_MODES.satellite || mode === SWEDEN_MAP_MODES.hybrid;
+
+  const layers = [];
+
+  if (satelliteActive) {
+    layers.push({
+      id: "satellite-base",
+      type: "raster",
+      source: DEFAULT_SATELLITE_SOURCE.id,
+      paint: {
+        "raster-opacity": mode === SWEDEN_MAP_MODES.hybrid ? 0.92 : 1
+      }
+    });
+  }
+
+  layers.push(
   {
     id: "bg",
     type: "background",
@@ -36,6 +57,9 @@ export const createLayers = () => [
     source: "sweden_vector",
     "source-layer": "landcover",
     type: "fill",
+    layout: {
+      visibility: satelliteActive && mode === SWEDEN_MAP_MODES.satellite ? "none" : "visible"
+    },
     paint: {
       "fill-color": [
         "match",
@@ -170,17 +194,7 @@ export const createLayers = () => [
     type: "fill-extrusion",
     minzoom: 13,
     paint: {
-      "fill-extrusion-color": [
-        "interpolate",
-        ["linear"],
-        baseBuildingHeightExpression,
-        0,
-        SWEDEN_MAP_PALETTE.buildingsHighLow,
-        50,
-        SWEDEN_MAP_PALETTE.buildingsHighMid,
-        180,
-        SWEDEN_MAP_PALETTE.buildingsHighTall
-      ],
+      "fill-extrusion-color": createBuildingTypeColorExpression(SWEDEN_MAP_PALETTE),
       "fill-extrusion-height": createVisualBuildingHeightExpression(
         LOD_CONFIG.defaultBuildingHeightScale
       ),
@@ -189,4 +203,7 @@ export const createLayers = () => [
       "fill-extrusion-vertical-gradient": true
     }
   }
-];
+  );
+
+  return layers;
+};

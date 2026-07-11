@@ -85,10 +85,5 @@ export const createWeatherPopup = ({ map, maplibregl }) => {
     }
   };
 
-  map.on("click", (e) => {
-    if (e.originalEvent.target.closest(".maplibregl-ctrl, .weather-marker")) return;
-    showWeather(e.lngLat);
-  });
-
-  return { popup };
+  return { popup, showWeather };
 };

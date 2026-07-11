@@ -1,0 +1,81 @@
+#map-root .map-mode-control {
+  display: grid;
+  gap: 0.48rem;
+  min-width: 220px;
+  margin-top: 0.55rem;
+  padding: 0.68rem;
+  border-radius: 0.95rem;
+  border: 1px solid #b8cde050;
+  background:
+    linear-gradient(180deg, #ffffffee, #f4f7fce8),
+    radial-gradient(600px 200px at 50% -20%, #d0e4f63f 0%, transparent 58%);
+  box-shadow: 0 10px 28px -14px #1a2d4222;
+  backdrop-filter: blur(14px) saturate(120%);
+}
+
+#map-root .map-mode-control--switching {
+  opacity: 0.88;
+  pointer-events: none;
+}
+
+#map-root .map-mode-control__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+#map-root .map-mode-control__title {
+  margin: 0;
+  font-size: 0.67rem;
+  color: var(--app-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+}
+
+#map-root .map-mode-control__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.32rem;
+}
+
+#map-root .map-mode-control__button {
+  min-height: 34px;
+  border: 1px solid #b8cde052;
+  border-radius: 0.54rem;
+  background: linear-gradient(180deg, #f4f8fc, #e5edf5);
+  color: #2a3e52;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    transform 0.1s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+#map-root .map-mode-control__button:hover {
+  background: linear-gradient(180deg, #e8f0f8, #dae5f0);
+  border-color: #97bcd97d;
+}
+
+#map-root .map-mode-control__button:active {
+  background: linear-gradient(180deg, #dce7f1, #d0dde9);
+  transform: translateY(1px);
+}
+
+#map-root .map-mode-control__button[data-state="active"] {
+  color: #ffffff;
+  border-color: #68afe09e;
+  background: linear-gradient(180deg, #3a8fd6, #2a7bc0);
+  box-shadow: inset 0 1px 0 #ffffff33;
+}
+
+#map-root .map-mode-control__button[data-state="active"]:hover {
+  background: linear-gradient(180deg, #4499de, #2f84c8);
+  border-color: #5ca5dd9e;
+}

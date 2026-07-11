@@ -1,0 +1,321 @@
+/* ── Place detail side panel ── */
+
+.place-card {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  width: min(22rem, calc(100% - 1.5rem));
+  display: flex;
+  flex-direction: column;
+  border-radius: 18px;
+  border: 1px solid #c4d8ea55;
+  background: linear-gradient(180deg, #fffffffc, #f5f8fbf5);
+  box-shadow:
+    0 16px 48px -16px #1a2d4228,
+    0 4px 16px -6px #1a2d4214;
+  backdrop-filter: blur(16px) saturate(120%);
+  z-index: 4;
+  overflow: hidden;
+  transform: translateX(calc(100% + 1.5rem));
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.22s ease;
+}
+
+.place-card--open {
+  transform: translateX(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.place-card__header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: start;
+  padding: 1rem 1rem 0.85rem;
+  border-bottom: 1px solid #d8e4ee70;
+}
+
+.place-card__category-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #edf4fb, #e2ebf5);
+  font-size: 1.35rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.place-card__title-block {
+  min-width: 0;
+}
+
+.place-card__name {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #1a2b3d;
+  word-break: break-word;
+}
+
+.place-card__category-label {
+  margin: 0.2rem 0 0;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--app-accent);
+}
+
+.place-card__address {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--app-text-muted);
+}
+
+.place-card__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: 999px;
+  background: #edf2f8;
+  color: #4a6378;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.place-card__close:hover {
+  background: #e2ebf3;
+  color: #1c2d3f;
+}
+
+.place-card__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.85rem 1rem 1rem;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.place-card__section {
+  padding: 0.8rem 0.85rem;
+  border-radius: 14px;
+  background: #ffffffb8;
+  border: 1px solid #d8e4ee66;
+}
+
+.place-card__section-title {
+  margin: 0 0 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #5c7389;
+}
+
+.place-card__coords {
+  margin: 0;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  color: #2a3e52;
+}
+
+.place-card__loading,
+.place-card__error {
+  margin: 0;
+  padding: 1.5rem 0.5rem;
+  text-align: center;
+  font-size: 0.86rem;
+  color: var(--app-text-muted);
+}
+
+.place-card__error {
+  color: #c53a3a;
+}
+
+.place-card__retry {
+  margin-top: 0.65rem;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  background: #edf2f8;
+  color: #1c2d3f;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.place-card__retry:hover {
+  background: #e2ebf3;
+}
+
+/* Weather */
+
+.place-card__weather-current {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.place-card__weather-icon {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.place-card__weather-temp {
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: var(--app-accent-strong);
+}
+
+.place-card__weather-label {
+  margin: 0.15rem 0 0;
+  font-size: 0.78rem;
+  color: var(--app-text-muted);
+}
+
+.place-card__weather-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  margin-top: 0.55rem;
+  font-size: 0.74rem;
+  color: #4a6378;
+}
+
+.place-card__weather-unavailable {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--app-text-muted);
+}
+
+/* Nearby POIs */
+
+.place-card__poi-list {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.place-card__poi-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.55rem;
+  align-items: center;
+  width: 100%;
+  padding: 0.55rem 0.6rem;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: #f3f7fb;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.place-card__poi-item:hover {
+  background: #eaf1f8;
+  border-color: #c4d8ea88;
+}
+
+.place-card__poi-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.place-card__poi-name {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #1c2d3f;
+  line-height: 1.25;
+}
+
+.place-card__poi-meta {
+  margin: 0.12rem 0 0;
+  font-size: 0.7rem;
+  color: var(--app-text-muted);
+}
+
+.place-card__poi-distance {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #5c7389;
+  white-space: nowrap;
+}
+
+.place-card__empty {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--app-text-muted);
+}
+
+/* Footer */
+
+.place-card__footer {
+  padding: 0.75rem 1rem 1rem;
+  border-top: 1px solid #d8e4ee70;
+  background: linear-gradient(180deg, #ffffff90, #f5f8fc);
+}
+
+.place-card__navigate {
+  width: 100%;
+  min-height: 2.65rem;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--app-accent), var(--app-accent-strong));
+  color: #fff;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  box-shadow: 0 6px 18px -8px #2a7bc066;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.place-card__navigate:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px -8px #2a7bc080;
+}
+
+.place-card__navigate:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 640px) {
+  .place-card {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-height: 58vh;
+    border-radius: 18px 18px 0 0;
+    transform: translateY(100%);
+  }
+
+  .place-card--open {
+    transform: translateY(0);
+  }
+}

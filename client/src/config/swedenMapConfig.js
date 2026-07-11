@@ -1,4 +1,11 @@
-export const SWEDEN_SOURCE_BOUNDS = Object.freeze([9.5, 54.8, 24.8, 69.7]);
+import {
+  DEM_TILE_SOURCE,
+  GLYPHS_URL,
+  SWEDEN_TILE_BOUNDS,
+  VECTOR_TILE_SOURCE
+} from "../map/tiles/swedenTileSources.js";
+
+export const SWEDEN_SOURCE_BOUNDS = SWEDEN_TILE_BOUNDS;
 
 export const SWEDEN_MAP_CONFIG = Object.freeze({
   center: [16.5, 62.1],
@@ -25,11 +32,9 @@ export const NAVIGATION_CONTROL_CONFIG = Object.freeze({
 });
 
 export const SWEDEN_DATA_SOURCES = Object.freeze({
-  vectorTileJsonUrl: "https://tiles.openfreemap.org/planet",
-  glyphs: "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
-  terrainTiles: [
-    "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
-  ]
+  vectorTileJsonUrl: VECTOR_TILE_SOURCE.tileJsonUrl,
+  glyphs: GLYPHS_URL,
+  terrainTiles: DEM_TILE_SOURCE.tiles
 });
 
 export const TERRAIN_CONFIG = Object.freeze({
@@ -38,12 +43,33 @@ export const TERRAIN_CONFIG = Object.freeze({
 });
 
 export const LOD_CONFIG = Object.freeze({
-  idleDelayMs: 170,
-  closeRangeZoomThreshold: 14,
+  idleDelayMs: 220,
+  mediumZoomThreshold: 10,
+  closeZoomThreshold: 14,
   defaultBuildingHeightScale: 1.72,
   closeRangeBuildingHeightScale: 1.58,
   settledBuildingOpacity: 0.9,
   movingBuildingOpacity: 0.76,
   closeRangeMovingPixelRatio: 1.35,
-  maxPixelRatio: 2
+  maxPixelRatio: 2,
+  zoomTierProfiles: Object.freeze({
+    far: Object.freeze({
+      buildingHeightScale: 1.35,
+      settledBuildingOpacity: 0.82,
+      movingBuildingOpacity: 0.68,
+      hideRoadLabelsWhileMoving: true
+    }),
+    medium: Object.freeze({
+      buildingHeightScale: 1.55,
+      settledBuildingOpacity: 0.88,
+      movingBuildingOpacity: 0.74,
+      hideRoadLabelsWhileMoving: true
+    }),
+    close: Object.freeze({
+      buildingHeightScale: 1.72,
+      settledBuildingOpacity: 0.92,
+      movingBuildingOpacity: 0.78,
+      hideRoadLabelsWhileMoving: true
+    })
+  })
 });

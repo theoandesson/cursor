@@ -56,6 +56,32 @@ const run = async () => {
       throw new Error("/api/cities returnerade för få städer.");
     }
 
+    const poisResponse = await fetch(`http://${host}:${port}/api/pois?limit=5`);
+    if (!poisResponse.ok) {
+      throw new Error(`/api/pois svarade ${poisResponse.status}`);
+    }
+    const poisPayload = await poisResponse.json();
+    if (!Array.isArray(poisPayload.pois) || poisPayload.pois.length < 1) {
+      throw new Error("/api/pois returnerade inga POI.");
+    }
+
+    const searchValidationResponse = await fetch(`http://${host}:${port}/api/search?q=`);
+    if (searchValidationResponse.status !== 400) {
+      throw new Error("/api/search borde returnera 400 för tom sökfråga.");
+    }
+
+    const newClientAssets = [
+      "/src/search/createSearchControl.js",
+      "/src/places/createPlaceCard.js",
+      "/src/map/modes/createMapModeControl.js"
+    ];
+    for (const assetPath of newClientAssets) {
+      const assetResponse = await fetch(`http://${host}:${port}${assetPath}`);
+      if (!assetResponse.ok) {
+        throw new Error(`${assetPath} svarade ${assetResponse.status}`);
+      }
+    }
+
     const mainScriptResponse = await fetch(`http://${host}:${port}/src/main.js`);
     if (!mainScriptResponse.ok) {
       throw new Error(`/src/main.js svarade ${mainScriptResponse.status}`);

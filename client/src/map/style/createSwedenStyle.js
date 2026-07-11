@@ -1,14 +1,15 @@
-import { TERRAIN_CONFIG, SWEDEN_DATA_SOURCES } from "../../config/swedenMapConfig.js";
+import { TERRAIN_CONFIG } from "../../config/swedenMapConfig.js";
+import { GLYPHS_URL } from "../tiles/swedenTileSources.js";
 import { createLayers } from "./createLayers.js";
 import { SWEDEN_MAP_PALETTE } from "./palette/swedenPalette.js";
 import { createSources } from "./createSources.js";
 
-export const createSwedenStyle = () => ({
+export const createSwedenStyle = ({ mode } = {}) => ({
   version: 8,
   name: "sweden-3d-perf-profile",
-  glyphs: SWEDEN_DATA_SOURCES.glyphs,
-  sources: createSources(),
-  layers: createLayers(),
+  glyphs: GLYPHS_URL,
+  sources: createSources({ mode }),
+  layers: createLayers({ mode }),
   terrain: {
     source: TERRAIN_CONFIG.source,
     exaggeration: TERRAIN_CONFIG.exaggeration
