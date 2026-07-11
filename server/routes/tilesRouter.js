@@ -115,10 +115,11 @@ const resolveTileJsonPayload = (result) => {
 };
 
 export const createTilesRouter = () => {
-  const router = Router();
+  const rootRouter = Router();
+  const tilesRouter = Router();
   const tileService = createSelfHostedTileService(tileConfig);
 
-  router.get("/vector/tilejson.json", async (_request, response) => {
+  tilesRouter.get("/vector/tilejson.json", async (_request, response) => {
     try {
       const result = await tileService.getVectorTileJson();
       if (result?.ok === false) {
@@ -142,7 +143,7 @@ export const createTilesRouter = () => {
     }
   });
 
-  router.get("/vector/:z/:x/:y.pbf", async (request, response) => {
+  tilesRouter.get("/vector/:z/:x/:y.pbf", async (request, response) => {
     const z = parseCoordinate(request.params.z);
     const x = parseCoordinate(request.params.x);
     const y = parseCoordinate(request.params.y);
@@ -179,7 +180,7 @@ export const createTilesRouter = () => {
     }
   });
 
-  router.get("/dem/tilejson.json", async (_request, response) => {
+  tilesRouter.get("/dem/tilejson.json", async (_request, response) => {
     try {
       const result = await tileService.getDemTileJson();
       if (result?.ok === false) {
@@ -203,7 +204,7 @@ export const createTilesRouter = () => {
     }
   });
 
-  router.get("/dem/:z/:x/:y.png", async (request, response) => {
+  tilesRouter.get("/dem/:z/:x/:y.png", async (request, response) => {
     const z = parseCoordinate(request.params.z);
     const x = parseCoordinate(request.params.x);
     const y = parseCoordinate(request.params.y);
@@ -240,9 +241,10 @@ export const createTilesRouter = () => {
     }
   });
 
-  router.use((_request, response) => {
+  tilesRouter.use((_request, response) => {
     response.status(404).json({ error: "Tile-endpoint hittades inte." });
   });
 
-  return router;
+  rootRouter.use("/tiles", tilesRouter);
+  return rootRouter;
 };
