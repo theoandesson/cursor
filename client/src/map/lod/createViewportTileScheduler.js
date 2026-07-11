@@ -69,6 +69,8 @@ export const buildViewportTileSchedule = ({ west, south, east, north, zoom, cent
 const createInlineSchedulerWorker = () => {
   const workerSource = `
     const lngLatToTile = ${lngLatToTile.toString()};
+    const wrapTileX = ${wrapTileX.toString()};
+    const clampTileY = ${clampTileY.toString()};
     const enumerateTilesInBounds = ${enumerateTilesInBounds.toString()};
     const prioritizeViewportTiles = ${prioritizeViewportTiles.toString()};
     const tileToKey = ${tileToKey.toString()};
