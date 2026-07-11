@@ -1,5 +1,4 @@
 import { TRAFFIC_LAYER_IDS } from "./config/trafficLayerConfig.js";
-import { TRAFFIC_LAYER_IDS as RUNTIME_TRAFFIC_LAYER_IDS } from "./createTrafficControl.js";
 import { SWEDISH_TRANSIT_LAYER_IDS } from "./createTransitLayer.js";
 import {
   createBridgeCasingColorExpression,
@@ -17,6 +16,12 @@ const TRAFFIC_FLOW_SEGMENT_LAYER_IDS = Object.freeze([
   "traffic-flow-segment-lines",
   "traffic-flow-segment-animated"
 ]);
+
+const RUNTIME_TRAFFIC_LAYER_IDS = Object.freeze({
+  flowCasing: TRAFFIC_FLOW_SEGMENT_LAYER_IDS[0],
+  transitRoutes: SWEDISH_TRANSIT_LAYER_IDS[1],
+  transitStops: SWEDISH_TRANSIT_LAYER_IDS[3]
+});
 
 const ROAD_LINE_COLOR_BINDINGS = [
   ["roads-tunnel-casing", createTunnelCasingColorExpression],
