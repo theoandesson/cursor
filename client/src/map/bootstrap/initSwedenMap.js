@@ -18,14 +18,15 @@ import { createStagedFeatureMount } from "../loading/createStagedFeatureMount.js
 import { createOrientationControl } from "../navigation/createOrientationControl.js";
 import { createMapModeControl } from "../modes/createMapModeControl.js";
 import { getMapModeLabel } from "../modes/applyMapMode.js";
-import { createMobileFabMenu } from "../mobile/createMobileFabMenu.js";
 import { DEFAULT_MAP_MODE } from "../modes/mapModes.js";
+import { createMobileFabMenu } from "../mobile/createMobileFabMenu.js";
 import { createViewportPrefetcher } from "../tiles/createViewportPrefetcher.js";
 import {
   getActiveVectorTileTemplate,
   getPrefetchableTileTemplatesForMode,
   isSelfHostedTileMode
 } from "../tiles/swedenTileSources.js";
+import { createLazyLayerController } from "../style/createLazyLayerMount.js";
 import { createSwedenStyle } from "../style/createSwedenStyle.js";
 
 const enableInteraction = (handler) => {
@@ -154,6 +155,8 @@ export const initSwedenMap = ({
   let unsubscribeOverlayStatus = null;
   let refreshRoadLabels = null;
   let disposeDeferredTerrain = null;
+  let disposeLazyLayers = null;
+  let unsubscribeLazyLayerUpdates = null;
   let cancelDeferredMount = null;
   let mapCoreMounted = false;
   let mapFeaturesMounted = false;
@@ -202,6 +205,10 @@ export const initSwedenMap = ({
     cancelDeferredMount = null;
     disposeDeferredTerrain?.();
     disposeDeferredTerrain = null;
+    unsubscribeLazyLayerUpdates?.();
+    unsubscribeLazyLayerUpdates = null;
+    disposeLazyLayers?.();
+    disposeLazyLayers = null;
 
     if (!mapFeaturesMounted && !mapCoreMounted) {
       return;
@@ -278,6 +285,13 @@ export const initSwedenMap = ({
     disposeMapClick = () => map.off("click", onMapClick);
 
     dayNightController.setMode(dayNightController.getMode());
+    const lazyLayersByZoom = map.getStyle()?.metadata?.lazyLayersByZoom;
+    const lazyLayerController = createLazyLayerController(map, lazyLayersByZoom);
+    disposeLazyLayers = lazyLayerController.destroy;
+    unsubscribeLazyLayerUpdates = lazyLayerController.subscribe(() => {
+      dayNightController?.reapplyMode();
+      refreshRoadLabels?.();
+    });
     disposeDeferredTerrain = enableDeferredTerrain(map);
     mapCoreMounted = true;
   };
@@ -419,7 +433,7 @@ export const initSwedenMap = ({
           message: `Kartläge: ${getMapModeLabel(mode)}.`
         });
       }
-    }),
+    })),
     "top-right"
   );
 

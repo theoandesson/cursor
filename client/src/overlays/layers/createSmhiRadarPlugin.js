@@ -14,6 +14,16 @@ const FRAME_POLL_MS = 60 * 1000;
 const FRAME_HOURS = 1;
 const SPEED_STEPS_MS = [1200, 800, 500, 300];
 
+const resolveBeforeLayerId = (map) => {
+  const candidateIds = ["sweden-buildings", "road-labels", "city-weather-labels"];
+  for (const layerId of candidateIds) {
+    if (map.getLayer(layerId)) {
+      return layerId;
+    }
+  }
+  return undefined;
+};
+
 const isValidRadarCoordinates = (coordinates) =>
   Array.isArray(coordinates) &&
   coordinates.length === 4 &&
@@ -222,7 +232,7 @@ export const createSmhiRadarPlugin = () => {
             "raster-resampling": "linear"
           }
         },
-        "sweden-buildings"
+        resolveBeforeLayerId(map)
       );
 
       await refreshFrames();

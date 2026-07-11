@@ -23,6 +23,8 @@ const EXPECTED_ENDPOINT_PATHS = [
   "/api/radar/metadata",
   "/api/radar/frames?hours=&limit=&offset=",
   "/api/radar/frames/:frameKey.png",
+  "/tiles/vector/tilejson.json",
+  "/tiles/vector/:z/:x/:y.pbf",
   "/api/pressure/metadata",
   "/api/pressure/frames?hours=&limit=&offset=",
   "/api/pressure/frames/:frameKey.geojson",

@@ -1,6 +1,5 @@
 import {
   DEM_TILE_SOURCE,
-  GLYPHS_URL,
   SWEDEN_TILE_BOUNDS,
   VECTOR_TILE_SOURCE,
   getActiveGlyphsUrl,

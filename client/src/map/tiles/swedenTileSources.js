@@ -37,7 +37,6 @@ export const GLYPHS_URL =
   "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf";
 
 const SELF_HOSTED_GLYPHS_URL = "/tiles/fonts/{fontstack}/{range}.pbf";
-
 const SELF_HOSTED_DEM_TILE_URL_TEMPLATE = "/tiles/dem/{z}/{x}/{y}.png";
 
 const TILE_MODES = Object.freeze({

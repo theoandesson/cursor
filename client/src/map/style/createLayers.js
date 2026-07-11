@@ -21,6 +21,17 @@ const urbanLanduseFilter = [
 
 const ROAD_LABEL_LAYER_ID = "road-labels";
 
+const createSwedenBorderLayer = () => ({
+  id: "sweden-border",
+  source: "sweden_boundary",
+  type: "line",
+  paint: {
+    "line-color": SWEDEN_MAP_PALETTE.swedenBorder,
+    "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.8, 10, 1.6, 15, 3],
+    "line-opacity": SWEDEN_MAP_PALETTE.swedenBorderOpacity
+  }
+});
+
 const createBaseTierLayers = ({ satelliteActive, mode }) => {
   const layers = [];
 
@@ -104,16 +115,6 @@ const createBaseTierLayers = ({ satelliteActive, mode }) => {
         "line-width": 1,
         "line-opacity": 0.65
       }
-    },
-    {
-      id: "sweden-border",
-      source: "sweden_boundary",
-      type: "line",
-      paint: {
-        "line-color": SWEDEN_MAP_PALETTE.swedenBorder,
-        "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.8, 10, 1.6, 15, 3],
-        "line-opacity": SWEDEN_MAP_PALETTE.swedenBorderOpacity
-      }
     }
   );
 
@@ -133,6 +134,7 @@ const createDetailAndLabelLayers = () => {
 };
 
 const createBuildingLayers = () => [
+  createSwedenBorderLayer(),
   {
     id: "sweden-buildings",
     source: "sweden_vector",

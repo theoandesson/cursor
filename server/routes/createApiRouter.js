@@ -188,6 +188,16 @@ export const createApiRouter = () => {
           path: "/api/radar/frames/:frameKey.png",
           description: "Proxad SMHI-radarbild (frameKey=latest eller radar_YYMMDDHHMM)"
         },
+        {
+          method: "GET",
+          path: "/tiles/vector/tilejson.json",
+          description: "Self-hosted vector TileJSON (kräver synkade tile-filer lokalt)"
+        },
+        {
+          method: "GET",
+          path: "/tiles/vector/:z/:x/:y.pbf",
+          description: "Self-hosted vector tile endpoint (kräver synkade tile-filer lokalt)"
+        },
         { method: "GET", path: "/api/pressure/metadata", description: "Tryck/åska-metadata och legend" },
         {
           method: "GET",
