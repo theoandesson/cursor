@@ -250,6 +250,7 @@ export const initSwedenMap = ({
       initialVisible: trafficState.transit
     });
     disposeTransitLayer = transitLayer.destroy;
+    trafficControl.setTransitLayer(transitLayer);
 
     disposeLod = createAdaptiveLodController({
       map,

@@ -110,10 +110,15 @@ export const createTrafficController = ({
   map.on("style.load", onStyleLoad);
   listeners.push(() => map.off("style.load", onStyleLoad));
 
-  ensureTrafficSource();
-  setVisibility(visible, { notify: false });
-  loadTraffic();
-  intervalId = setInterval(loadTraffic, REFRESH_INTERVAL_MS);
+  if (map.isStyleLoaded()) {
+    onStyleLoad();
+  }
+
+  intervalId = setInterval(() => {
+    if (visible) {
+      loadTraffic();
+    }
+  }, REFRESH_INTERVAL_MS);
 
   return {
     isVisible: () => visible,

@@ -1,7 +1,15 @@
 /* Google Maps–inspired traffic control and legend */
 
 #map-root .maplibregl-ctrl-bottom-left .traffic-control {
-  margin: 0 0 calc(var(--app-inset-safe-bottom) + 2.65rem) var(--app-inset-safe-left);
+  margin: 0 0 calc(var(--app-inset-safe-bottom) + 0.35rem) var(--app-inset-safe-left);
+  order: -1;
+}
+
+#map-root .maplibregl-ctrl-bottom-left {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-start;
+  gap: 0.35rem;
 }
 
 #map-root .traffic-control {
