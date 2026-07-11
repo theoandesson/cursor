@@ -1,9 +1,15 @@
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const workspaceRoot = path.resolve(__dirname, "..", "..");
+const distClientDirectory = path.join(workspaceRoot, "dist", "client");
+const sourceClientDirectory = path.join(workspaceRoot, "client");
+const staticDirectory = fs.existsSync(distClientDirectory)
+  ? distClientDirectory
+  : sourceClientDirectory;
 
 const parsePort = (value, fallback) => {
   const parsed = Number.parseInt(value ?? "", 10);
@@ -31,6 +37,6 @@ const parseBoolean = (value, fallback) => {
 export const appConfig = Object.freeze({
   host: process.env.HOST ?? "127.0.0.1",
   port: parsePort(process.env.PORT, 4173),
-  staticDirectory: path.join(workspaceRoot, "client"),
+  staticDirectory,
   autoOpenBrowser: parseBoolean(process.env.AUTO_OPEN_BROWSER, false)
 });
