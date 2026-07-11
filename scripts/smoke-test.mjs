@@ -56,6 +56,35 @@ const run = async () => {
       throw new Error("/api/cities returnerade för få städer.");
     }
 
+    const radarMetaResponse = await fetch(`http://${host}:${port}/api/radar/metadata`);
+    if (!radarMetaResponse.ok) {
+      throw new Error(`/api/radar/metadata svarade ${radarMetaResponse.status}`);
+    }
+    const radarMetaPayload = await radarMetaResponse.json();
+    if (!radarMetaPayload?.coordinates || !Array.isArray(radarMetaPayload.coordinates)) {
+      throw new Error("/api/radar/metadata saknar koordinater.");
+    }
+
+    const radarFramesResponse = await fetch(`http://${host}:${port}/api/radar/frames?hours=1&limit=3`);
+    if (!radarFramesResponse.ok) {
+      throw new Error(`/api/radar/frames svarade ${radarFramesResponse.status}`);
+    }
+    const radarFramesPayload = await radarFramesResponse.json();
+    if (!Array.isArray(radarFramesPayload.frames) || radarFramesPayload.frames.length < 1) {
+      throw new Error("/api/radar/frames returnerade inga bilder.");
+    }
+
+    const radarImageResponse = await fetch(
+      `http://${host}:${port}${radarFramesPayload.frames.at(-1).imageUrl}`
+    );
+    if (!radarImageResponse.ok) {
+      throw new Error(`Radar PNG svarade ${radarImageResponse.status}`);
+    }
+    const radarContentType = radarImageResponse.headers.get("content-type") ?? "";
+    if (!radarContentType.includes("image/png")) {
+      throw new Error("Radar PNG returnerade felaktigt content-type.");
+    }
+
     const mainScriptResponse = await fetch(`http://${host}:${port}/src/main.js`);
     if (!mainScriptResponse.ok) {
       throw new Error(`/src/main.js svarade ${mainScriptResponse.status}`);

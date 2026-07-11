@@ -1,10 +1,17 @@
 import { Router } from "express";
 import { parseBoolean, parseFloatInRange, parseIntegerInRange } from "../lib/parseQuery.js";
 import { getCityById, getCityWeather, listCities, toCityDto } from "../services/cityWeatherService.js";
+import {
+  getRadarImage,
+  getRadarMetadataPayload,
+  listRadarFrames
+} from "../services/radarProxyService.js";
 import { fetchWeatherByPoint } from "../services/smhiWeatherService.js";
 
 const MAX_PAGE_SIZE = 300;
 const MAX_FORECAST_HOURS = 48;
+const MAX_RADAR_HOURS = 6;
+const MAX_RADAR_FRAMES = 72;
 
 const parsePageQuery = (request) => {
   const limit = parseIntegerInRange(request.query.limit, { min: 1, max: MAX_PAGE_SIZE });
@@ -37,7 +44,14 @@ export const createApiRouter = () => {
         { method: "GET", path: "/api/cities/:cityId", description: "Hämta en stad via id" },
         { method: "GET", path: "/api/weather/point?lon=&lat=&hours=", description: "Väder för valfri punkt" },
         { method: "GET", path: "/api/weather/cities", description: "Väder för alla städer i listan" },
-        { method: "GET", path: "/api/weather/cities/:cityId", description: "Väder för en specifik stad" }
+        { method: "GET", path: "/api/weather/cities/:cityId", description: "Väder för en specifik stad" },
+        { method: "GET", path: "/api/radar/metadata", description: "Radar-metadata och georeferens" },
+        { method: "GET", path: "/api/radar/frames?hours=&limit=&offset=", description: "Radarframes för tidslinje" },
+        {
+          method: "GET",
+          path: "/api/radar/frames/:frameKey.png",
+          description: "Proxad SMHI-radarbild (frameKey=latest eller radar_YYMMDDHHMM)"
+        }
       ]
     });
   });
@@ -98,6 +112,61 @@ export const createApiRouter = () => {
     } catch (error) {
       response.status(502).json({
         error: error instanceof Error ? error.message : "Kunde inte hämta stadsväder."
+      });
+    }
+  });
+
+  router.get("/radar/metadata", async (_request, response) => {
+    try {
+      const metadata = await getRadarMetadataPayload();
+      response.status(200).json(metadata);
+    } catch (error) {
+      response.status(502).json({
+        error: error instanceof Error ? error.message : "Kunde inte hämta radar-metadata."
+      });
+    }
+  });
+
+  router.get("/radar/frames", async (request, response) => {
+    const hours =
+      parseIntegerInRange(request.query.hours, { min: 1, max: MAX_RADAR_HOURS }) ?? 1;
+    const limit = parseIntegerInRange(request.query.limit, { min: 1, max: MAX_RADAR_FRAMES });
+    const offset = parseIntegerInRange(request.query.offset, { min: 0 }) ?? 0;
+    const forceRefresh = parseBoolean(request.query.refresh, false);
+
+    try {
+      const payload = await listRadarFrames({
+        hours,
+        limit,
+        offset,
+        forceRefresh
+      });
+      response.status(200).json(payload);
+    } catch (error) {
+      response.status(502).json({
+        error: error instanceof Error ? error.message : "Kunde inte hämta radarframes."
+      });
+    }
+  });
+
+  router.get("/radar/frames/:frameKey.png", async (request, response) => {
+    const frameKey = String(request.params.frameKey ?? "").trim();
+    const forceRefresh = parseBoolean(request.query.refresh, false);
+
+    if (!frameKey) {
+      response.status(400).json({ error: "Ogiltig radarframe." });
+      return;
+    }
+
+    try {
+      const image = await getRadarImage({ frameKey, forceRefresh });
+      response.setHeader("Content-Type", image.contentType);
+      response.setHeader("Cache-Control", image.cacheControl);
+      response.status(200).send(image.buffer);
+    } catch (error) {
+      const statusCode = error?.statusCode === 404 ? 404 : 502;
+      response.status(statusCode).json({
+        error: error instanceof Error ? error.message : "Kunde inte hämta radarbild."
       });
     }
   });

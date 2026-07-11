@@ -3,6 +3,7 @@ import {
   NAVIGATION_CONTROL_CONFIG,
   SWEDEN_MAP_CONFIG
 } from "../../config/swedenMapConfig.js";
+import { createOverlaySystem } from "../../overlays/bootstrap/createOverlaySystem.js";
 import { createCityWeatherLayer } from "../../weather/createCityWeatherLayer.js";
 import { createWeatherPopup } from "../../weather/createWeatherPopup.js";
 import { createAdaptiveLodController } from "../lod/createAdaptiveLodController.js";
@@ -80,10 +81,12 @@ export const initSwedenMap = ({
     createInitialLoadUxController({ map, loadingOverlay });
   }
 
-  map.on("load", () => {
+  map.on("load", async () => {
+    const overlaySystem = createOverlaySystem({ map, maplibregl });
     createCityWeatherLayer({ map, maplibregl });
     createWeatherPopup({ map, maplibregl });
     createAdaptiveLodController({ map, lodConfig: LOD_CONFIG, onStatusChange });
+    await overlaySystem.mount();
   });
 
   return map;
