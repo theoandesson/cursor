@@ -20,6 +20,9 @@ const EXPECTED_ENDPOINT_PATHS = [
   "/api/weather/point?lon=&lat=&hours=",
   "/api/weather/cities",
   "/api/weather/cities/:cityId",
+  "/api/radar/metadata",
+  "/api/radar/frames?hours=&limit=&offset=",
+  "/api/radar/frames/:frameKey.png",
   "/api/tiles/proxy?url=",
   "/api/tiles/proxy/stats",
   "/api/search?q=&limit=",
@@ -54,7 +57,9 @@ const NEW_CLIENT_ASSETS = [
   "/src/perf/perfTracker.js",
   "/src/navigation/routes.js",
   "/src/store/weatherStore.js",
-  "/src/api/bootstrapClient.js"
+  "/src/api/bootstrapClient.js",
+  "/src/overlays/bootstrap/createOverlaySystem.js",
+  "/src/overlays/layers/createSmhiRadarPlugin.js"
 ];
 
 const assert = (condition, message) => {
@@ -383,6 +388,32 @@ const testBootstrapAndPerf = async (baseUrl) => {
   assert(perfTrackerResponse.ok, `/src/perf/perfTracker.js svarade ${perfTrackerResponse.status}`);
 };
 
+const testRadarEndpoints = async (baseUrl) => {
+  const { response: metaResponse, body: metaPayload } = await request(baseUrl, "/api/radar/metadata");
+  assert(metaResponse.ok, `/api/radar/metadata svarade ${metaResponse.status}`);
+  assert(
+    Array.isArray(metaPayload.coordinates) && metaPayload.coordinates.length === 4,
+    "/api/radar/metadata saknar koordinater."
+  );
+
+  const { response: framesResponse, body: framesPayload } = await request(
+    baseUrl,
+    "/api/radar/frames?hours=1&limit=3"
+  );
+  assert(framesResponse.ok, `/api/radar/frames svarade ${framesResponse.status}`);
+  assert(
+    Array.isArray(framesPayload.frames) && framesPayload.frames.length >= 1,
+    "/api/radar/frames returnerade inga bilder."
+  );
+
+  const { response: imageResponse, contentType } = await request(
+    baseUrl,
+    framesPayload.frames.at(-1).imageUrl
+  );
+  assert(imageResponse.ok, `Radar PNG svarade ${imageResponse.status}`);
+  assert(contentType.includes("image/png"), "Radar PNG returnerade felaktigt content-type.");
+};
+
 const run = async () => {
   const host = "127.0.0.1";
   const port = 4199;
@@ -405,8 +436,9 @@ const run = async () => {
     await testClientAssets(baseUrl);
     await testExistingApis(baseUrl);
     await testBootstrapAndPerf(baseUrl);
+    await testRadarEndpoints(baseUrl);
 
-    console.log("Smoke-test klar: server, API, bootstrap, prestanda, säkerhet och klientfiler fungerar.");
+    console.log("Smoke-test klar: server, API, bootstrap, radar, prestanda, säkerhet och klientfiler fungerar.");
   } finally {
     await new Promise((resolve, reject) => {
       if (!server.listening) {

@@ -19,6 +19,11 @@ import { GeocodeNotFoundError, reverseGeocode, searchPlaces } from "../services/
 import { POI_CATEGORY_BY_ID } from "../data/poiCategories.js";
 import { getPoiById, getPoisNearPoint, listPois, toPoiDto } from "../services/poiService.js";
 import { getPointWeather } from "../services/pointWeatherService.js";
+import {
+  getRadarImage,
+  getRadarMetadataPayload,
+  listRadarFrames
+} from "../services/radarProxyService.js";
 import { fetchWeatherByPoint } from "../services/smhiWeatherService.js";
 import { getStopsNearPoint, listLines, listStops, listTransit } from "../services/transitService.js";
 import {
@@ -32,6 +37,8 @@ const tileProxy = createTileProxyService();
 
 const MAX_PAGE_SIZE = 300;
 const MAX_FORECAST_HOURS = 48;
+const MAX_RADAR_HOURS = 6;
+const MAX_RADAR_FRAMES = 72;
 const MAX_POI_RADIUS_KM = 100;
 const DEFAULT_POI_RADIUS_KM = 5;
 const DEFAULT_NEAR_POI_LIMIT = 20;
@@ -169,6 +176,13 @@ export const createApiRouter = () => {
         { method: "GET", path: "/api/weather/point?lon=&lat=&hours=", description: "Väder för valfri punkt" },
         { method: "GET", path: "/api/weather/cities", description: "Väder för alla städer i listan" },
         { method: "GET", path: "/api/weather/cities/:cityId", description: "Väder för en specifik stad" },
+        { method: "GET", path: "/api/radar/metadata", description: "Radar-metadata och georeferens" },
+        { method: "GET", path: "/api/radar/frames?hours=&limit=&offset=", description: "Radarframes för tidslinje" },
+        {
+          method: "GET",
+          path: "/api/radar/frames/:frameKey.png",
+          description: "Proxad SMHI-radarbild (frameKey=latest eller radar_YYMMDDHHMM)"
+        },
         { method: "GET", path: "/api/tiles/proxy?url=", description: "CORS-säker tile-proxy med minnescache" },
         { method: "GET", path: "/api/tiles/proxy/stats", description: "Tile-proxy cachestatistik" },
         { method: "GET", path: "/api/search?q=&limit=", description: "Autocomplete-sökning av platser i Sverige" },
@@ -316,6 +330,61 @@ export const createApiRouter = () => {
     } catch (error) {
       response.status(502).json({
         error: error instanceof Error ? error.message : "Kunde inte hämta stadsväder."
+      });
+    }
+  });
+
+  router.get("/radar/metadata", async (_request, response) => {
+    try {
+      const metadata = await getRadarMetadataPayload();
+      response.status(200).json(metadata);
+    } catch (error) {
+      response.status(502).json({
+        error: error instanceof Error ? error.message : "Kunde inte hämta radar-metadata."
+      });
+    }
+  });
+
+  router.get("/radar/frames", async (request, response) => {
+    const hours =
+      parseIntegerInRange(request.query.hours, { min: 1, max: MAX_RADAR_HOURS }) ?? 1;
+    const limit = parseIntegerInRange(request.query.limit, { min: 1, max: MAX_RADAR_FRAMES });
+    const offset = parseIntegerInRange(request.query.offset, { min: 0 }) ?? 0;
+    const forceRefresh = parseBoolean(request.query.refresh, false);
+
+    try {
+      const payload = await listRadarFrames({
+        hours,
+        limit,
+        offset,
+        forceRefresh
+      });
+      response.status(200).json(payload);
+    } catch (error) {
+      response.status(502).json({
+        error: error instanceof Error ? error.message : "Kunde inte hämta radarframes."
+      });
+    }
+  });
+
+  router.get("/radar/frames/:frameKey.png", async (request, response) => {
+    const frameKey = String(request.params.frameKey ?? "").trim();
+    const forceRefresh = parseBoolean(request.query.refresh, false);
+
+    if (!frameKey) {
+      response.status(400).json({ error: "Ogiltig radarframe." });
+      return;
+    }
+
+    try {
+      const image = await getRadarImage({ frameKey, forceRefresh });
+      response.setHeader("Content-Type", image.contentType);
+      response.setHeader("Cache-Control", image.cacheControl);
+      response.status(200).send(image.buffer);
+    } catch (error) {
+      const statusCode = error?.statusCode === 404 ? 404 : 502;
+      response.status(statusCode).json({
+        error: error instanceof Error ? error.message : "Kunde inte hämta radarbild."
       });
     }
   });

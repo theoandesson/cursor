@@ -3,6 +3,7 @@ import {
   NAVIGATION_CONTROL_CONFIG,
   SWEDEN_MAP_CONFIG
 } from "../../config/swedenMapConfig.js";
+import { createOverlaySystem } from "../../overlays/bootstrap/createOverlaySystem.js";
 import { createPlaceCard, shouldIgnoreMapPlaceClick } from "../../places/createPlaceCard.js";
 import { createSearchControl } from "../../search/createSearchControl.js";
 import { createCityWeatherLayer } from "../../weather/createCityWeatherLayer.js";
@@ -122,6 +123,7 @@ export const initSwedenMap = ({
   let trafficControl = null;
   let trafficControlAdded = false;
   let dayNightController = null;
+  let disposeOverlaySystem = null;
   let disposeDeferredTerrain = null;
   let cancelDeferredMount = null;
   let mapCoreMounted = false;
@@ -194,6 +196,8 @@ export const initSwedenMap = ({
     disposeLod = null;
     disposeLandmarks?.();
     disposeLandmarks = null;
+    disposeOverlaySystem?.();
+    disposeOverlaySystem = null;
     disposeMapClick?.();
     disposeMapClick = null;
     mapFeaturesMounted = false;
@@ -322,7 +326,7 @@ export const initSwedenMap = ({
         },
         {
           name: "lod-and-scheduler",
-          priority: 2,
+          priority: 3,
           mount: () => {
             disposeLod = createAdaptiveLodController({
               map,
@@ -343,8 +347,17 @@ export const initSwedenMap = ({
           }
         },
         {
+          name: "overlays",
+          priority: 2,
+          mount: () => {
+            const overlaySystem = createOverlaySystem({ map, maplibregl });
+            void overlaySystem.mount();
+            disposeOverlaySystem = overlaySystem.dispose;
+          }
+        },
+        {
           name: "landmarks-and-traffic",
-          priority: 3,
+          priority: 4,
           mount: () => {
             disposeLandmarks = createLandmarkLayer({ map, maplibregl });
             mountTrafficFeatures().catch((error) => {
@@ -354,7 +367,7 @@ export const initSwedenMap = ({
         },
         {
           name: "prefetcher",
-          priority: 4,
+          priority: 5,
           mount: () => {
             disposePrefetcher = createViewportPrefetcher(map, {
               deferInitialPrefetch: true,
@@ -431,6 +444,8 @@ export const initSwedenMap = ({
     disposeLoadUx = null;
     placeCard?.destroy();
     placeCard = null;
+    disposeOverlaySystem?.();
+    disposeOverlaySystem = null;
     dayNightController?.destroy();
     dayNightController = null;
     return originalRemove();
