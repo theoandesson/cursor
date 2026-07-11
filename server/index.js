@@ -7,8 +7,9 @@ import { startBackgroundRefresh, warmWeatherCache } from "./services/weatherWarm
 const boot = async () => {
   const baseUrl = `http://${appConfig.host}:${appConfig.port}`;
   let stopBackgroundRefresh = null;
+  let server = null;
 
-  await startServer({
+  const context = await startServer({
     host: appConfig.host,
     port: appConfig.port,
     staticDirectory: appConfig.staticDirectory,
@@ -16,7 +17,8 @@ const boot = async () => {
       console.log(`Sverige 3D-karta startad: ${baseUrl}`);
       console.log("LOD: låg detalj vid rörelse, hög detalj i idle.");
     },
-    onReady: async () => {
+    onReady: async ({ server: httpServer }) => {
+      server = httpServer;
       try {
         await warmWeatherCache({ forecastHours: 24 });
         stopBackgroundRefresh = startBackgroundRefresh({ intervalMs: 5 * 60 * 1000 });
@@ -32,12 +34,22 @@ const boot = async () => {
     }
   });
 
+  server = context.server;
+
   if (appConfig.autoOpenBrowser) {
     await openLocalhost(baseUrl);
   }
 
   const shutdown = () => {
     stopBackgroundRefresh?.();
+    if (server) {
+      server.close(() => {
+        process.exit(0);
+      });
+      setTimeout(() => process.exit(1), 5000).unref();
+    } else {
+      process.exit(0);
+    }
   };
 
   process.on("SIGINT", shutdown);

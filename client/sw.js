@@ -9,6 +9,10 @@ import {
 
 const API_CACHE_NAME = "sweden-map-api-v1";
 const API_SWR_PATHS = new Set(["/api/bootstrap", "/api/weather/cities"]);
+const DELETE_OUTDATED_DEBOUNCE_MS = 60000;
+
+let lastDeleteOutdatedAt = 0;
+let deleteOutdatedInFlight = null;
 
 const cacheableResponse = (response) =>
   response && (response.ok || response.type === "opaque");
@@ -26,6 +30,14 @@ const isApiCacheableRequest = (request) => {
   }
 };
 
+const putInCache = async (cache, request, response) => {
+  try {
+    await cache.put(request, response.clone());
+  } catch (error) {
+    console.warn("Tilecache put failed.", error);
+  }
+};
+
 const staleWhileRevalidateApi = async (request) => {
   const cache = await caches.open(API_CACHE_NAME);
   const cached = await cache.match(request);
@@ -33,7 +45,7 @@ const staleWhileRevalidateApi = async (request) => {
   const networkPromise = fetch(request)
     .then((response) => {
       if (cacheableResponse(response)) {
-        cache.put(request, response.clone());
+        return putInCache(cache, request, response).then(() => response);
       }
       return response;
     })
@@ -89,6 +101,24 @@ const deleteOutdatedTileCaches = async (activeCacheName) => {
   await Promise.all(outdated.map((cacheName) => caches.delete(cacheName)));
 };
 
+const debouncedDeleteOutdatedTileCaches = (activeCacheName) => {
+  const now = Date.now();
+  if (deleteOutdatedInFlight && now - lastDeleteOutdatedAt < DELETE_OUTDATED_DEBOUNCE_MS) {
+    return deleteOutdatedInFlight;
+  }
+
+  lastDeleteOutdatedAt = now;
+  deleteOutdatedInFlight = deleteOutdatedTileCaches(activeCacheName)
+    .catch((error) => {
+      console.warn("Tilecache cleanup failed.", error);
+    })
+    .finally(() => {
+      deleteOutdatedInFlight = null;
+    });
+
+  return deleteOutdatedInFlight;
+};
+
 const findCachedInNamedCaches = async (request, cacheNames) => {
   for (const cacheName of cacheNames) {
     const cache = await caches.open(cacheName);
@@ -121,7 +151,7 @@ const getCachedResponseOrFetch = async (request, cacheName) => {
 
   const networkPromise = fetch(request).then((response) => {
     if (cacheableResponse(response)) {
-      cache.put(request, response.clone());
+      return putInCache(cache, request, response).then(() => response);
     }
     return response;
   });
@@ -150,7 +180,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   const activeCacheName = buildTileCacheName();
   event.waitUntil(
-    deleteOutdatedTileCaches(activeCacheName).then(() => self.clients.claim())
+    debouncedDeleteOutdatedTileCaches(activeCacheName).then(() => self.clients.claim())
   );
 });
 
@@ -166,7 +196,7 @@ self.addEventListener("fetch", (event) => {
 
   const activeCacheName = buildTileCacheName();
   event.respondWith(getCachedResponseOrFetch(event.request, activeCacheName));
-  event.waitUntil(deleteOutdatedTileCaches(activeCacheName));
+  event.waitUntil(debouncedDeleteOutdatedTileCaches(activeCacheName));
 });
 
 self.addEventListener("message", (event) => {

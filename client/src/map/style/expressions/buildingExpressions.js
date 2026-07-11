@@ -4,8 +4,14 @@ const MIN_LEVEL_HEIGHT_METERS = 4;
 
 const buildingLevelsValue = [
   "coalesce",
-  ["to-number", ["get", "building:levels"], 0],
-  ["to-number", ["get", "levels"], 0],
+  [
+    "case",
+    ["has", "building:levels"],
+    ["to-number", ["get", "building:levels"], 0],
+    ["has", "levels"],
+    ["to-number", ["get", "levels"], 0],
+    0
+  ],
   0
 ];
 

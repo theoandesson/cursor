@@ -31,29 +31,36 @@ export const createMapModeControl = ({ map, onModeChange, onStyleLoaded, onBefor
   const listeners = [];
   const buttons = [];
 
+  const resetSwitching = () => {
+    container?.classList.remove("map-mode-control--switching");
+    isSwitching = false;
+  };
+
   const switchMode = (mode) => {
     if (isSwitching || mode === currentMode) {
-      return;
+      return false;
     }
 
     isSwitching = true;
     container?.classList.add("map-mode-control--switching");
 
-    const appliedMode = applyMapMode({
+    applyMapMode({
       map,
       mode,
       onBeforeStyleChange,
       onStyleLoaded: (payload) => {
         currentMode = payload.mode;
         setActiveButton({ buttons, activeMode: currentMode });
-        container?.classList.remove("map-mode-control--switching");
-        isSwitching = false;
+        resetSwitching();
         onModeChange?.(currentMode);
         onStyleLoaded?.(currentMode);
+      },
+      onStyleError: () => {
+        resetSwitching();
       }
     });
 
-    setActiveButton({ buttons, activeMode: appliedMode });
+    return true;
   };
 
   const focusMode = (mode) => {

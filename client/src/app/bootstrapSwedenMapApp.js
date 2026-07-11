@@ -9,6 +9,7 @@ import { createAppShell } from "./createAppShell.js";
 
 const MAP_ROOT_ID = "map-root";
 const CITY_FLY_ZOOM = 11;
+const SW_WAIT_TIMEOUT_MS = 8000;
 
 const createBootstrapOnTiming = (perfTracker) => {
   if (!perfTracker) {
@@ -54,7 +55,11 @@ export const bootstrapSwedenMapApp = async ({ maplibregl, perfTracker }) => {
   });
   perfTracker?.recordMilestone("bootstrap-prefetch-start");
 
-  const appShell = createAppShell({ mapRootElement, perfTracker, fetchFn: fetchWithTiming });
+  const appShell = createAppShell({
+    mapRootElement,
+    perfTracker,
+    bootstrapPrefetch
+  });
   perfTracker?.recordMilestone("app-shell-ready");
 
   const setStatus = createMapStatusPresenter({ mapRootElement });
@@ -70,9 +75,18 @@ export const bootstrapSwedenMapApp = async ({ maplibregl, perfTracker }) => {
   perfTracker?.recordMilestone("sw-register-start");
 
   const endSwRegister = perfTracker?.startSpan("sw-register");
-  await waitForTileCacheServiceWorker({
+  let swDispose = null;
+  const swWaitPromise = waitForTileCacheServiceWorker({
     onStatusChange: setCacheStatus
-  }).finally(() => {
+  }).then((result) => {
+    swDispose = result?.dispose ?? null;
+    return result?.registration ?? result;
+  });
+  const swTimeoutPromise = new Promise((resolve) => {
+    setTimeout(resolve, SW_WAIT_TIMEOUT_MS);
+  });
+
+  await Promise.race([swWaitPromise, swTimeoutPromise]).finally(() => {
     endSwRegister?.();
     perfTracker?.recordMilestone("sw-register-done");
   });
@@ -94,7 +108,7 @@ export const bootstrapSwedenMapApp = async ({ maplibregl, perfTracker }) => {
     }
   });
 
-  mapRootElement.addEventListener("city:select", (event) => {
+  const handleCitySelect = (event) => {
     const city = event.detail?.city;
     if (!city || city.lon == null || city.lat == null) {
       return;
@@ -107,9 +121,19 @@ export const bootstrapSwedenMapApp = async ({ maplibregl, perfTracker }) => {
       duration: 1700,
       essential: true
     });
-  });
+  };
+
+  mapRootElement.addEventListener("city:select", handleCitySelect);
 
   perfTracker?.recordMilestone("shell-ready");
 
-  return { map, appShell };
+  return {
+    map,
+    appShell,
+    destroy: () => {
+      mapRootElement.removeEventListener("city:select", handleCitySelect);
+      appShell.destroy();
+      swDispose?.();
+    }
+  };
 };

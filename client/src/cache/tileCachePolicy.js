@@ -8,6 +8,9 @@ const ESRI_HOST = "server.arcgisonline.com";
 const isProxiedTileRequest = (url) =>
   url.pathname.startsWith("/api/tiles/proxy") && url.searchParams.has("url");
 
+const isSelfHostedVectorTile = (url, origin) =>
+  url.origin === origin && url.pathname.startsWith("/tiles/vector/");
+
 export const getDailyCacheVersion = (date = new Date()) =>
   date.toISOString().slice(0, 10);
 
@@ -42,7 +45,8 @@ export const isTileCacheableRequest = (request) => {
       isOpenFreeMapTile(url) ||
       isTerrainTile(url) ||
       isEsriImageryTile(url) ||
-      isProxiedTileRequest(url)
+      isProxiedTileRequest(url) ||
+      isSelfHostedVectorTile(url, url.origin)
     );
   } catch {
     return false;

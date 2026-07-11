@@ -1,20 +1,6 @@
+import { formatAddress } from "../shared/formatAddress.js";
+
 const API_BASE = "/api";
-
-const formatAddressValue = (address) => {
-  if (!address) {
-    return "";
-  }
-
-  if (typeof address === "string") {
-    return address;
-  }
-
-  const street = [address.road, address.house_number].filter(Boolean).join(" ");
-  const locality = address.city ?? address.town ?? address.village ?? address.suburb;
-  return [street, [address.postcode, locality].filter(Boolean).join(" "), address.country]
-    .filter(Boolean)
-    .join(", ");
-};
 
 const fetchJson = async (url, { signal } = {}) => {
   const response = await fetch(url, { signal });
@@ -43,10 +29,10 @@ const normalizeSearchResult = (result) => {
     "Okänd plats";
 
   const subtitle =
-    result.subtitle ??
-    result.description ??
-    (result.displayName && result.displayName !== label ? result.displayName : "") ??
-    formatAddressValue(result.address) ??
+    result.subtitle ||
+    result.description ||
+    (result.displayName && result.displayName !== label ? result.displayName : "") ||
+    formatAddress(result.address) ||
     "";
 
   return {
@@ -79,30 +65,4 @@ export const searchPlaces = async (query, { signal, limit } = {}) => {
   return rawResults
     .map(normalizeSearchResult)
     .filter((result) => result !== null);
-};
-
-export const reverseGeocode = async (lon, lat, { signal } = {}) => {
-  const normalizedLon = Number(lon);
-  const normalizedLat = Number(lat);
-  if (!Number.isFinite(normalizedLon) || !Number.isFinite(normalizedLat)) {
-    throw new Error("Ogiltiga koordinater för omvänd sökning.");
-  }
-
-  const params = new URLSearchParams({
-    lon: String(normalizedLon),
-    lat: String(normalizedLat)
-  });
-
-  const payload = await fetchJson(
-    `${API_BASE}/search/reverse?${params.toString()}`,
-    { signal }
-  );
-
-  const rawResult = payload.result ?? payload.place ?? payload;
-  const normalized = normalizeSearchResult(rawResult);
-  if (!normalized) {
-    throw new Error("Kunde inte tolka omvänd sökning.");
-  }
-
-  return normalized;
 };

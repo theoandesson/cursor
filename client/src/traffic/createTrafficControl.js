@@ -1,8 +1,5 @@
-import { TRAFFIC_LAYER_IDS } from "./config/trafficLayerConfig.js";
-import { createTrafficController } from "./createTrafficController.js";
-import { createTrafficLegend } from "./createTrafficLegend.js";
 import { SWEDISH_TRANSIT_LAYER_IDS } from "./createTransitLayer.js";
-import { fetchTraffic } from "./trafficService.js";
+import { createTrafficLegend } from "./createTrafficLegend.js";
 
 export const TRANSIT_LAYER_IDS = SWEDISH_TRANSIT_LAYER_IDS;
 
@@ -22,8 +19,6 @@ const DEFAULT_STATE = Object.freeze({
   roadLabels: true,
   legend: false
 });
-
-const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 const setLayersVisibility = (map, layerIds, visible) => {
   const visibility = visible ? "visible" : "none";
@@ -76,12 +71,11 @@ const setToggleState = ({ toggle, label, checked }) => {
 export const createTrafficControl = ({
   map,
   onStateChange,
-  initialState = {},
-  dayNightController = null
+  onLegendChange,
+  initialState = {}
 } = {}) => {
   let container = null;
   let legend = null;
-  let intervalId = null;
   let isDisposed = false;
   let transitLayer = null;
   const listeners = [];
@@ -92,15 +86,6 @@ export const createTrafficControl = ({
     ...initialState
   };
 
-  const flowController = createTrafficController({
-    map,
-    initialVisible: state.trafficFlow,
-    onVisibilityChange: (visible) => {
-      state.trafficFlow = visible;
-      onStateChange?.({ ...state });
-    }
-  });
-
   const applyTransitVisibility = () => {
     if (transitLayer?.setVisible) {
       transitLayer.setVisible(state.transit);
@@ -109,31 +94,10 @@ export const createTrafficControl = ({
     setLayersVisibility(map, TRANSIT_LAYER_IDS, state.transit);
   };
 
-  const loadTrafficData = async () => {
-    try {
-      const traffic = await fetchTraffic();
-      if (isDisposed) {
-        return;
-      }
-      if (traffic?.geojson) {
-        flowController.setTrafficData(traffic.geojson);
-      }
-    } catch {
-      /* ignore refresh failures */
-    }
-  };
-
   const applyState = () => {
-    if (state.trafficFlow) {
-      flowController.show();
-      loadTrafficData();
-    } else {
-      flowController.hide();
-    }
-
     applyTransitVisibility();
     setLayersVisibility(map, ROAD_LABEL_LAYER_IDS, state.roadLabels);
-    legend?.setVisible(state.legend);
+    onLegendChange?.(state.legend);
     onStateChange?.({ ...state });
   };
 
@@ -148,24 +112,11 @@ export const createTrafficControl = ({
   };
 
   const onStyleLoad = () => {
-    flowController.setDayNightMode(dayNightController?.getMode?.() ?? "day");
     applyState();
   };
 
   map.on("style.load", onStyleLoad);
   listeners.push(() => map.off("style.load", onStyleLoad));
-
-  intervalId = setInterval(() => {
-    if (state.trafficFlow) {
-      loadTrafficData();
-    }
-  }, REFRESH_INTERVAL_MS);
-  listeners.push(() => {
-    if (intervalId) {
-      clearInterval(intervalId);
-      intervalId = null;
-    }
-  });
 
   const control = {
     onAdd: () => {
@@ -252,14 +203,12 @@ export const createTrafficControl = ({
     getState: () => ({ ...state }),
     setState,
     applyState,
+    getLegend: () => legend,
     setTransitLayer: (layer) => {
       transitLayer = layer;
       applyTransitVisibility();
     },
-    setDayNightMode: (mode) => flowController.setDayNightMode(mode),
-    setTrafficData: (geojson) => flowController.setTrafficData(geojson),
     destroy: () => {
-      flowController.destroy();
       control.onRemove();
     }
   };

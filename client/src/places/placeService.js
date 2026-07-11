@@ -1,3 +1,5 @@
+import { formatAddress } from "../shared/formatAddress.js";
+
 const API_BASE = "/api";
 
 const fetchJson = async (url, { signal } = {}) => {
@@ -10,31 +12,19 @@ const fetchJson = async (url, { signal } = {}) => {
   return response.json();
 };
 
-const formatAddressValue = (address) => {
-  if (!address) {
-    return "";
-  }
-
-  if (typeof address === "string") {
-    return address;
-  }
-
-  const street = [address.road, address.house_number].filter(Boolean).join(" ");
-  const locality = address.city ?? address.town ?? address.village ?? address.suburb;
-  return [street, [address.postcode, locality].filter(Boolean).join(" "), address.country]
-    .filter(Boolean)
-    .join(", ");
-};
-
 export const normalizePlace = (raw = {}, fallbackLon, fallbackLat) => {
   const lon = Number(raw.lon ?? raw.longitude ?? fallbackLon);
   const lat = Number(raw.lat ?? raw.latitude ?? fallbackLat);
+
+  if (!Number.isFinite(lon) || !Number.isFinite(lat)) {
+    throw new Error("Ogiltiga koordinater.");
+  }
 
   return {
     id: raw.id ?? raw.placeId ?? `${lon},${lat}`,
     name: raw.name ?? raw.label ?? "Okänd plats",
     displayName: raw.displayName ?? raw.subtitle ?? "",
-    address: formatAddressValue(raw.address) || raw.subtitle || raw.displayName || "",
+    address: formatAddress(raw.address) || raw.subtitle || raw.displayName || "",
     lon,
     lat,
     category: raw.category ?? raw.type ?? "place",
@@ -69,6 +59,10 @@ export const fetchPoisNear = async (
   lat,
   { radiusKm = 5, limit = 8, signal } = {}
 ) => {
+  if (!Number.isFinite(lon) || !Number.isFinite(lat)) {
+    throw new Error("Ogiltiga koordinater.");
+  }
+
   const params = new URLSearchParams({
     lon: String(lon),
     lat: String(lat),
@@ -83,6 +77,10 @@ export const fetchPoisNear = async (
 };
 
 export const fetchReverseGeocode = async (lon, lat, { signal } = {}) => {
+  if (!Number.isFinite(lon) || !Number.isFinite(lat)) {
+    throw new Error("Ogiltiga koordinater.");
+  }
+
   const params = new URLSearchParams({
     lon: String(lon),
     lat: String(lat)

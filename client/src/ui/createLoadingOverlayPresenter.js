@@ -21,6 +21,11 @@ export const createLoadingOverlayPresenter = ({ mapRootElement }) => {
 
   const progressTrack = document.createElement("div");
   progressTrack.className = "loading-overlay__track";
+  progressTrack.setAttribute("role", "progressbar");
+  progressTrack.setAttribute("aria-valuemin", "0");
+  progressTrack.setAttribute("aria-valuemax", "100");
+  progressTrack.setAttribute("aria-valuenow", "6");
+  progressTrack.setAttribute("aria-label", "Laddningsförlopp");
   const progressFill = document.createElement("div");
   progressFill.className = "loading-overlay__fill";
   progressTrack.appendChild(progressFill);
@@ -40,8 +45,10 @@ export const createLoadingOverlayPresenter = ({ mapRootElement }) => {
 
   const setProgress = (progress) => {
     const clamped = clampProgress(progress);
+    const percent = Math.round(clamped * 100);
     progressFill.style.transform = `scaleX(${clamped})`;
-    progressText.textContent = `${String(Math.round(clamped * 100)).padStart(2, "0")}%`;
+    progressText.textContent = `${String(percent).padStart(2, "0")}%`;
+    progressTrack.setAttribute("aria-valuenow", String(percent));
   };
 
   const setMessage = (text) => {
@@ -71,6 +78,13 @@ export const createLoadingOverlayPresenter = ({ mapRootElement }) => {
     show,
     hide,
     setProgress,
-    setMessage
+    setMessage,
+    destroy: () => {
+      if (hideTimeoutId) {
+        clearTimeout(hideTimeoutId);
+        hideTimeoutId = null;
+      }
+      overlay.remove();
+    }
   };
 };

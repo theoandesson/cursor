@@ -222,7 +222,6 @@ export const initSwedenMap = ({
     if (!trafficControl) {
       trafficControl = createTrafficControl({
         map,
-        dayNightController,
         onStateChange: (trafficState) => {
           trafficFlowLayer?.setVisible(trafficState.trafficFlow);
           transitLayer?.setVisible(trafficState.transit);
@@ -237,6 +236,9 @@ export const initSwedenMap = ({
                 ? "Kollektivtrafik visas på kartan."
                 : latestLodStatus?.message ?? "Trafikflöde dolt."
           });
+        },
+        onLegendChange: (visible) => {
+          trafficFlowLayer?.setLegendVisible?.(visible);
         }
       });
 
@@ -247,14 +249,15 @@ export const initSwedenMap = ({
     }
 
     const trafficState = trafficControl.getState();
-    trafficControl.applyState();
 
     trafficFlowLayer = createTrafficFlowLayer({
       map,
       maplibregl,
-      initialVisible: trafficState.trafficFlow
+      initialVisible: trafficState.trafficFlow,
+      legend: trafficControl.getLegend()
     });
     disposeTrafficFlow = trafficFlowLayer.destroy;
+    trafficFlowLayer.setLegendVisible(trafficState.legend);
 
     transitLayer = createTransitLayer({
       map,
@@ -263,6 +266,7 @@ export const initSwedenMap = ({
     });
     disposeTransitLayer = transitLayer.destroy;
     trafficControl.setTransitLayer(transitLayer);
+    trafficControl.applyState();
   };
 
   const mountCoreMapFeatures = () => {
@@ -350,9 +354,11 @@ export const initSwedenMap = ({
           name: "overlays",
           priority: 2,
           mount: () => {
-            const overlaySystem = createOverlaySystem({ map, maplibregl });
+            const overlaySystem = createOverlaySystem({ map });
             void overlaySystem.mount();
-            disposeOverlaySystem = overlaySystem.dispose;
+            disposeOverlaySystem = () => {
+              void overlaySystem.dispose();
+            };
           }
         },
         {

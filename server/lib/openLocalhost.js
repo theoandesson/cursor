@@ -5,7 +5,8 @@ export const openLocalhost = async (url) => {
     await open(url);
     return true;
   } catch (error) {
-    console.warn(`Kunde inte öppna webbläsaren automatiskt: ${error.message}`);
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`Kunde inte öppna webbläsaren automatiskt: ${message}`);
     return false;
   }
 };

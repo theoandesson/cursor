@@ -146,23 +146,35 @@ const buildRadarControls = ({ overlay, overlayManager, layerNode, listeners }) =
   });
 
   const onPlay = async () => {
-    await overlayManager.setVisible(overlay.id, true);
-    await plugin.play();
-    sync();
+    try {
+      await overlayManager.setVisible(overlay.id, true);
+      await plugin.play();
+      sync();
+    } catch (error) {
+      console.warn("[layer-panel] Radar play failed:", error);
+    }
   };
   const onPause = () => {
     plugin.pause();
     sync();
   };
   const onPrevious = async () => {
-    await overlayManager.setVisible(overlay.id, true);
-    await plugin.stepPrevious();
-    sync();
+    try {
+      await overlayManager.setVisible(overlay.id, true);
+      await plugin.stepPrevious();
+      sync();
+    } catch (error) {
+      console.warn("[layer-panel] Radar step previous failed:", error);
+    }
   };
   const onNext = async () => {
-    await overlayManager.setVisible(overlay.id, true);
-    await plugin.stepNext();
-    sync();
+    try {
+      await overlayManager.setVisible(overlay.id, true);
+      await plugin.stepNext();
+      sync();
+    } catch (error) {
+      console.warn("[layer-panel] Radar step next failed:", error);
+    }
   };
 
   playButton.addEventListener("click", onPlay);
@@ -186,9 +198,13 @@ const buildRadarControls = ({ overlay, overlayManager, layerNode, listeners }) =
     value: 0,
     formatValue: () => plugin.getAnimationState().frameTime,
     onInput: async (value) => {
-      await overlayManager.setVisible(overlay.id, true);
-      await plugin.scrubTo(value);
-      sync();
+      try {
+        await overlayManager.setVisible(overlay.id, true);
+        await plugin.scrubTo(value);
+        sync();
+      } catch (error) {
+        console.warn("[layer-panel] Radar scrub failed:", error);
+      }
     }
   });
   listeners.push(timeline.release);
@@ -213,7 +229,13 @@ const buildRadarControls = ({ overlay, overlayManager, layerNode, listeners }) =
 
   anim.append(row, timeline.row, speed.row, status);
 
-  const sync = (currentOverlay = overlay) => {
+  const sync = () => {
+    const snapshot = overlayManager.getState();
+    const currentOverlay = snapshot.overlays.find((item) => item.id === overlay.id);
+    if (!currentOverlay) {
+      return;
+    }
+
     const animation = plugin.getAnimationState();
     timeline.range.max = String(Math.max(0, animation.frameCount - 1));
     timeline.range.value = String(animation.frameIndex);
@@ -225,6 +247,7 @@ const buildRadarControls = ({ overlay, overlayManager, layerNode, listeners }) =
     playButton.setAttribute("aria-pressed", String(animation.playing));
     status.textContent = currentOverlay.statusMessage || animation.frameTime;
     layerNode.dataset.enabled = currentOverlay.visible ? "true" : "false";
+    layerNode.dataset.status = currentOverlay.status;
   };
 
   return { anim, sync };
@@ -319,10 +342,22 @@ export const createLayerPanelControl = ({ overlayManager }) => {
           setToggleState({ button: toggle, visible: overlay.visible });
 
           const onToggle = async () => {
-            await overlayManager.toggleVisible(overlay.id);
+            const current = overlayManager
+              .getState()
+              .overlays.find((item) => item.id === overlay.id);
+            if (current?.status === "loading") {
+              return;
+            }
+
+            try {
+              await overlayManager.toggleVisible(overlay.id);
+            } catch (error) {
+              console.warn(`[layer-panel] Toggle failed for ${overlay.id}:`, error);
+            }
           };
           toggle.addEventListener("click", onToggle);
           listeners.push(() => toggle.removeEventListener("click", onToggle));
+          toggle.disabled = overlay.status === "loading";
 
           const name = document.createElement("span");
           name.className = LAYER_NAME_CLASS;
@@ -366,11 +401,12 @@ export const createLayerPanelControl = ({ overlayManager }) => {
             }
 
             setToggleState({ button: toggle, visible: current.visible });
+            toggle.disabled = current.status === "loading";
             opacity.range.value = String(Math.round(current.opacity * 100));
             opacity.output.textContent = `${Math.round(current.opacity * 100)}%`;
             layerNode.dataset.enabled = current.visible ? "true" : "false";
             layerNode.dataset.status = current.status;
-            radarControls?.sync?.(current);
+            radarControls?.sync?.();
           };
 
           layerSyncHandlers.push(syncLayer);

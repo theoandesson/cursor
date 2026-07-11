@@ -1,47 +1,87 @@
 const openDatabaseEntries = new Map();
+const BLOCKED_TIMEOUT_MS = 10000;
 
 export const openDatabase = (name, version, upgradeFn) => {
   const existing = openDatabaseEntries.get(name);
-  if (existing && existing.version >= version) {
+  if (existing?.promise && existing.version >= version) {
     return existing.promise;
   }
 
+  let resolveOpen;
+  let rejectOpen;
   const promise = new Promise((resolve, reject) => {
-    if (!("indexedDB" in globalThis)) {
-      reject(new Error("IndexedDB is not available"));
-      return;
-    }
-
-    let request;
-    try {
-      request = indexedDB.open(name, version);
-    } catch (error) {
-      reject(error);
-      return;
-    }
-
-    request.onerror = () => {
-      reject(request.error ?? new Error(`Failed to open IndexedDB database "${name}"`));
-    };
-
-    request.onblocked = () => {
-      console.warn(`IndexedDB open blocked for "${name}"`);
-    };
-
-    request.onupgradeneeded = (event) => {
-      try {
-        upgradeFn(event.target.result, event);
-      } catch (error) {
-        reject(error);
-      }
-    };
-
-    request.onsuccess = () => {
-      resolve(request.result);
-    };
+    resolveOpen = resolve;
+    rejectOpen = reject;
   });
 
-  openDatabaseEntries.set(name, { version, promise });
+  openDatabaseEntries.set(name, { version, promise, pending: true });
+
+  if (!("indexedDB" in globalThis)) {
+    openDatabaseEntries.delete(name);
+    rejectOpen(new Error("IndexedDB is not available"));
+    return promise;
+  }
+
+  let request;
+  try {
+    request = indexedDB.open(name, version);
+  } catch (error) {
+    openDatabaseEntries.delete(name);
+    rejectOpen(error);
+    return promise;
+  }
+
+  let blockedTimer = null;
+
+  const clearBlockedTimer = () => {
+    if (blockedTimer) {
+      clearTimeout(blockedTimer);
+      blockedTimer = null;
+    }
+  };
+
+  request.onerror = () => {
+    clearBlockedTimer();
+    openDatabaseEntries.delete(name);
+    rejectOpen(request.error ?? new Error(`Failed to open IndexedDB database "${name}"`));
+  };
+
+  request.onblocked = () => {
+    console.warn(`IndexedDB open blocked for "${name}"`);
+    clearBlockedTimer();
+    blockedTimer = setTimeout(() => {
+      openDatabaseEntries.delete(name);
+      rejectOpen(new Error(`IndexedDB open blocked for "${name}"`));
+    }, BLOCKED_TIMEOUT_MS);
+  };
+
+  request.onupgradeneeded = (event) => {
+    try {
+      upgradeFn(event.target.result, event);
+    } catch (error) {
+      clearBlockedTimer();
+      openDatabaseEntries.delete(name);
+      rejectOpen(error);
+    }
+  };
+
+  request.onsuccess = () => {
+    clearBlockedTimer();
+    const db = request.result;
+
+    db.onversionchange = () => {
+      db.close();
+      openDatabaseEntries.delete(name);
+    };
+
+    const entry = openDatabaseEntries.get(name);
+    if (entry) {
+      entry.pending = false;
+    }
+
+    resolveOpen(db);
+  };
+
   return promise;
 };
 

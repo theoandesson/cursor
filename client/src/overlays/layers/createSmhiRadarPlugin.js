@@ -14,6 +14,17 @@ const FRAME_POLL_MS = 60 * 1000;
 const FRAME_HOURS = 1;
 const SPEED_STEPS_MS = [1200, 800, 500, 300];
 
+const isValidRadarCoordinates = (coordinates) =>
+  Array.isArray(coordinates) &&
+  coordinates.length === 4 &&
+  coordinates.every(
+    (corner) =>
+      Array.isArray(corner) &&
+      corner.length === 2 &&
+      Number.isFinite(corner[0]) &&
+      Number.isFinite(corner[1])
+  );
+
 const formatFrameTime = (isoString) => {
   try {
     return new Date(isoString).toLocaleTimeString("sv-SE", {
@@ -42,6 +53,7 @@ const createInitialRadarState = () => ({
 
 export const createSmhiRadarPlugin = () => {
   const state = createInitialRadarState();
+  let frameIndexChain = Promise.resolve();
 
   const clearAnimationTimer = () => {
     if (state.animationTimer) {
@@ -80,7 +92,7 @@ export const createSmhiRadarPlugin = () => {
     });
   };
 
-  const setFrameIndex = async (index, { announce = true } = {}) => {
+  const setFrameIndexInternal = async (index, { announce = true } = {}) => {
     if (!state.frames.length) {
       return;
     }
@@ -94,7 +106,6 @@ export const createSmhiRadarPlugin = () => {
         state.manager?.setOverlayStatus?.(PLUGIN_ID, {
           statusMessage: formatFrameTime(state.frames[normalizedIndex].valid)
         });
-        state.manager?.notify?.();
       }
     } catch (error) {
       state.manager?.setOverlayStatus?.(PLUGIN_ID, {
@@ -102,8 +113,14 @@ export const createSmhiRadarPlugin = () => {
         statusMessage:
           error instanceof Error ? error.message : "Kunde inte uppdatera radarbild."
       });
-      state.manager?.notify?.();
     }
+  };
+
+  const setFrameIndex = (index, options = {}) => {
+    frameIndexChain = frameIndexChain
+      .catch(() => {})
+      .then(() => setFrameIndexInternal(index, options));
+    return frameIndexChain;
   };
 
   const scheduleNextFrame = () => {
@@ -133,12 +150,8 @@ export const createSmhiRadarPlugin = () => {
       throw new Error("Inga radarframes tillgängliga just nu.");
     }
 
-    const nextIndex = Math.max(
-      0,
-      state.frames.findIndex((frame) => frame.key === previousKey)
-    );
-
-    state.frameIndex = nextIndex >= 0 ? nextIndex : state.frames.length - 1;
+    const foundIndex = state.frames.findIndex((frame) => frame.key === previousKey);
+    state.frameIndex = foundIndex >= 0 ? foundIndex : state.frames.length - 1;
     await setFrameIndex(state.frameIndex, { announce: false });
     return payload;
   };
@@ -167,8 +180,8 @@ export const createSmhiRadarPlugin = () => {
         if (state.playing) {
           scheduleNextFrame();
         }
-      } catch {
-        /* ignore transient refresh errors */
+      } catch (error) {
+        console.warn("[smhi-radar] Frame poll refresh failed:", error);
       }
     }, FRAME_POLL_MS);
   };
@@ -184,6 +197,9 @@ export const createSmhiRadarPlugin = () => {
       state.map = map;
 
       const metadata = await fetchRadarMetadata();
+      if (!isValidRadarCoordinates(metadata.coordinates)) {
+        throw new Error("Ogiltiga radarkoordinater från SMHI.");
+      }
       state.coordinates = metadata.coordinates;
 
       map.addSource(SOURCE_ID, {

@@ -11,7 +11,6 @@ import { createBootstrapRouter } from "./bootstrapRouter.js";
 import {
   getCityById,
   getCityWeather,
-  isCacheWarm,
   listCities,
   toCityDto
 } from "../services/cityWeatherService.js";
@@ -24,7 +23,6 @@ import {
   getRadarMetadataPayload,
   listRadarFrames
 } from "../services/radarProxyService.js";
-import { fetchWeatherByPoint } from "../services/smhiWeatherService.js";
 import { getStopsNearPoint, listLines, listStops, listTransit } from "../services/transitService.js";
 import {
   getTrafficNearPoint,
@@ -299,9 +297,9 @@ export const createApiRouter = () => {
       const { weather, cacheHit } = await getPointWeather({ lon, lat, forecastHours });
       response.locals.cacheHit = cacheHit;
       response.status(200).json(weather);
-    } catch (error) {
+    } catch {
       response.status(502).json({
-        error: error instanceof Error ? error.message : "Kunde inte hämta väderdata."
+        error: "Kunde inte hämta väderdata."
       });
     }
   });
@@ -317,7 +315,6 @@ export const createApiRouter = () => {
     const forceRefresh = parseBoolean(request.query.refresh, false);
 
     try {
-      const cacheHit = !forceRefresh && isCacheWarm(forecastHours);
       const payload = await getCityWeather({
         forecastHours,
         forceRefresh,
@@ -325,11 +322,12 @@ export const createApiRouter = () => {
         offset
       });
 
-      response.locals.cacheHit = cacheHit;
-      response.status(200).json(payload);
-    } catch (error) {
+      response.locals.cacheHit = payload.cacheHit === true;
+      const { cacheHit: _cacheHit, ...body } = payload;
+      response.status(200).json(body);
+    } catch {
       response.status(502).json({
-        error: error instanceof Error ? error.message : "Kunde inte hämta stadsväder."
+        error: "Kunde inte hämta stadsväder."
       });
     }
   });
@@ -348,8 +346,25 @@ export const createApiRouter = () => {
   router.get("/radar/frames", async (request, response) => {
     const hours =
       parseIntegerInRange(request.query.hours, { min: 1, max: MAX_RADAR_HOURS }) ?? 1;
-    const limit = parseIntegerInRange(request.query.limit, { min: 1, max: MAX_RADAR_FRAMES });
-    const offset = parseIntegerInRange(request.query.offset, { min: 0 }) ?? 0;
+    const limitResult = parseIntegerInRangeOrReject(request.query.limit, {
+      min: 1,
+      max: MAX_RADAR_FRAMES
+    });
+    if (!limitResult.ok) {
+      response.status(400).json({
+        error: `Ogiltig limit. Ange ett heltal mellan 1 och ${MAX_RADAR_FRAMES}.`
+      });
+      return;
+    }
+
+    const offsetResult = parseIntegerInRangeOrReject(request.query.offset, { min: 0 });
+    if (!offsetResult.ok) {
+      response.status(400).json({ error: "Ogiltig offset. Ange ett heltal >= 0." });
+      return;
+    }
+
+    const limit = limitResult.value ?? MAX_RADAR_FRAMES;
+    const offset = offsetResult.value ?? 0;
     const forceRefresh = parseBoolean(request.query.refresh, false);
 
     try {
@@ -360,9 +375,9 @@ export const createApiRouter = () => {
         forceRefresh
       });
       response.status(200).json(payload);
-    } catch (error) {
+    } catch {
       response.status(502).json({
-        error: error instanceof Error ? error.message : "Kunde inte hämta radarframes."
+        error: "Kunde inte hämta radarframes."
       });
     }
   });
@@ -588,26 +603,28 @@ export const createApiRouter = () => {
   router.get("/weather/cities/:cityId", setCacheHeaders("weather"), async (request, response) => {
     const city = getCityById(request.params.cityId);
     if (!city) {
-      response.status(404).json({ error: `Okänd stad: ${request.params.cityId}` });
+      response.status(404).json({ error: "Okänd stad." });
       return;
     }
 
+    const forecastHours = parseForecastHours(request);
+
     try {
-      const weather = await fetchWeatherByPoint({
+      const { weather, cacheHit } = await getPointWeather({
         lon: city.lon,
         lat: city.lat,
-        forecastHours: parseForecastHours(request)
+        forecastHours
       });
-
+      response.locals.cacheHit = cacheHit;
       response.status(200).json({
         city: toCityDto(city),
         approvedTime: weather.approvedTime,
         current: weather.current,
         forecast: weather.forecast
       });
-    } catch (error) {
+    } catch {
       response.status(502).json({
-        error: error instanceof Error ? error.message : "Kunde inte hämta stadsväder."
+        error: "Kunde inte hämta stadsväder."
       });
     }
   });

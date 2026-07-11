@@ -155,8 +155,13 @@ export const searchPlaces = async ({ query, limit = 8 }) => {
     return cached;
   }
 
-  const payload = await enqueueNominatimRequest(() =>
-    nominatimFetch("/search", {
+  const payload = await enqueueNominatimRequest(async () => {
+    const recheck = getCached(cacheKey);
+    if (recheck) {
+      return recheck;
+    }
+
+    return nominatimFetch("/search", {
       q: normalizedQuery,
       format: "json",
       addressdetails: 1,
@@ -164,8 +169,8 @@ export const searchPlaces = async ({ query, limit = 8 }) => {
       viewbox: nominatimViewbox,
       bounded: 1,
       limit
-    })
-  );
+    });
+  });
 
   const results = {
     query: normalizedQuery,
@@ -187,15 +192,20 @@ export const reverseGeocode = async ({ lon, lat }) => {
     return cached;
   }
 
-  const payload = await enqueueNominatimRequest(() =>
-    nominatimFetch("/reverse", {
+  const payload = await enqueueNominatimRequest(async () => {
+    const recheck = getCached(cacheKey);
+    if (recheck) {
+      return recheck;
+    }
+
+    return nominatimFetch("/reverse", {
       lon: roundedLon,
       lat: roundedLat,
       format: "json",
       addressdetails: 1,
       countrycodes: "se"
-    })
-  );
+    });
+  });
 
   if (!payload || payload.error) {
     throw new GeocodeNotFoundError(payload?.error ?? undefined);

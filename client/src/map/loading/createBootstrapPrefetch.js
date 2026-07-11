@@ -1,24 +1,7 @@
 import { fetchBootstrapWithSwr } from "../../api/bootstrapClient.js";
+import { extractBootstrapParts } from "../../weather/applyCityWeather.js";
 
-/**
- * Extracts { cities, weatherEntries } from a raw bootstrap API response.
- * Mirrors the logic in applyCityWeather.js without importing from the weather module.
- */
-const extractBootstrapParts = (data) => {
-  const weatherEntries =
-    data?.weather?.cities ??
-    data?.cityWeather?.cities ??
-    [];
-
-  const rawCities = data?.cities;
-  const cities = Array.isArray(rawCities)
-    ? rawCities
-    : Array.isArray(rawCities?.cities)
-      ? rawCities.cities
-      : weatherEntries.map((entry) => entry.city).filter(Boolean);
-
-  return { cities, weatherEntries };
-};
+export { extractBootstrapParts };
 
 /**
  * Fires fetchBootstrapWithSwr immediately at app start and stores the result in a
@@ -33,7 +16,10 @@ const extractBootstrapParts = (data) => {
 export const startBootstrapPrefetch = ({ fetchFn, onTiming } = {}) => {
   const fetchPromise = fetchBootstrapWithSwr({ fetchFn, onTiming })
     .then((result) => result?.data ?? null)
-    .catch(() => null);
+    .catch((error) => {
+      console.error("[bootstrap-prefetch] Failed to prefetch bootstrap data:", error);
+      return null;
+    });
 
   return { fetchPromise };
 };

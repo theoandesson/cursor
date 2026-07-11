@@ -7,7 +7,10 @@ const workspaceRoot = path.resolve(__dirname, "..", "..");
 
 const parsePort = (value, fallback) => {
   const parsed = Number.parseInt(value ?? "", 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  if (!Number.isFinite(parsed) || parsed < 1 || parsed > 65535) {
+    return fallback;
+  }
+  return parsed;
 };
 
 const parseBoolean = (value, fallback) => {
@@ -29,5 +32,5 @@ export const appConfig = Object.freeze({
   host: process.env.HOST ?? "127.0.0.1",
   port: parsePort(process.env.PORT, 4173),
   staticDirectory: path.join(workspaceRoot, "client"),
-  autoOpenBrowser: parseBoolean(process.env.AUTO_OPEN_BROWSER, true)
+  autoOpenBrowser: parseBoolean(process.env.AUTO_OPEN_BROWSER, false)
 });

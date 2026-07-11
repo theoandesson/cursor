@@ -1,8 +1,9 @@
-export const createPrefetchQueue = ({ maxConcurrent = 3 } = {}) => {
+export const createPrefetchQueue = ({ maxConcurrent = 3, onError } = {}) => {
   const pending = new Set();
   const queued = [];
   const inFlight = new Set();
   let activeCount = 0;
+  let flushGeneration = 0;
 
   const pump = () => {
     while (activeCount < maxConcurrent && queued.length > 0) {
@@ -16,7 +17,9 @@ export const createPrefetchQueue = ({ maxConcurrent = 3 } = {}) => {
 
       Promise.resolve()
         .then(() => job.fetchFn())
-        .catch(() => undefined)
+        .catch((error) => {
+          onError?.(error, job.url);
+        })
         .finally(() => {
           activeCount -= 1;
           inFlight.delete(job.url);
@@ -37,17 +40,25 @@ export const createPrefetchQueue = ({ maxConcurrent = 3 } = {}) => {
     return true;
   };
 
-  const flush = () =>
-    new Promise((resolve) => {
+  const flush = () => {
+    const generation = ++flushGeneration;
+    return new Promise((resolve) => {
       const check = () => {
+        if (generation !== flushGeneration) {
+          resolve();
+          return;
+        }
+
         if (queued.length === 0 && activeCount === 0) {
           resolve();
           return;
         }
+
         setTimeout(check, 16);
       };
       check();
     });
+  };
 
   return { enqueue, flush, pending };
 };

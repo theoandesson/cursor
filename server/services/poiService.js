@@ -64,7 +64,7 @@ export const listPois = ({ search, category, bbox, limit, offset } = {}) => {
     return (
       poi.name.toLowerCase().includes(normalizedSearch) ||
       poi.id.toLowerCase().includes(normalizedSearch) ||
-      poi.address.toLowerCase().includes(normalizedSearch) ||
+      (poi.address?.toLowerCase().includes(normalizedSearch) ?? false) ||
       (poi.cityId?.toLowerCase().includes(normalizedSearch) ?? false)
     );
   });

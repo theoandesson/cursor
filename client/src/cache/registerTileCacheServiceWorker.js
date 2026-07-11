@@ -12,6 +12,35 @@ const buildActiveStatusText = ({ version, entries }) => {
   return `Tilecache aktiv (${version}) - ny cacheversion varje dag.`;
 };
 
+let workerMessageListener = null;
+let workerMessageHandler = null;
+
+const ensureWorkerMessageListener = (handler) => {
+  if (!("serviceWorker" in navigator)) {
+    return () => undefined;
+  }
+
+  if (workerMessageListener && workerMessageHandler === handler) {
+    return () => undefined;
+  }
+
+  if (workerMessageListener) {
+    navigator.serviceWorker.removeEventListener("message", workerMessageListener);
+  }
+
+  workerMessageHandler = handler;
+  workerMessageListener = handler;
+  navigator.serviceWorker.addEventListener("message", workerMessageListener);
+
+  return () => {
+    if (workerMessageListener === handler) {
+      navigator.serviceWorker.removeEventListener("message", workerMessageListener);
+      workerMessageListener = null;
+      workerMessageHandler = null;
+    }
+  };
+};
+
 export const registerTileCacheServiceWorker = async ({
   onStatusChange
 } = {}) => {
@@ -19,12 +48,32 @@ export const registerTileCacheServiceWorker = async ({
 
   if (!("serviceWorker" in navigator)) {
     setStatus("Tilecache stöds inte i denna webbläsare.");
-    return null;
+    return { registration: null, dispose: () => undefined };
   }
 
   const fallbackVersion = getDailyCacheVersion();
 
   let refreshHealth = () => undefined;
+  let healthInterval = null;
+  let visibilityHandler = null;
+  let removeWorkerMessageListener = () => undefined;
+  let disposed = false;
+
+  const dispose = () => {
+    if (disposed) {
+      return;
+    }
+    disposed = true;
+    if (healthInterval) {
+      clearInterval(healthInterval);
+      healthInterval = null;
+    }
+    if (visibilityHandler) {
+      document.removeEventListener("visibilitychange", visibilityHandler);
+      visibilityHandler = null;
+    }
+    removeWorkerMessageListener();
+  };
 
   const handleWorkerMessage = (event) => {
     if (!event.data?.type) {
@@ -50,7 +99,7 @@ export const registerTileCacheServiceWorker = async ({
     }
   };
 
-  navigator.serviceWorker.addEventListener("message", handleWorkerMessage);
+  removeWorkerMessageListener = ensureWorkerMessageListener(handleWorkerMessage);
 
   try {
     const registration = await navigator.serviceWorker.register("/sw.js", {
@@ -76,26 +125,20 @@ export const registerTileCacheServiceWorker = async ({
       activeWorker?.postMessage({ type: "REQUEST_TILE_CACHE_HEALTH" });
     };
 
-    const healthInterval = setInterval(refreshHealth, 12000);
-    document.addEventListener("visibilitychange", () => {
+    healthInterval = setInterval(refreshHealth, 12000);
+    visibilityHandler = () => {
       if (document.visibilityState === "visible") {
         refreshHealth();
       }
-    });
+    };
+    document.addEventListener("visibilitychange", visibilityHandler);
 
-    window.addEventListener(
-      "beforeunload",
-      () => {
-        clearInterval(healthInterval);
-      },
-      { once: true }
-    );
-
-    return registration;
+    return { registration, dispose };
   } catch (error) {
     console.warn("Kunde inte registrera tilecache service worker.", error);
     setStatus("Tilecache kunde inte aktiveras.");
-    return null;
+    dispose();
+    return { registration: null, dispose: () => undefined };
   }
 };
 
@@ -104,9 +147,9 @@ export const registerTileCacheServiceWorker = async ({
  * first tile requests can be intercepted on repeat visits.
  */
 export const waitForTileCacheServiceWorker = async (options) => {
-  const registration = await registerTileCacheServiceWorker(options);
-  if (registration && "serviceWorker" in navigator) {
+  const result = await registerTileCacheServiceWorker(options);
+  if (result.registration && "serviceWorker" in navigator) {
     await navigator.serviceWorker.ready;
   }
-  return registration;
+  return result;
 };
