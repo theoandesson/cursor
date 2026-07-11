@@ -1,4 +1,5 @@
 import { createOverlayManager } from "../controller/createOverlayManager.js";
+import { createPressureSystemsPlugin } from "../layers/createPressureSystemsPlugin.js";
 import { createSmhiRadarPlugin } from "../layers/createSmhiRadarPlugin.js";
 import { createTrafficFlowPlugin } from "../layers/createTrafficFlowPlugin.js";
 import { createTransitPlugin } from "../layers/createTransitPlugin.js";
@@ -14,6 +15,7 @@ export const createOverlaySystem = ({ map, maplibregl }) => {
   let unsubscribeStatus = null;
 
   overlayManager.registerPlugin(createSmhiRadarPlugin());
+  overlayManager.registerPlugin(createPressureSystemsPlugin());
   overlayManager.registerPlugin(createTrafficFlowPlugin({ maplibregl }));
   overlayManager.registerPlugin(createTransitPlugin({ maplibregl }));
 

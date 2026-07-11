@@ -3,6 +3,10 @@ export const STYLE_LAYER_IDS = Object.freeze({
   CITY_WEATHER_CIRCLES: "city-weather-circles",
   CITY_WEATHER_LABELS: "city-weather-labels",
   SMHI_RADAR: "overlay-smhi-radar",
+  PRESSURE_HIGH_FILL: "overlay-pressure-high-fill",
+  PRESSURE_LOW_FILL: "overlay-pressure-low-fill",
+  PRESSURE_STORM_FILL: "overlay-pressure-storm-fill",
+  PRESSURE_LABELS: "overlay-pressure-labels",
   TRAFFIC_FLOW_CASING: "traffic-flow-segment-casing",
   TRAFFIC_FLOW_LINES: "traffic-flow-segment-lines",
   TRAFFIC_FLOW_ANIMATED: "traffic-flow-segment-animated",
@@ -17,6 +21,7 @@ export const STYLE_LAYER_IDS = Object.freeze({
 
 export const OVERLAY_SOURCE_IDS = Object.freeze({
   SMHI_RADAR: "overlay-smhi-radar-source",
+  PRESSURE_SYSTEMS: "overlay-pressure-systems-source",
   TRAFFIC_FLOW: "traffic-flow-segments-source",
   TRANSIT_LINES: "swedish-transit-lines-source",
   TRANSIT_STOPS: "swedish-transit-stops-source"
@@ -33,6 +38,13 @@ export const TRANSIT_LAYER_IDS = Object.freeze([
   STYLE_LAYER_IDS.TRANSIT_STOP_HALO,
   STYLE_LAYER_IDS.TRANSIT_STOPS,
   STYLE_LAYER_IDS.TRANSIT_STOP_LABELS
+]);
+
+export const PRESSURE_LAYER_IDS = Object.freeze([
+  STYLE_LAYER_IDS.PRESSURE_HIGH_FILL,
+  STYLE_LAYER_IDS.PRESSURE_LOW_FILL,
+  STYLE_LAYER_IDS.PRESSURE_STORM_FILL,
+  STYLE_LAYER_IDS.PRESSURE_LABELS
 ]);
 
 export const TRAFFIC_FLOW_LAYER_IDS = Object.freeze([
