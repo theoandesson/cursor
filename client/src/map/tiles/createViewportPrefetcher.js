@@ -12,7 +12,8 @@ const DEFAULT_OPTIONS = Object.freeze({
   prefetchRings: 2,
   zoomLevelsAhead: 1,
   idleDelayMs: 80,
-  maxFetchedEntries: 12_000
+  maxFetchedEntries: 12_000,
+  deferInitialPrefetch: false
 });
 
 class PriorityQueue {
@@ -367,14 +368,23 @@ export const createViewportPrefetcher = (map, userOptions = {}) => {
 
   const onMoveEnd = () => schedulePrefetch();
   const onZoomEnd = () => schedulePrefetch();
-  const onLoad = () => schedulePrefetch();
+  const onLoad = () => {
+    if (!options.deferInitialPrefetch) {
+      schedulePrefetch();
+    }
+  };
 
   map.on("moveend", onMoveEnd);
   map.on("zoomend", onZoomEnd);
-  map.on("load", onLoad);
+  if (!options.deferInitialPrefetch) {
+    map.on("load", onLoad);
+  }
 
   return {
     flush: () => {
+      schedulePrefetch();
+    },
+    start: () => {
       schedulePrefetch();
     },
     setTileTemplates: (nextTemplates) => {
@@ -393,7 +403,9 @@ export const createViewportPrefetcher = (map, userOptions = {}) => {
       abortController = new AbortController();
       map.off("moveend", onMoveEnd);
       map.off("zoomend", onZoomEnd);
-      map.off("load", onLoad);
+      if (!options.deferInitialPrefetch) {
+        map.off("load", onLoad);
+      }
       queue.clear();
       inflight.clear();
     },

@@ -56,7 +56,7 @@ export const bootstrapSwedenMapApp = ({ maplibregl, perfTracker }) => {
 
   setStatus({
     profile: "settled",
-    message: "Laddar terräng- och byggnadsdata för Sverige…"
+    message: "Laddar kartdata för Sverige…"
   });
   setCacheStatus("Tilecache initieras…");
 

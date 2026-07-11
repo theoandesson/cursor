@@ -13,6 +13,8 @@ import { createLandmarkLayer } from "../landmarks/createLandmarkLayer.js";
 import { createAdaptiveLodController } from "../lod/createAdaptiveLodController.js";
 import { createViewportTileScheduler } from "../lod/createViewportTileScheduler.js";
 import { createInitialLoadUxController } from "../loading/createInitialLoadUxController.js";
+import { enableDeferredTerrain } from "../loading/enableDeferredTerrain.js";
+import { scheduleDeferredWork } from "../loading/scheduleDeferredWork.js";
 import { createOrientationControl } from "../navigation/createOrientationControl.js";
 import { createMapModeControl } from "../modes/createMapModeControl.js";
 import { getMapModeLabel } from "../modes/applyMapMode.js";
@@ -79,7 +81,7 @@ export const initSwedenMap = ({
 
   const map = new maplibregl.Map({
     container: mapContainer,
-    style: createSwedenStyle(),
+    style: createSwedenStyle({ includeTerrain: false }),
     center: SWEDEN_MAP_CONFIG.center,
     zoom: SWEDEN_MAP_CONFIG.zoom,
     minZoom: SWEDEN_MAP_CONFIG.minZoom,
@@ -120,6 +122,9 @@ export const initSwedenMap = ({
   let trafficControl = null;
   let trafficControlAdded = false;
   let dayNightController = null;
+  let disposeDeferredTerrain = null;
+  let cancelDeferredMount = null;
+  let mapCoreMounted = false;
   let mapFeaturesMounted = false;
 
   if (loadingOverlay) {
@@ -195,7 +200,12 @@ export const initSwedenMap = ({
   };
 
   const teardownMapFeatures = () => {
-    if (!mapFeaturesMounted) {
+    cancelDeferredMount?.();
+    cancelDeferredMount = null;
+    disposeDeferredTerrain?.();
+    disposeDeferredTerrain = null;
+
+    if (!mapFeaturesMounted && !mapCoreMounted) {
       return;
     }
 
@@ -220,15 +230,13 @@ export const initSwedenMap = ({
     disposeMapClick?.();
     disposeMapClick = null;
     mapFeaturesMounted = false;
+    mapCoreMounted = false;
   };
 
-  const mountMapFeatures = () => {
+  const mountDeferredMapFeatures = () => {
     if (mapFeaturesMounted) {
       return;
     }
-
-    perfTracker?.recordMilestone("map-load");
-    perfTracker?.measure("map-construct", "map-construct-start", "milestone:map-load");
 
     disposeWeatherLayer = createCityWeatherLayer({
       map,
@@ -240,37 +248,9 @@ export const initSwedenMap = ({
       onCitiesUpdate
     });
 
-    if (!placeCard) {
-      placeCard = createPlaceCard({ map, mapConfig: SWEDEN_MAP_CONFIG });
-    }
-
-    const weatherPopup = createWeatherPopup({
-      map,
-      maplibregl,
-      perfTracker,
-      fetchFn,
-      onShow: () => placeCard?.close()
-    });
-    disposeWeatherPopup = weatherPopup.destroy;
-
-    const onMapClick = (event) => {
-      if (shouldIgnoreMapPlaceClick(map, event)) {
-        return;
-      }
-
-      weatherPopup.popup.remove();
-      placeCard.openAt(event.lngLat, { trigger: mapContainer });
-    };
-
-    map.on("click", onMapClick);
-    disposeMapClick = () => map.off("click", onMapClick);
-
-    dayNightController.setMode(dayNightController.getMode());
-    const activeTrafficControl = ensureTrafficControl();
-    activeTrafficControl.applyState();
-
     disposeLandmarks = createLandmarkLayer({ map, maplibregl });
 
+    const activeTrafficControl = ensureTrafficControl();
     const trafficState = activeTrafficControl.getState();
 
     trafficFlowLayer = createTrafficFlowLayer({
@@ -305,8 +285,60 @@ export const initSwedenMap = ({
       }
     });
 
-    disposePrefetcher = createViewportPrefetcher(map);
+    disposePrefetcher = createViewportPrefetcher(map, { deferInitialPrefetch: true });
+    disposePrefetcher.start();
     mapFeaturesMounted = true;
+  };
+
+  const mountCoreMapFeatures = () => {
+    if (mapCoreMounted) {
+      return;
+    }
+
+    perfTracker?.recordMilestone("map-load");
+    perfTracker?.measure("map-construct", "map-construct-start", "milestone:map-load");
+
+    if (!placeCard) {
+      placeCard = createPlaceCard({ map, mapConfig: SWEDEN_MAP_CONFIG });
+    }
+
+    const weatherPopup = createWeatherPopup({
+      map,
+      maplibregl,
+      perfTracker,
+      fetchFn,
+      onShow: () => placeCard?.close()
+    });
+    disposeWeatherPopup = weatherPopup.destroy;
+
+    const onMapClick = (event) => {
+      if (shouldIgnoreMapPlaceClick(map, event)) {
+        return;
+      }
+
+      weatherPopup.popup.remove();
+      placeCard.openAt(event.lngLat, { trigger: mapContainer });
+    };
+
+    map.on("click", onMapClick);
+    disposeMapClick = () => map.off("click", onMapClick);
+
+    dayNightController.setMode(dayNightController.getMode());
+    ensureTrafficControl().applyState();
+    disposeDeferredTerrain = enableDeferredTerrain(map);
+    mapCoreMounted = true;
+  };
+
+  const mountMapFeatures = () => {
+    mountCoreMapFeatures();
+    mountDeferredMapFeatures();
+  };
+
+  const scheduleDeferredMapFeatures = () => {
+    cancelDeferredMount?.();
+    cancelDeferredMount = scheduleDeferredWork(() => {
+      mountDeferredMapFeatures();
+    });
   };
 
   map.addControl(
@@ -332,7 +364,10 @@ export const initSwedenMap = ({
   );
   map.addControl(new maplibregl.ScaleControl({ maxWidth: 180, unit: "metric" }), "bottom-left");
 
-  map.once("load", mountMapFeatures);
+  map.once("load", () => {
+    mountCoreMapFeatures();
+    scheduleDeferredMapFeatures();
+  });
 
   map.once("idle", () => {
     if (mapIdleRecorded) {
