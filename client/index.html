@@ -2,30 +2,45 @@
 <html lang="sv">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#f0f5fa" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0f1419" media="(prefers-color-scheme: dark)" />
+    <meta name="color-scheme" content="light dark" />
     <title>Sverige 3D-karta</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap"
+    />
     <link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin />
+    <link rel="preconnect" href="https://server.arcgisonline.com" crossorigin />
     <link rel="dns-prefetch" href="https://s3.amazonaws.com" />
+    <link rel="dns-prefetch" href="https://server.arcgisonline.com" />
     <link
       rel="stylesheet"
       href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"
     />
     <link rel="stylesheet" href="/src/styles/app.css" />
+    <link rel="stylesheet" href="/src/styles/map-modes.css" />
     <link rel="stylesheet" href="/src/styles/weather.css" />
+    <link rel="stylesheet" href="/src/styles/search.css" />
+    <link rel="stylesheet" href="/src/styles/place-card.css" />
+    <link rel="stylesheet" href="/src/styles/traffic.css" />
   </head>
   <body>
-    <div id="app-shell">
-      <header id="top-bar">
-        <div id="app-chrome-left">
+    <div id="app-shell" data-nav-state="collapsed">
+      <header id="top-bar" data-nav-state="collapsed">
+        <div id="top-bar-surface" class="top-bar__surface">
           <div id="brand-stack">
             <p id="brand-kicker">Nordic Terrain Suite</p>
             <h1>Sverige 3D-karta</h1>
+            <p id="brand-subtitle">Premium 3D-navigering och liveväder i realtid</p>
           </div>
-        </div>
-        <div id="app-chrome-center">
-          <div id="search-mount"></div>
-        </div>
-        <div id="app-chrome-right">
+          <nav id="app-nav" aria-label="Huvudnavigering"></nav>
           <div id="status-stack">
             <p id="map-status">Initierar…</p>
             <p id="cache-status">Tilecache initieras…</p>

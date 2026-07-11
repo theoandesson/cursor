@@ -1,8 +1,12 @@
 import { createDebouncedAction } from "./createDebouncedAction.js";
 import { createVisualBuildingHeightExpression } from "../style/expressions/buildingExpressions.js";
+import { TRAFFIC_LABEL_LAYER_IDS } from "../../traffic/createTrafficPaletteBindings.js";
 
 const BUILDING_LAYER_ID = "sweden-buildings";
 const WEATHER_LABEL_LAYER_ID = "city-weather-labels";
+
+const PAINT_TRANSITION = { duration: 320, delay: 0 };
+const INSTANT_TRANSITION = { duration: 0, delay: 0 };
 
 const setLayerVisibility = ({ map, layerId, visible }) => {
   if (!map.getLayer(layerId)) {
@@ -11,37 +15,135 @@ const setLayerVisibility = ({ map, layerId, visible }) => {
   map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
 };
 
+const resolveZoomTier = (zoom, lodConfig) => {
+  if (zoom < lodConfig.mediumZoomThreshold) {
+    return "far";
+  }
+  if (zoom < lodConfig.closeZoomThreshold) {
+    return "medium";
+  }
+  return "close";
+};
+
+const resolveZoomTierProfile = ({ tier, lodConfig, isMoving, closeRange }) => {
+  const tierProfile = lodConfig.zoomTierProfiles[tier];
+  const buildingHeightScale = closeRange
+    ? lodConfig.closeRangeBuildingHeightScale
+    : tierProfile.buildingHeightScale;
+  const buildingOpacity = isMoving
+    ? tierProfile.movingBuildingOpacity
+    : tierProfile.settledBuildingOpacity;
+
+  return {
+    buildingHeightScale,
+    buildingOpacity,
+    hideRoadLabels: isMoving && tierProfile.hideRoadLabelsWhileMoving,
+    hideWeatherLabels: isMoving && closeRange,
+    pixelRatio: isMoving && closeRange ? lodConfig.closeRangeMovingPixelRatio : null
+  };
+};
+
+const lerp = (from, to, amount) => from + (to - from) * amount;
+
 export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) => {
   let currentProfile = null;
+  let currentZoomTier = null;
   let currentCloseRange = null;
   let rafId = null;
+  let transitionRafId = null;
   let pixelRatio = null;
   let weatherLabelsVisible = true;
+  let roadLabelsVisible = true;
+  const roadLabelVisibility = new Map(
+    TRAFFIC_LABEL_LAYER_IDS.map((layerId) => [layerId, true])
+  );
   let currentBuildingOpacity = null;
   let currentBuildingHeightScale = null;
+  let animatedBuildingOpacity = null;
 
   const defaultPixelRatio = Math.min(
     globalThis.devicePixelRatio ?? 1,
     lodConfig.maxPixelRatio
   );
 
-  const isCloseRange = () => map.getZoom() >= lodConfig.closeRangeZoomThreshold;
+  const isCloseRange = () => map.getZoom() >= lodConfig.closeZoomThreshold;
 
   const setMapPixelRatio = (nextPixelRatio) => {
-    if (pixelRatio === nextPixelRatio || typeof map.setPixelRatio !== "function") {
+    const resolvedPixelRatio = nextPixelRatio ?? defaultPixelRatio;
+    if (pixelRatio === resolvedPixelRatio || typeof map.setPixelRatio !== "function") {
       return;
     }
-    pixelRatio = nextPixelRatio;
-    map.setPixelRatio(nextPixelRatio);
+    pixelRatio = resolvedPixelRatio;
+    map.setPixelRatio(resolvedPixelRatio);
   };
 
-  const setBuildingStyle = ({ heightScale, opacity }) => {
+  const setPaintTransition = (layerId, property, transition = PAINT_TRANSITION) => {
+    if (!map.getLayer(layerId)) {
+      return;
+    }
+    map.setPaintProperty(layerId, `${property}-transition`, transition);
+  };
+
+  const applyBuildingOpacity = (opacity, { animated = false } = {}) => {
+    if (!map.getLayer(BUILDING_LAYER_ID)) {
+      return;
+    }
+    if (currentBuildingOpacity !== opacity) {
+      currentBuildingOpacity = opacity;
+      setPaintTransition(
+        BUILDING_LAYER_ID,
+        "fill-extrusion-opacity",
+        animated ? INSTANT_TRANSITION : PAINT_TRANSITION
+      );
+      map.setPaintProperty(BUILDING_LAYER_ID, "fill-extrusion-opacity", opacity);
+    }
+  };
+
+  const animateBuildingOpacity = (targetOpacity) => {
+    if (transitionRafId != null) {
+      cancelAnimationFrame(transitionRafId);
+      transitionRafId = null;
+    }
+
+    const startOpacity = animatedBuildingOpacity ?? currentBuildingOpacity ?? targetOpacity;
+    if (Math.abs(startOpacity - targetOpacity) < 0.01) {
+      applyBuildingOpacity(targetOpacity);
+      animatedBuildingOpacity = targetOpacity;
+      return;
+    }
+
+    animatedBuildingOpacity = startOpacity;
+    const startTime = performance.now();
+
+    const step = (now) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(1, elapsed / PAINT_TRANSITION.duration);
+      const eased = 1 - (1 - progress) ** 3;
+      const nextOpacity = lerp(startOpacity, targetOpacity, eased);
+      animatedBuildingOpacity = nextOpacity;
+      applyBuildingOpacity(nextOpacity, { animated: true });
+
+      if (progress < 1) {
+        transitionRafId = requestAnimationFrame(step);
+        return;
+      }
+
+      transitionRafId = null;
+      animatedBuildingOpacity = targetOpacity;
+      applyBuildingOpacity(targetOpacity);
+    };
+
+    transitionRafId = requestAnimationFrame(step);
+  };
+
+  const setBuildingStyle = ({ heightScale, opacity, smoothOpacity = true }) => {
     if (!map.getLayer(BUILDING_LAYER_ID)) {
       return;
     }
 
     if (currentBuildingHeightScale !== heightScale) {
       currentBuildingHeightScale = heightScale;
+      setPaintTransition(BUILDING_LAYER_ID, "fill-extrusion-height");
       map.setPaintProperty(
         BUILDING_LAYER_ID,
         "fill-extrusion-height",
@@ -49,10 +151,11 @@ export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) 
       );
     }
 
-    if (currentBuildingOpacity !== opacity) {
-      currentBuildingOpacity = opacity;
-      map.setPaintProperty(BUILDING_LAYER_ID, "fill-extrusion-opacity", opacity);
+    if (smoothOpacity) {
+      animateBuildingOpacity(opacity);
+      return;
     }
+    applyBuildingOpacity(opacity);
   };
 
   const setWeatherLabelVisibility = (visible) => {
@@ -63,43 +166,69 @@ export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) 
     setLayerVisibility({ map, layerId: WEATHER_LABEL_LAYER_ID, visible });
   };
 
-  const resolveStatusMessage = ({ profileName, closeRange }) => {
+  const setRoadLabelVisibility = (visible) => {
+    if (roadLabelsVisible === visible) {
+      return;
+    }
+    roadLabelsVisible = visible;
+    for (const layerId of TRAFFIC_LABEL_LAYER_IDS) {
+      roadLabelVisibility.set(layerId, visible);
+      setLayerVisibility({ map, layerId, visible });
+    }
+  };
+
+  const resolveStatusMessage = ({ profileName, zoomTier, closeRange }) => {
+    const tierLabel =
+      zoomTier === "far" ? "långt" : zoomTier === "medium" ? "mellan" : "nära";
+
     if (profileName === "moving") {
       return closeRange
-        ? "Närzoom i rörelse: prioriterar stabil, mjuk rendering."
-        : "Rörelse: flytande rendering utan blockhopp.";
+        ? `Närzoom i rörelse (${tierLabel}): mjuk rendering utan vägetiketter.`
+        : `Rörelse (${tierLabel}): flytande rendering med prioriterad tile-laddning.`;
     }
+
     return closeRange
-      ? "Närzoom: hög detalj med jämn 3D-terräng."
-      : "Stilla: full detalj och färgsatt terräng.";
+      ? `Närzoom (${tierLabel}): hög detalj med färgsatta byggnader.`
+      : `Stilla (${tierLabel}): full detalj och färgsatt terräng.`;
   };
 
   const applyProfile = (profileName) => {
+    const zoom = map.getZoom();
+    const zoomTier = resolveZoomTier(zoom, lodConfig);
     const closeRange = isCloseRange();
-    if (currentProfile === profileName && currentCloseRange === closeRange) {
+    if (
+      currentProfile === profileName &&
+      currentZoomTier === zoomTier &&
+      currentCloseRange === closeRange
+    ) {
       return;
     }
+
     currentProfile = profileName;
+    currentZoomTier = zoomTier;
     currentCloseRange = closeRange;
 
     const isMoving = profileName === "moving";
-    const useCloseRangeMotionProfile = isMoving && closeRange;
-    const buildingHeightScale = closeRange
-      ? lodConfig.closeRangeBuildingHeightScale
-      : lodConfig.defaultBuildingHeightScale;
-    const buildingOpacity = isMoving
-      ? lodConfig.movingBuildingOpacity
-      : lodConfig.settledBuildingOpacity;
+    const tierProfile = resolveZoomTierProfile({
+      tier: zoomTier,
+      lodConfig,
+      isMoving,
+      closeRange
+    });
 
-    setBuildingStyle({ heightScale: buildingHeightScale, opacity: buildingOpacity });
-    setWeatherLabelVisibility(!useCloseRangeMotionProfile);
-    setMapPixelRatio(
-      useCloseRangeMotionProfile ? lodConfig.closeRangeMovingPixelRatio : defaultPixelRatio
-    );
+    setBuildingStyle({
+      heightScale: tierProfile.buildingHeightScale,
+      opacity: tierProfile.buildingOpacity,
+      smoothOpacity: !isMoving
+    });
+    setWeatherLabelVisibility(!tierProfile.hideWeatherLabels);
+    setRoadLabelVisibility(!tierProfile.hideRoadLabels);
+    setMapPixelRatio(tierProfile.pixelRatio);
 
     onStatusChange?.({
       profile: profileName,
-      message: resolveStatusMessage({ profileName, closeRange })
+      zoomTier,
+      message: resolveStatusMessage({ profileName, zoomTier, closeRange })
     });
   };
 
@@ -129,7 +258,6 @@ export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) 
 
   map.on("movestart", enterMovingMode);
   map.on("moveend", queueSettledMode);
-  map.on("idle", queueSettledMode);
   map.on("zoom", queueProfileRefresh);
 
   applyProfile("settled");
@@ -139,12 +267,26 @@ export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) 
       cancelAnimationFrame(rafId);
       rafId = null;
     }
+    if (transitionRafId != null) {
+      cancelAnimationFrame(transitionRafId);
+      transitionRafId = null;
+    }
     scheduleSettled.cancel();
     map.off("movestart", enterMovingMode);
     map.off("moveend", queueSettledMode);
-    map.off("idle", queueSettledMode);
     map.off("zoom", queueProfileRefresh);
     setWeatherLabelVisibility(true);
+    setRoadLabelVisibility(true);
+    for (const layerId of TRAFFIC_LABEL_LAYER_IDS) {
+      roadLabelVisibility.set(layerId, true);
+    }
     setMapPixelRatio(defaultPixelRatio);
+    if (map.getLayer(BUILDING_LAYER_ID)) {
+      setBuildingStyle({
+        heightScale: lodConfig.defaultBuildingHeightScale,
+        opacity: lodConfig.settledBuildingOpacity,
+        smoothOpacity: false
+      });
+    }
   };
 };

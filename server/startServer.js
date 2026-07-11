@@ -4,14 +4,21 @@ export const startServer = async ({
   host,
   port,
   staticDirectory,
-  onListening
+  onListening,
+  onReady
 }) => {
   const app = createApp({ staticDirectory });
 
   return new Promise((resolve, reject) => {
-    const server = app.listen(port, host, () => {
+    const server = app.listen(port, host, async () => {
       onListening?.();
-      resolve({ app, server });
+
+      const readyContext = { app, server };
+      if (onReady) {
+        await onReady(readyContext);
+      }
+
+      resolve(readyContext);
     });
 
     server.on("error", (error) => {
