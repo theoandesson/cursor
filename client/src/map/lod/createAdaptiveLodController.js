@@ -6,6 +6,7 @@ const WEATHER_LABEL_LAYER_ID = "city-weather-labels";
 const ROAD_LABEL_LAYER_ID = "road-labels";
 
 const PAINT_TRANSITION = { duration: 320, delay: 0 };
+const INSTANT_TRANSITION = { duration: 0, delay: 0 };
 
 const setLayerVisibility = ({ map, layerId, visible }) => {
   if (!map.getLayer(layerId)) {
@@ -73,20 +74,24 @@ export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) 
     map.setPixelRatio(resolvedPixelRatio);
   };
 
-  const setPaintTransition = (layerId, property) => {
+  const setPaintTransition = (layerId, property, transition = PAINT_TRANSITION) => {
     if (!map.getLayer(layerId)) {
       return;
     }
-    map.setPaintProperty(layerId, `${property}-transition`, PAINT_TRANSITION);
+    map.setPaintProperty(layerId, `${property}-transition`, transition);
   };
 
-  const applyBuildingOpacity = (opacity) => {
+  const applyBuildingOpacity = (opacity, { animated = false } = {}) => {
     if (!map.getLayer(BUILDING_LAYER_ID)) {
       return;
     }
     if (currentBuildingOpacity !== opacity) {
       currentBuildingOpacity = opacity;
-      setPaintTransition(BUILDING_LAYER_ID, "fill-extrusion-opacity");
+      setPaintTransition(
+        BUILDING_LAYER_ID,
+        "fill-extrusion-opacity",
+        animated ? INSTANT_TRANSITION : PAINT_TRANSITION
+      );
       map.setPaintProperty(BUILDING_LAYER_ID, "fill-extrusion-opacity", opacity);
     }
   };
@@ -98,6 +103,12 @@ export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) 
     }
 
     const startOpacity = animatedBuildingOpacity ?? currentBuildingOpacity ?? targetOpacity;
+    if (Math.abs(startOpacity - targetOpacity) < 0.01) {
+      applyBuildingOpacity(targetOpacity);
+      animatedBuildingOpacity = targetOpacity;
+      return;
+    }
+
     animatedBuildingOpacity = startOpacity;
     const startTime = performance.now();
 
@@ -107,7 +118,7 @@ export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) 
       const eased = 1 - (1 - progress) ** 3;
       const nextOpacity = lerp(startOpacity, targetOpacity, eased);
       animatedBuildingOpacity = nextOpacity;
-      applyBuildingOpacity(nextOpacity);
+      applyBuildingOpacity(nextOpacity, { animated: true });
 
       if (progress < 1) {
         transitionRafId = requestAnimationFrame(step);
@@ -116,6 +127,7 @@ export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) 
 
       transitionRafId = null;
       animatedBuildingOpacity = targetOpacity;
+      applyBuildingOpacity(targetOpacity);
     };
 
     transitionRafId = requestAnimationFrame(step);
@@ -201,7 +213,7 @@ export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) 
     setBuildingStyle({
       heightScale: tierProfile.buildingHeightScale,
       opacity: tierProfile.buildingOpacity,
-      smoothOpacity: true
+      smoothOpacity: !isMoving
     });
     setWeatherLabelVisibility(!tierProfile.hideWeatherLabels);
     setRoadLabelVisibility(!tierProfile.hideRoadLabels);
@@ -240,7 +252,6 @@ export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) 
 
   map.on("movestart", enterMovingMode);
   map.on("moveend", queueSettledMode);
-  map.on("idle", queueSettledMode);
   map.on("zoom", queueProfileRefresh);
 
   applyProfile("settled");
@@ -257,10 +268,16 @@ export const createAdaptiveLodController = ({ map, lodConfig, onStatusChange }) 
     scheduleSettled.cancel();
     map.off("movestart", enterMovingMode);
     map.off("moveend", queueSettledMode);
-    map.off("idle", queueSettledMode);
     map.off("zoom", queueProfileRefresh);
     setWeatherLabelVisibility(true);
     setRoadLabelVisibility(true);
     setMapPixelRatio(defaultPixelRatio);
+    if (map.getLayer(BUILDING_LAYER_ID)) {
+      setBuildingStyle({
+        heightScale: lodConfig.defaultBuildingHeightScale,
+        opacity: lodConfig.settledBuildingOpacity,
+        smoothOpacity: false
+      });
+    }
   };
 };

@@ -1,7 +1,17 @@
 const NOMINATIM_BASE_URL = "https://nominatim.openstreetmap.org";
 const USER_AGENT = "sweden-3d-map-fidelity/1.0.0 (https://github.com/sverige-3d-karta)";
 const CACHE_TTL_MS = 5 * 60 * 1000;
+const CACHE_MAX_ENTRIES = 256;
 const MIN_REQUEST_INTERVAL_MS = 1000;
+const FETCH_TIMEOUT_MS = 10_000;
+const MAX_SEARCH_QUERY_LENGTH = 200;
+
+export class GeocodeNotFoundError extends Error {
+  constructor(message = "Ingen plats hittades för koordinaterna.") {
+    super(message);
+    this.name = "GeocodeNotFoundError";
+  }
+}
 
 const SWEDEN_VIEWBOX = {
   minLon: 9.5,
@@ -52,10 +62,32 @@ const getCached = (key) => {
 };
 
 const setCached = (key, data) => {
+  if (cache.size >= CACHE_MAX_ENTRIES) {
+    const oldestKey = cache.keys().next().value;
+    if (oldestKey != null) {
+      cache.delete(oldestKey);
+    }
+  }
+
   cache.set(key, {
     data,
     expiresAt: Date.now() + CACHE_TTL_MS
   });
+};
+
+const fetchWithTimeout = async (url, options = {}) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("Tidsgräns överskreds vid hämtning av platsdata.");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 };
 
 const nominatimFetch = async (path, searchParams) => {
@@ -64,7 +96,7 @@ const nominatimFetch = async (path, searchParams) => {
     url.searchParams.set(key, String(value));
   }
 
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     headers: {
       "User-Agent": USER_AGENT,
       Accept: "application/json"
@@ -72,11 +104,11 @@ const nominatimFetch = async (path, searchParams) => {
   });
 
   if (response.status === 429) {
-    throw new Error("Nominatim rate limit exceeded. Försök igen om en stund.");
+    throw new Error("Nominatim rate limit överskreds. Försök igen om en stund.");
   }
 
   if (!response.ok) {
-    throw new Error(`Nominatim API ${response.status}: ${response.statusText}`);
+    throw new Error(`Nominatim svarade med fel ${response.status}. Försök igen om en stund.`);
   }
 
   return response.json();
@@ -112,6 +144,9 @@ export const searchPlaces = async ({ query, limit = 8 }) => {
   const normalizedQuery = query.trim();
   if (!normalizedQuery) {
     throw new Error("Sökfrågan får inte vara tom.");
+  }
+  if (normalizedQuery.length > MAX_SEARCH_QUERY_LENGTH) {
+    throw new Error(`Sökfrågan får vara högst ${MAX_SEARCH_QUERY_LENGTH} tecken.`);
   }
 
   const cacheKey = `search:${normalizedQuery.toLowerCase()}:${limit}`;
@@ -163,7 +198,7 @@ export const reverseGeocode = async ({ lon, lat }) => {
   );
 
   if (!payload || payload.error) {
-    throw new Error(payload?.error ?? "Ingen plats hittades för koordinaterna.");
+    throw new GeocodeNotFoundError(payload?.error ?? undefined);
   }
 
   const result = {

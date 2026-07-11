@@ -14,6 +14,7 @@ import { createViewportTileScheduler } from "../lod/createViewportTileScheduler.
 import { createInitialLoadUxController } from "../loading/createInitialLoadUxController.js";
 import { createOrientationControl } from "../navigation/createOrientationControl.js";
 import { createMapModeControl } from "../modes/createMapModeControl.js";
+import { getMapModeLabel } from "../modes/applyMapMode.js";
 import { createViewportPrefetcher } from "../tiles/createViewportPrefetcher.js";
 import { createSwedenStyle } from "../style/createSwedenStyle.js";
 
@@ -57,8 +58,16 @@ export const initSwedenMap = ({
     });
   };
 
+  const mapContainer = container;
+  mapContainer.setAttribute("tabindex", "0");
+  mapContainer.setAttribute("role", "application");
+  mapContainer.setAttribute(
+    "aria-label",
+    mapContainer.getAttribute("aria-label") ?? "3D-karta över Sverige"
+  );
+
   const map = new maplibregl.Map({
-    container,
+    container: mapContainer,
     style: createSwedenStyle(),
     center: SWEDEN_MAP_CONFIG.center,
     zoom: SWEDEN_MAP_CONFIG.zoom,
@@ -85,13 +94,28 @@ export const initSwedenMap = ({
   enableExtendedNavigation(map);
 
   let placeCard = null;
+  let disposeLoadUx = null;
+  let disposeLandmarks = null;
+  let landmarkControl = null;
+  let disposeLod = null;
+  let disposeTileScheduler = null;
+  let disposePrefetcher = null;
+  let disposeMapClick = null;
+  let disposeWeatherLayer = null;
+  let disposeWeatherPopup = null;
+  let dayNightController = null;
+  let mapFeaturesMounted = false;
+
+  if (loadingOverlay) {
+    disposeLoadUx = createInitialLoadUxController({ map, loadingOverlay });
+  }
 
   map.addControl(
     createSearchControl({
       map,
       mapConfig: SWEDEN_MAP_CONFIG,
-      onPlaceSelect: (result) => {
-        placeCard?.showPlace(result);
+      onPlaceSelect: (result, { trigger } = {}) => {
+        placeCard?.showPlace(result, { trigger });
       }
     }),
     "top-left"
@@ -105,25 +129,31 @@ export const initSwedenMap = ({
     }),
     "top-right"
   );
-  map.addControl(
-    new maplibregl.NavigationControl({ showZoom: true, showCompass: true, visualizePitch: true }),
-    "top-left"
-  );
-  map.addControl(new maplibregl.ScaleControl({ maxWidth: 180, unit: "metric" }));
 
-  if (loadingOverlay) {
-    createInitialLoadUxController({ map, loadingOverlay });
-  }
-
-  let disposeLandmarks = null;
-  let disposeLod = null;
-  let disposeTileScheduler = null;
-  let disposePrefetcher = null;
-  let disposeMapClick = null;
-  let dayNightController = null;
-  let mapFeaturesMounted = false;
+  dayNightController = createDayNightController({
+    map,
+    initialMode: "day",
+    onModeChange: (mode) => {
+      publishStatus({
+        dayNightMode: mode,
+        message:
+          mode === "night"
+            ? "Nattläge: dämpad palett och mörkare himmel."
+            : latestLodStatus?.message ?? "Dagläge: full färgskala aktiverad."
+      });
+    }
+  });
+  map.addControl(dayNightController.control, "top-right");
 
   const teardownMapFeatures = () => {
+    if (!mapFeaturesMounted) {
+      return;
+    }
+
+    disposeWeatherLayer?.();
+    disposeWeatherLayer = null;
+    disposeWeatherPopup?.();
+    disposeWeatherPopup = null;
     disposePrefetcher?.destroy();
     disposePrefetcher = null;
     disposeTileScheduler?.();
@@ -132,6 +162,10 @@ export const initSwedenMap = ({
     disposeLod = null;
     disposeLandmarks?.();
     disposeLandmarks = null;
+    if (landmarkControl) {
+      map.removeControl(landmarkControl);
+      landmarkControl = null;
+    }
     disposeMapClick?.();
     disposeMapClick = null;
     mapFeaturesMounted = false;
@@ -139,47 +173,40 @@ export const initSwedenMap = ({
 
   const mountMapFeatures = () => {
     if (mapFeaturesMounted) {
-      teardownMapFeatures();
+      return;
     }
 
-    createCityWeatherLayer({ map, maplibregl });
-    createWeatherPopup({ map, maplibregl });
+    disposeWeatherLayer = createCityWeatherLayer({ map, maplibregl });
 
     if (!placeCard) {
       placeCard = createPlaceCard({ map, mapConfig: SWEDEN_MAP_CONFIG });
     }
+
+    const weatherPopup = createWeatherPopup({
+      map,
+      maplibregl,
+      onShow: () => placeCard?.close()
+    });
+    disposeWeatherPopup = weatherPopup.destroy;
 
     const onMapClick = (event) => {
       if (shouldIgnoreMapPlaceClick(map, event)) {
         return;
       }
 
-      placeCard.openAt(event.lngLat);
+      weatherPopup.popup.remove();
+      placeCard.openAt(event.lngLat, { trigger: mapContainer });
     };
 
     map.on("click", onMapClick);
     disposeMapClick = () => map.off("click", onMapClick);
 
-    if (!dayNightController) {
-      dayNightController = createDayNightController({
-        map,
-        initialMode: "day",
-        onModeChange: (mode) => {
-          publishStatus({
-            dayNightMode: mode,
-            message:
-              mode === "night"
-                ? "Nattläge: dämpad palett och mörkare himmel."
-                : latestLodStatus?.message ?? "Dagläge: full färgskala aktiverad."
-          });
-        }
-      });
-      map.addControl(dayNightController.control, "top-right");
-    } else {
-      dayNightController.setMode(dayNightController.getMode());
-    }
+    dayNightController.setMode(dayNightController.getMode());
 
-    disposeLandmarks = createLandmarkLayer({ map, maplibregl });
+    const landmarkLayer = createLandmarkLayer({ map, maplibregl });
+    disposeLandmarks = landmarkLayer.destroy;
+    landmarkControl = landmarkLayer.control;
+    map.addControl(landmarkControl, "top-right");
 
     disposeLod = createAdaptiveLodController({
       map,
@@ -205,27 +232,36 @@ export const initSwedenMap = ({
   map.addControl(
     createMapModeControl({
       map,
+      onBeforeStyleChange: teardownMapFeatures,
       onStyleLoaded: () => {
         mountMapFeatures();
       },
       onModeChange: (mode) => {
         publishStatus({
           mapMode: mode,
-          message: `Kartläge: ${mode}.`
+          message: `Kartläge: ${getMapModeLabel(mode)}.`
         });
       }
     }),
     "top-right"
   );
 
-  map.on("load", mountMapFeatures);
+  map.addControl(
+    new maplibregl.NavigationControl({ showZoom: true, showCompass: true, visualizePitch: true }),
+    "bottom-right"
+  );
+  map.addControl(new maplibregl.ScaleControl({ maxWidth: 180, unit: "metric" }), "bottom-left");
+
+  map.once("load", mountMapFeatures);
 
   const originalRemove = map.remove.bind(map);
   map.remove = () => {
     teardownMapFeatures();
-    dayNightController?.destroy();
-    dayNightController = null;
+    disposeLoadUx?.();
+    disposeLoadUx = null;
+    placeCard?.destroy();
     placeCard = null;
+    dayNightController = null;
     return originalRemove();
   };
 

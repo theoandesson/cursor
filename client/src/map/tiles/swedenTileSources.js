@@ -109,9 +109,17 @@ export const DEFAULT_SATELLITE_SOURCE = SATELLITE_TILE_SOURCES.esriWorldImagery;
 /** Tile URL templates the viewport prefetcher may warm-cache. */
 export const PREFETCHABLE_TILE_TEMPLATES = Object.freeze([
   VECTOR_TILE_SOURCE.tileUrlTemplate,
-  ...DEM_TILE_SOURCE.tiles,
-  ...DEFAULT_SATELLITE_SOURCE.tiles
+  ...DEM_TILE_SOURCE.tiles
 ]);
+
+/** Prefetch templates scoped to the active basemap mode. */
+export const getPrefetchableTileTemplatesForMode = (mode) => {
+  const templates = [VECTOR_TILE_SOURCE.tileUrlTemplate, ...DEM_TILE_SOURCE.tiles];
+  if (mode === "satellite" || mode === "hybrid") {
+    templates.push(...DEFAULT_SATELLITE_SOURCE.tiles);
+  }
+  return templates;
+};
 
 const lngLatToTile = (lng, lat, zoom) => {
   const scale = 2 ** zoom;

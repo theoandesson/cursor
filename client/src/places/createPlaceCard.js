@@ -12,6 +12,8 @@ const NAVIGATE_FLY_DURATION_MS = 1400;
 const DEFAULT_NAVIGATE_ZOOM = 15;
 const NEARBY_POI_LIMIT = 8;
 const NEARBY_POI_RADIUS_KM = 3;
+const FOCUSABLE_SELECTOR =
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 const formatCoords = (lon, lat) =>
   `${lat.toFixed(5)}°N, ${lon.toFixed(5)}°E`;
@@ -28,6 +30,11 @@ const formatDistance = (distanceKm) => {
   return `${distanceKm.toFixed(1)} km`;
 };
 
+const getFocusableElements = (root) =>
+  [...root.querySelectorAll(FOCUSABLE_SELECTOR)].filter(
+    (element) => !element.hidden && element.getAttribute("aria-hidden") !== "true"
+  );
+
 const buildWeatherHtml = (weather) => {
   if (!weather?.current) {
     return `<p class="place-card__weather-unavailable">Ingen väderdata tillgänglig.</p>`;
@@ -38,7 +45,7 @@ const buildWeatherHtml = (weather) => {
 
   return `
     <div class="place-card__weather-current">
-      <span class="place-card__weather-icon">${sym.icon}</span>
+      <span class="place-card__weather-icon" aria-hidden="true">${sym.icon}</span>
       <div>
         <span class="place-card__weather-temp">${
           weather.current.temp != null ? weather.current.temp.toFixed(1) : "?"
@@ -65,6 +72,10 @@ const buildNearbyHtml = (pois, activePlaceId) => {
     .slice(0, NEARBY_POI_LIMIT)
     .map((poi) => {
       const meta = getPoiCategoryMeta(poi.category);
+      const distance = formatDistance(poi.distanceKm);
+      const ariaLabel = distance
+        ? `${poi.name}, ${meta.label}, ${distance}`
+        : `${poi.name}, ${meta.label}`;
       return `
         <li>
           <button
@@ -76,13 +87,14 @@ const buildNearbyHtml = (pois, activePlaceId) => {
             data-poi-category="${poi.category}"
             data-poi-name="${poi.name.replace(/"/g, "&quot;")}"
             data-poi-address="${(poi.address ?? "").replace(/"/g, "&quot;")}"
+            aria-label="${ariaLabel.replace(/"/g, "&quot;")}"
           >
             <span class="place-card__poi-icon" aria-hidden="true">${meta.icon}</span>
             <span>
               <p class="place-card__poi-name">${poi.name}</p>
               <p class="place-card__poi-meta">${meta.label}</p>
             </span>
-            <span class="place-card__poi-distance">${formatDistance(poi.distanceKm)}</span>
+            <span class="place-card__poi-distance" aria-hidden="true">${distance}</span>
           </button>
         </li>`;
     })
@@ -98,14 +110,67 @@ export const createPlaceCard = ({ map, mapConfig }) => {
   let categoryElement = null;
   let addressElement = null;
   let bodyElement = null;
+  let statusElement = null;
   let navigateButton = null;
+  let closeButton = null;
   let abortController = null;
   let currentPlace = null;
   let lastOpenRequest = null;
+  let lastFocusTrigger = null;
 
-  const setOpen = (isOpen) => {
-    panel?.classList.toggle("place-card--open", isOpen);
-    panel?.setAttribute("aria-hidden", String(!isOpen));
+  const onBodyClick = (event) => {
+    const button = event.target.closest("[data-poi-id]");
+    if (!button) {
+      return;
+    }
+
+    showPlace(
+      {
+        id: button.dataset.poiId,
+        name: button.dataset.poiName ?? "Plats",
+        lon: Number(button.dataset.poiLon),
+        lat: Number(button.dataset.poiLat),
+        category: button.dataset.poiCategory ?? "place",
+        categoryName: getPoiCategoryMeta(button.dataset.poiCategory).label,
+        address: button.dataset.poiAddress ?? ""
+      },
+      { trigger: button }
+    );
+  };
+
+  const announceStatus = (message) => {
+    if (!statusElement) {
+      return;
+    }
+    statusElement.textContent = message;
+  };
+
+  const setOpen = (isOpen, { trigger } = {}) => {
+    if (!panel) {
+      return;
+    }
+
+    if (isOpen) {
+      lastFocusTrigger = trigger ?? document.activeElement;
+      panel.inert = false;
+      panel.classList.add("place-card--open");
+      panel.setAttribute("aria-hidden", "false");
+      requestAnimationFrame(() => {
+        closeButton?.focus();
+      });
+      return;
+    }
+
+    panel.inert = true;
+    panel.classList.remove("place-card--open");
+    panel.setAttribute("aria-hidden", "true");
+    announceStatus("");
+
+    const returnFocusTo = lastFocusTrigger;
+    lastFocusTrigger = null;
+    if (returnFocusTo && typeof returnFocusTo.focus === "function") {
+      returnFocusTo.focus();
+    }
   };
 
   const renderLoading = () => {
@@ -114,6 +179,7 @@ export const createPlaceCard = ({ map, mapConfig }) => {
     }
 
     bodyElement.innerHTML = `<p class="place-card__loading">Hämtar platsinformation…</p>`;
+    announceStatus("Hämtar platsinformation.");
   };
 
   const renderError = (message, onRetry) => {
@@ -128,6 +194,8 @@ export const createPlaceCard = ({ map, mapConfig }) => {
     bodyElement.innerHTML = `
       <p class="place-card__error">${message}</p>
       ${retryButton}`;
+
+    announceStatus(message);
 
     const retry = bodyElement.querySelector(".place-card__retry");
     retry?.addEventListener("click", onRetry, { once: true });
@@ -167,19 +235,7 @@ export const createPlaceCard = ({ map, mapConfig }) => {
         ${buildNearbyHtml(nearbyPois, place.id)}
       </section>`;
 
-    bodyElement.querySelectorAll("[data-poi-id]").forEach((button) => {
-      button.addEventListener("click", () => {
-        showPlace({
-          id: button.dataset.poiId,
-          name: button.dataset.poiName ?? "Plats",
-          lon: Number(button.dataset.poiLon),
-          lat: Number(button.dataset.poiLat),
-          category: button.dataset.poiCategory ?? "place",
-          categoryName: getPoiCategoryMeta(button.dataset.poiCategory).label,
-          address: button.dataset.poiAddress ?? ""
-        });
-      });
-    });
+    announceStatus(`Platsdetaljer för ${place.name} visas.`);
   };
 
   const flyToPlace = (place) => {
@@ -194,7 +250,10 @@ export const createPlaceCard = ({ map, mapConfig }) => {
     });
   };
 
-  const loadPlaceDetails = async (place, { reverseLookup = false } = {}) => {
+  const loadPlaceDetails = async (
+    place,
+    { reverseLookup = false, trigger } = {}
+  ) => {
     abortController?.abort();
     abortController = new AbortController();
     const { signal } = abortController;
@@ -202,7 +261,7 @@ export const createPlaceCard = ({ map, mapConfig }) => {
     lastOpenRequest = requestId;
 
     currentPlace = place;
-    setOpen(true);
+    setOpen(true, { trigger });
     updateHeader(place);
     renderLoading();
 
@@ -242,22 +301,22 @@ export const createPlaceCard = ({ map, mapConfig }) => {
 
       renderError(
         error instanceof Error ? error.message : "Kunde inte hämta platsinformation.",
-        () => loadPlaceDetails(place, { reverseLookup })
+        () => loadPlaceDetails(place, { reverseLookup, trigger })
       );
     }
   };
 
-  const openAt = (lngLat) => {
+  const openAt = (lngLat, { trigger } = {}) => {
     const lon = Number(lngLat.lng ?? lngLat.lon);
     const lat = Number(lngLat.lat);
     loadPlaceDetails(
       normalizePlace({ name: "Vald plats" }, lon, lat),
-      { reverseLookup: true }
+      { reverseLookup: true, trigger }
     );
   };
 
-  const showPlace = (place) => {
-    loadPlaceDetails(normalizePlace(place, place.lon, place.lat));
+  const showPlace = (place, { trigger } = {}) => {
+    loadPlaceDetails(normalizePlace(place, place.lon, place.lat), { trigger });
   };
 
   const close = () => {
@@ -267,11 +326,48 @@ export const createPlaceCard = ({ map, mapConfig }) => {
     setOpen(false);
   };
 
+  const onPanelKeyDown = (event) => {
+    if (!panel?.classList.contains("place-card--open")) {
+      return;
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      close();
+      return;
+    }
+
+    if (event.key !== "Tab") {
+      return;
+    }
+
+    const focusables = getFocusableElements(panel);
+    if (focusables.length === 0) {
+      return;
+    }
+
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+      return;
+    }
+
+    if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
   const mount = () => {
     panel = document.createElement("aside");
     panel.className = "place-card";
-    panel.setAttribute("aria-label", "Platsdetaljer");
+    panel.setAttribute("role", "dialog");
+    panel.setAttribute("aria-modal", "false");
     panel.setAttribute("aria-hidden", "true");
+    panel.inert = true;
 
     const header = document.createElement("header");
     header.className = "place-card__header";
@@ -285,6 +381,8 @@ export const createPlaceCard = ({ map, mapConfig }) => {
 
     nameElement = document.createElement("h2");
     nameElement.className = "place-card__name";
+    nameElement.id = "place-card-title";
+    panel.setAttribute("aria-labelledby", "place-card-title");
 
     categoryElement = document.createElement("p");
     categoryElement.className = "place-card__category-label";
@@ -294,7 +392,7 @@ export const createPlaceCard = ({ map, mapConfig }) => {
 
     titleBlock.append(nameElement, categoryElement, addressElement);
 
-    const closeButton = document.createElement("button");
+    closeButton = document.createElement("button");
     closeButton.type = "button";
     closeButton.className = "place-card__close";
     closeButton.setAttribute("aria-label", "Stäng platskort");
@@ -305,6 +403,13 @@ export const createPlaceCard = ({ map, mapConfig }) => {
 
     bodyElement = document.createElement("div");
     bodyElement.className = "place-card__body";
+    bodyElement.addEventListener("click", onBodyClick);
+
+    statusElement = document.createElement("div");
+    statusElement.className = "place-card__status";
+    statusElement.setAttribute("role", "status");
+    statusElement.setAttribute("aria-live", "polite");
+    statusElement.setAttribute("aria-atomic", "true");
 
     const footer = document.createElement("footer");
     footer.className = "place-card__footer";
@@ -320,21 +425,30 @@ export const createPlaceCard = ({ map, mapConfig }) => {
     });
 
     footer.append(navigateButton);
-    panel.append(header, bodyElement, footer);
-    map.getContainer().append(panel);
-
+    panel.append(header, bodyElement, statusElement, footer);
+    panel.addEventListener("keydown", onPanelKeyDown);
     panel.addEventListener("click", (event) => {
       event.stopPropagation();
     });
+    map.getContainer().append(panel);
   };
 
   mount();
+
+  const destroy = () => {
+    abortController?.abort();
+    panel?.removeEventListener("keydown", onPanelKeyDown);
+    bodyElement?.removeEventListener("click", onBodyClick);
+    panel?.remove();
+    panel = null;
+  };
 
   return {
     openAt,
     showPlace,
     close,
     flyToPlace,
+    destroy,
     element: panel
   };
 };
@@ -344,8 +458,17 @@ export const isWeatherLayerClick = (map, point) => {
   return features.length > 0;
 };
 
+const IGNORED_CLICK_SELECTORS = [
+  ".maplibregl-ctrl",
+  ".place-card",
+  ".map-search-control",
+  ".weather-popup-container",
+  ".weather-hover-container",
+  ".landmark-popup-container"
+].join(", ");
+
 export const shouldIgnoreMapPlaceClick = (map, event) => {
-  if (event.originalEvent.target.closest(".maplibregl-ctrl, .place-card, .map-search-control")) {
+  if (event.originalEvent.target.closest(IGNORED_CLICK_SELECTORS)) {
     return true;
   }
 

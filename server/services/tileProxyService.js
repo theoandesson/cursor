@@ -2,6 +2,8 @@ import { URL } from "node:url";
 
 const DEFAULT_CACHE_MAX_ENTRIES = 512;
 const DEFAULT_CACHE_TTL_MS = 15 * 60 * 1000;
+const MAX_TILE_BYTES = 10 * 1024 * 1024;
+const FETCH_TIMEOUT_MS = 12_000;
 
 const ALLOWED_HOSTS = new Set([
   "tiles.openfreemap.org",
@@ -82,7 +84,26 @@ export const createTileProxyService = ({
     }
   };
 
+  const fetchWithTimeout = async (url, options = {}) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    try {
+      return await fetchImpl(url, { ...options, signal: controller.signal });
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new Error("Tidsgräns överskreds vid hämtning av tile.");
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
   const isAllowedTarget = (targetUrl) => {
+    if (targetUrl.username || targetUrl.password) {
+      return false;
+    }
+
     if (!ALLOWED_HOSTS.has(targetUrl.hostname)) {
       return false;
     }
@@ -104,6 +125,14 @@ export const createTileProxyService = ({
       targetUrl = new URL(rawUrl);
     } catch {
       return { ok: false, status: 400, body: { error: "Ogiltig url-parameter." } };
+    }
+
+    if (targetUrl.username || targetUrl.password) {
+      return {
+        ok: false,
+        status: 400,
+        body: { error: "URL får inte innehålla inloggningsuppgifter." }
+      };
     }
 
     if (!isAllowedTarget(targetUrl)) {
@@ -128,12 +157,21 @@ export const createTileProxyService = ({
     }
 
     try {
-      const upstream = await fetchImpl(targetUrl, {
+      const upstream = await fetchWithTimeout(targetUrl, {
+        redirect: "manual",
         headers: {
           Accept: "*/*",
           "User-Agent": "sweden-3d-map-fidelity/1.0 tile-proxy"
         }
       });
+
+      if (upstream.status >= 300 && upstream.status < 400) {
+        return {
+          ok: false,
+          status: 502,
+          body: { error: "Upstream-omdirigering blockerades av säkerhetsskäl." }
+        };
+      }
 
       if (!upstream.ok) {
         return {
@@ -143,7 +181,23 @@ export const createTileProxyService = ({
         };
       }
 
+      const contentLength = Number(upstream.headers.get("content-length"));
+      if (Number.isFinite(contentLength) && contentLength > MAX_TILE_BYTES) {
+        return {
+          ok: false,
+          status: 413,
+          body: { error: "Tile-svaret är för stort." }
+        };
+      }
+
       const buffer = Buffer.from(await upstream.arrayBuffer());
+      if (buffer.byteLength > MAX_TILE_BYTES) {
+        return {
+          ok: false,
+          status: 413,
+          body: { error: "Tile-svaret är för stort." }
+        };
+      }
       const contentType = inferContentType(
         targetUrl,
         upstream.headers.get("content-type")

@@ -2,27 +2,25 @@
 
 .place-card {
   position: absolute;
-  top: 12px;
-  right: 12px;
-  bottom: 12px;
-  width: min(22rem, calc(100% - 1.5rem));
+  top: var(--app-inset-safe-top);
+  right: var(--app-inset-safe-right);
+  bottom: var(--app-inset-safe-bottom);
+  width: min(22rem, calc(100% - var(--app-space-6)));
   display: flex;
   flex-direction: column;
-  border-radius: 18px;
-  border: 1px solid #c4d8ea55;
-  background: linear-gradient(180deg, #fffffffc, #f5f8fbf5);
-  box-shadow:
-    0 16px 48px -16px #1a2d4228,
-    0 4px 16px -6px #1a2d4214;
+  border-radius: var(--app-radius-xl);
+  border: 1px solid var(--app-border);
+  background: var(--app-panel-gradient-glass);
+  box-shadow: var(--app-shadow-float);
   backdrop-filter: blur(16px) saturate(120%);
-  z-index: 4;
+  z-index: var(--z-panel);
   overflow: hidden;
-  transform: translateX(calc(100% + 1.5rem));
+  transform: translateX(calc(100% + var(--app-space-6)));
   opacity: 0;
   pointer-events: none;
   transition:
-    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.22s ease;
+    transform var(--app-duration-slow) var(--app-ease-out),
+    opacity var(--app-duration-normal) ease;
 }
 
 .place-card--open {
@@ -34,10 +32,10 @@
 .place-card__header {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 0.75rem;
+  gap: var(--app-space-3);
   align-items: start;
-  padding: 1rem 1rem 0.85rem;
-  border-bottom: 1px solid #d8e4ee70;
+  padding: var(--app-space-4) var(--app-space-4) 0.85rem;
+  border-bottom: 1px solid var(--app-border-subtle);
 }
 
 .place-card__category-icon {
@@ -46,8 +44,8 @@
   justify-content: center;
   width: 2.5rem;
   height: 2.5rem;
-  border-radius: 12px;
-  background: linear-gradient(180deg, #edf4fb, #e2ebf5);
+  border-radius: var(--app-radius-md);
+  background: linear-gradient(180deg, var(--app-surface-muted), var(--app-surface-raised));
   font-size: 1.35rem;
   line-height: 1;
   flex-shrink: 0;
@@ -59,26 +57,26 @@
 
 .place-card__name {
   margin: 0;
-  font-size: 1.05rem;
-  font-weight: 700;
-  line-height: 1.25;
-  color: #1a2b3d;
+  font-size: var(--app-font-xl);
+  font-weight: var(--app-font-weight-bold);
+  line-height: var(--app-line-tight);
+  color: var(--app-text-primary);
   word-break: break-word;
 }
 
 .place-card__category-label {
-  margin: 0.2rem 0 0;
-  font-size: 0.74rem;
-  font-weight: 600;
+  margin: var(--app-space-1) 0 0;
+  font-size: var(--app-font-sm);
+  font-weight: var(--app-font-weight-semibold);
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: var(--app-accent);
+  color: var(--app-accent-text);
 }
 
 .place-card__address {
   margin: 0.35rem 0 0;
-  font-size: 0.8rem;
-  line-height: 1.4;
+  font-size: var(--app-font-md);
+  line-height: var(--app-line-relaxed);
   color: var(--app-text-muted);
 }
 
@@ -86,82 +84,91 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
+  width: var(--app-touch-min);
+  height: var(--app-touch-min);
   border: 0;
-  border-radius: 999px;
-  background: #edf2f8;
-  color: #4a6378;
+  border-radius: var(--app-radius-pill);
+  background: var(--app-surface-muted);
+  color: var(--app-control-text);
   font-size: 1.2rem;
   line-height: 1;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition:
+    background var(--app-duration-fast) ease,
+    color var(--app-duration-fast) ease,
+    transform var(--app-duration-fast) ease;
 }
 
 .place-card__close:hover {
-  background: #e2ebf3;
-  color: #1c2d3f;
+  background: var(--app-surface-hover);
+  color: var(--app-text-primary);
+}
+
+.place-card__close:active {
+  transform: scale(0.94);
 }
 
 .place-card__body {
   flex: 1;
   overflow-y: auto;
-  padding: 0.85rem 1rem 1rem;
+  padding: 0.85rem var(--app-space-4) var(--app-space-4);
   display: grid;
-  gap: 0.9rem;
+  gap: var(--app-space-3);
+  scrollbar-width: thin;
 }
 
 .place-card__section {
-  padding: 0.8rem 0.85rem;
-  border-radius: 14px;
-  background: #ffffffb8;
-  border: 1px solid #d8e4ee66;
+  padding: var(--app-space-3);
+  border-radius: var(--app-radius-md);
+  background: color-mix(in srgb, var(--app-surface) 72%, transparent);
+  border: 1px solid var(--app-border-subtle);
 }
 
 .place-card__section-title {
   margin: 0 0 0.55rem;
-  font-size: 0.72rem;
-  font-weight: 700;
+  font-size: var(--app-font-sm);
+  font-weight: var(--app-font-weight-bold);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #5c7389;
+  color: var(--app-text-muted);
 }
 
 .place-card__coords {
   margin: 0;
-  font-size: 0.82rem;
+  font-size: var(--app-font-md);
   font-variant-numeric: tabular-nums;
-  color: #2a3e52;
+  color: var(--app-text-secondary);
 }
 
 .place-card__loading,
 .place-card__error {
   margin: 0;
-  padding: 1.5rem 0.5rem;
+  padding: var(--app-space-6) var(--app-space-2);
   text-align: center;
   font-size: 0.86rem;
   color: var(--app-text-muted);
 }
 
 .place-card__error {
-  color: #c53a3a;
+  color: var(--app-error);
 }
 
 .place-card__retry {
   margin-top: 0.65rem;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--app-radius-pill);
   padding: 0.45rem 0.9rem;
-  background: #edf2f8;
-  color: #1c2d3f;
+  background: var(--app-surface-muted);
+  color: var(--app-text-primary);
   font: inherit;
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-size: var(--app-font-md);
+  font-weight: var(--app-font-weight-semibold);
   cursor: pointer;
+  transition: background var(--app-duration-fast) ease;
 }
 
 .place-card__retry:hover {
-  background: #e2ebf3;
+  background: var(--app-surface-hover);
 }
 
 /* Weather */
@@ -179,7 +186,7 @@
 
 .place-card__weather-temp {
   font-size: 1.45rem;
-  font-weight: 700;
+  font-weight: var(--app-font-weight-bold);
   color: var(--app-accent-strong);
 }
 
@@ -192,15 +199,15 @@
 .place-card__weather-details {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem 0.75rem;
+  gap: 0.35rem var(--app-space-3);
   margin-top: 0.55rem;
-  font-size: 0.74rem;
-  color: #4a6378;
+  font-size: var(--app-font-sm);
+  color: var(--app-control-text);
 }
 
 .place-card__weather-unavailable {
   margin: 0;
-  font-size: 0.8rem;
+  font-size: var(--app-font-md);
   color: var(--app-text-muted);
 }
 
@@ -222,18 +229,18 @@
   width: 100%;
   padding: 0.55rem 0.6rem;
   border: 1px solid transparent;
-  border-radius: 12px;
-  background: #f3f7fb;
+  border-radius: var(--app-radius-md);
+  background: var(--app-surface-muted);
   text-align: left;
   cursor: pointer;
   transition:
-    background 0.15s ease,
-    border-color 0.15s ease;
+    background var(--app-duration-fast) ease,
+    border-color var(--app-duration-fast) ease;
 }
 
 .place-card__poi-item:hover {
-  background: #eaf1f8;
-  border-color: #c4d8ea88;
+  background: var(--app-surface-hover);
+  border-color: var(--app-border);
 }
 
 .place-card__poi-icon {
@@ -243,75 +250,88 @@
 
 .place-card__poi-name {
   margin: 0;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #1c2d3f;
-  line-height: 1.25;
+  font-size: var(--app-font-md);
+  font-weight: var(--app-font-weight-semibold);
+  color: var(--app-text-primary);
+  line-height: var(--app-line-tight);
 }
 
 .place-card__poi-meta {
   margin: 0.12rem 0 0;
-  font-size: 0.7rem;
+  font-size: var(--app-font-sm);
   color: var(--app-text-muted);
 }
 
 .place-card__poi-distance {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: #5c7389;
+  font-size: var(--app-font-sm);
+  font-weight: var(--app-font-weight-semibold);
+  color: var(--app-text-muted);
   white-space: nowrap;
 }
 
 .place-card__empty {
   margin: 0;
-  font-size: 0.8rem;
+  font-size: var(--app-font-md);
   color: var(--app-text-muted);
+}
+
+.place-card__status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* Footer */
 
 .place-card__footer {
-  padding: 0.75rem 1rem 1rem;
-  border-top: 1px solid #d8e4ee70;
-  background: linear-gradient(180deg, #ffffff90, #f5f8fc);
+  padding: var(--app-space-3) var(--app-space-4) var(--app-space-4);
+  padding-bottom: max(var(--app-space-4), env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--app-border-subtle);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--app-surface) 56%, transparent), var(--app-surface-raised));
 }
 
 .place-card__navigate {
   width: 100%;
   min-height: 2.65rem;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--app-radius-pill);
   background: linear-gradient(180deg, var(--app-accent), var(--app-accent-strong));
-  color: #fff;
+  color: var(--app-text-on-accent);
   font: inherit;
   font-size: 0.9rem;
-  font-weight: 650;
+  font-weight: var(--app-font-weight-semibold);
   letter-spacing: 0.01em;
   cursor: pointer;
-  box-shadow: 0 6px 18px -8px #2a7bc066;
+  box-shadow: 0 6px 18px -8px var(--app-accent-glow);
   transition:
-    transform 0.15s ease,
-    box-shadow 0.15s ease;
+    transform var(--app-duration-fast) ease,
+    box-shadow var(--app-duration-fast) ease;
 }
 
 .place-card__navigate:hover {
   transform: translateY(-1px);
-  box-shadow: 0 8px 22px -8px #2a7bc080;
+  box-shadow: 0 8px 22px -8px color-mix(in srgb, var(--app-accent-glow) 125%, transparent);
 }
 
 .place-card__navigate:active {
   transform: translateY(0);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 720px) {
   .place-card {
     top: auto;
     right: 0;
     bottom: 0;
     left: 0;
     width: 100%;
-    max-height: 58vh;
-    border-radius: 18px 18px 0 0;
+    max-height: min(58vh, calc(100% - var(--app-control-width) - var(--app-space-8)));
+    border-radius: var(--app-radius-xl) var(--app-radius-xl) 0 0;
     transform: translateY(100%);
   }
 

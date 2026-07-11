@@ -87,24 +87,24 @@ export const getPoisNearPoint = ({ lon, lat, radiusKm = 5, limit = 20 } = {}) =>
   const safeRadiusKm = Math.max(0.1, radiusKm ?? 5);
   const safeLimit = Math.max(1, limit ?? 20);
 
-  const nearby = SWEDISH_POIS.map((poi) => ({
+  const ranked = SWEDISH_POIS.map((poi) => ({
     poi,
     distanceKm: haversineKm(lon, lat, poi.lon, poi.lat)
   }))
     .filter(({ distanceKm }) => distanceKm <= safeRadiusKm)
-    .sort((left, right) => left.distanceKm - right.distanceKm)
-    .slice(0, safeLimit)
-    .map(({ poi, distanceKm }) => ({
-      ...toPoiDto(poi),
-      distanceKm: Number(distanceKm.toFixed(3))
-    }));
+    .sort((left, right) => left.distanceKm - right.distanceKm);
+
+  const pois = ranked.slice(0, safeLimit).map(({ poi, distanceKm }) => ({
+    ...toPoiDto(poi),
+    distanceKm: Number(distanceKm.toFixed(3))
+  }));
 
   return {
     lon,
     lat,
     radiusKm: safeRadiusKm,
     limit: safeLimit,
-    total: nearby.length,
-    pois: nearby
+    total: ranked.length,
+    pois
   };
 };

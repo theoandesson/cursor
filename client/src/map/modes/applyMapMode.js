@@ -62,24 +62,34 @@ const getStyleForMode = (mode) => {
   return buildStyle();
 };
 
-export const applyMapMode = ({ map, mode, onStyleLoaded }) => {
+let activeStyleSwitchId = 0;
+
+export const applyMapMode = ({ map, mode, onStyleLoaded, onBeforeStyleChange }) => {
   const nextMode = STYLE_BUILDERS[mode] ? mode : MAP_MODES.STANDARD;
+  const switchId = ++activeStyleSwitchId;
   const camera = captureCamera(map);
   const nextStyle = getStyleForMode(nextMode);
 
+  onBeforeStyleChange?.();
+
   const handleStyleLoad = () => {
+    if (switchId !== activeStyleSwitchId) {
+      return;
+    }
+
     restoreCamera(map, camera);
     onStyleLoaded?.({ mode: nextMode });
   };
 
-  if (map.isStyleLoaded()) {
+  const applyStyle = () => {
     map.once("style.load", handleStyleLoad);
     map.setStyle(nextStyle);
+  };
+
+  if (map.isStyleLoaded()) {
+    applyStyle();
   } else {
-    map.once("load", () => {
-      map.once("style.load", handleStyleLoad);
-      map.setStyle(nextStyle);
-    });
+    map.once("load", applyStyle);
   }
 
   return nextMode;

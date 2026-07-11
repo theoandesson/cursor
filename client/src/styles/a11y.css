@@ -1,0 +1,19 @@
+/* Shared keyboard focus indicators for map controls and panels */
+
+#map-root button:focus-visible,
+#map-root input:focus-visible,
+#map-root [role="option"]:focus-visible,
+#map-root [role="radio"]:focus-visible,
+.place-card button:focus-visible {
+  outline: 2px solid var(--app-accent-strong);
+  outline-offset: 2px;
+}
+
+#map-root .map-search-control__form:focus-within {
+  outline: none;
+}
+
+#map-root .maplibregl-popup-close-button:focus-visible {
+  outline: 2px solid var(--app-accent-strong);
+  outline-offset: 2px;
+}

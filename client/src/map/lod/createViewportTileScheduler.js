@@ -90,21 +90,27 @@ const createInlineSchedulerWorker = () => {
   `;
 
   const blob = new Blob([workerSource], { type: "application/javascript" });
-  return new Worker(URL.createObjectURL(blob), { type: "module" });
+  const workerUrl = URL.createObjectURL(blob);
+  return {
+    worker: new Worker(workerUrl, { type: "module" }),
+    workerUrl
+  };
 };
 
 export const createViewportTileScheduler = ({ map, onStatusChange }) => {
   let worker = null;
+  let workerUrl = null;
   let requestId = 0;
   let pendingRequestId = null;
-  let lastVisibleTileCount = null;
+  let lastStatusSignature = null;
   let rafId = null;
 
   const reportStatus = (visibleTileCount, prioritizedTiles = []) => {
-    if (lastVisibleTileCount === visibleTileCount) {
+    const signature = `${visibleTileCount}|${prioritizedTiles[0] ?? ""}|${prioritizedTiles.at(-1) ?? ""}`;
+    if (lastStatusSignature === signature) {
       return;
     }
-    lastVisibleTileCount = visibleTileCount;
+    lastStatusSignature = signature;
     onStatusChange?.({
       visibleTileCount,
       prioritizedTileKeys: prioritizedTiles
@@ -176,10 +182,13 @@ export const createViewportTileScheduler = ({ map, onStatusChange }) => {
   };
 
   try {
-    worker = createInlineSchedulerWorker();
+    const workerHandle = createInlineSchedulerWorker();
+    worker = workerHandle.worker;
+    workerUrl = workerHandle.workerUrl;
     worker.addEventListener("message", onWorkerMessage);
   } catch {
     worker = null;
+    workerUrl = null;
   }
 
   map.on("moveend", queueSchedule);
@@ -199,6 +208,10 @@ export const createViewportTileScheduler = ({ map, onStatusChange }) => {
       worker.removeEventListener("message", onWorkerMessage);
       worker.terminate();
       worker = null;
+    }
+    if (workerUrl) {
+      URL.revokeObjectURL(workerUrl);
+      workerUrl = null;
     }
   };
 };

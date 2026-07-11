@@ -11,42 +11,136 @@ const DEFAULT_OPTIONS = Object.freeze({
   maxConcurrent: 6,
   prefetchRings: 2,
   zoomLevelsAhead: 1,
-  idleDelayMs: 80
+  idleDelayMs: 80,
+  maxFetchedEntries: 12_000
 });
 
 class PriorityQueue {
   constructor() {
     this.items = [];
-    this.keys = new Set();
+    this.keys = new Map();
   }
 
   get size() {
     return this.items.length;
   }
 
+  clear() {
+    this.items.length = 0;
+    this.keys.clear();
+  }
+
   enqueue(tile, priority) {
     const key = `${tile.z}/${tile.x}/${tile.y}`;
-    if (this.keys.has(key)) {
-      const existing = this.items.find((entry) => entry.key === key);
-      if (existing && priority < existing.priority) {
+    const existingIndex = this.keys.get(key);
+    if (existingIndex != null) {
+      const existing = this.items[existingIndex];
+      if (priority < existing.priority) {
         existing.priority = priority;
-        this.items.sort((left, right) => left.priority - right.priority);
+        this.bubbleUp(existingIndex);
+        this.bubbleDown(existingIndex);
       }
       return;
     }
 
-    this.keys.add(key);
     this.items.push({ key, tile, priority });
-    this.items.sort((left, right) => left.priority - right.priority);
+    this.keys.set(key, this.items.length - 1);
+    this.bubbleUp(this.items.length - 1);
   }
 
   dequeue() {
-    const next = this.items.shift();
-    if (!next) {
+    if (this.items.length === 0) {
       return null;
     }
+
+    const next = this.items[0];
+    const last = this.items.pop();
     this.keys.delete(next.key);
+
+    if (this.items.length > 0 && last) {
+      this.items[0] = last;
+      this.keys.set(last.key, 0);
+      this.bubbleDown(0);
+    }
+
     return next;
+  }
+
+  bubbleUp(index) {
+    while (index > 0) {
+      const parentIndex = Math.floor((index - 1) / 2);
+      if (this.items[parentIndex].priority <= this.items[index].priority) {
+        break;
+      }
+      this.swap(index, parentIndex);
+      index = parentIndex;
+    }
+  }
+
+  bubbleDown(index) {
+    const length = this.items.length;
+    while (true) {
+      const left = index * 2 + 1;
+      const right = left + 1;
+      let smallest = index;
+
+      if (left < length && this.items[left].priority < this.items[smallest].priority) {
+        smallest = left;
+      }
+      if (right < length && this.items[right].priority < this.items[smallest].priority) {
+        smallest = right;
+      }
+      if (smallest === index) {
+        break;
+      }
+      this.swap(index, smallest);
+      index = smallest;
+    }
+  }
+
+  swap(leftIndex, rightIndex) {
+    const left = this.items[leftIndex];
+    const right = this.items[rightIndex];
+    this.items[leftIndex] = right;
+    this.items[rightIndex] = left;
+    this.keys.set(left.key, rightIndex);
+    this.keys.set(right.key, leftIndex);
+  }
+}
+
+class BoundedFetchCache {
+  constructor(maxEntries) {
+    this.maxEntries = maxEntries;
+    this.entries = new Map();
+  }
+
+  has(key) {
+    if (!this.entries.has(key)) {
+      return false;
+    }
+    const value = this.entries.get(key);
+    this.entries.delete(key);
+    this.entries.set(key, value);
+    return true;
+  }
+
+  add(key) {
+    if (this.entries.has(key)) {
+      this.entries.delete(key);
+    }
+    this.entries.set(key, true);
+    while (this.entries.size > this.maxEntries) {
+      const oldestKey = this.entries.keys().next().value;
+      this.entries.delete(oldestKey);
+    }
+  }
+
+  clear() {
+    this.entries.clear();
+  }
+
+  get size() {
+    return this.entries.size;
   }
 }
 
@@ -114,20 +208,22 @@ export const createViewportPrefetcher = (map, userOptions = {}) => {
   const options = { ...DEFAULT_OPTIONS, ...userOptions };
   const queue = new PriorityQueue();
   const inflight = new Set();
-  const fetched = new Set();
-  const tileTemplates = buildPrefetchTemplates(options);
+  const fetched = new BoundedFetchCache(options.maxFetchedEntries);
+  let tileTemplates = buildPrefetchTemplates(options);
 
   let previousCenter = map.getCenter();
   let previousZoom = map.getZoom();
   let idleTimer = null;
   let disposed = false;
+  let draining = false;
+  let abortController = new AbortController();
 
   const minZoom = Math.min(VECTOR_TILE_SOURCE.minzoom, DEM_TILE_SOURCE.minzoom);
   const maxZoom = Math.max(VECTOR_TILE_SOURCE.maxzoom, DEM_TILE_SOURCE.maxzoom);
 
   const prefetchTile = async (tile, template) => {
     const key = `${template}|${tile.z}/${tile.x}/${tile.y}`;
-    if (fetched.has(key) || inflight.has(key)) {
+    if (disposed || fetched.has(key) || inflight.has(key)) {
       return;
     }
 
@@ -138,10 +234,16 @@ export const createViewportPrefetcher = (map, userOptions = {}) => {
       await fetch(url, {
         mode: "cors",
         credentials: "omit",
-        cache: "force-cache"
+        cache: "force-cache",
+        signal: abortController.signal
       });
-      fetched.add(key);
-    } catch {
+      if (!disposed) {
+        fetched.add(key);
+      }
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        return;
+      }
       // Best-effort warm cache — ignore individual tile failures.
     } finally {
       inflight.delete(key);
@@ -149,40 +251,52 @@ export const createViewportPrefetcher = (map, userOptions = {}) => {
   };
 
   const drainQueue = async () => {
-    while (!disposed && queue.size > 0 && inflight.size < options.maxConcurrent) {
-      const entry = queue.dequeue();
-      if (!entry) {
-        break;
-      }
+    if (draining || disposed) {
+      return;
+    }
 
-      const work = tileTemplates.map((template) => prefetchTile(entry.tile, template));
-      await Promise.allSettled(work);
+    draining = true;
+    try {
+      while (!disposed && queue.size > 0 && inflight.size < options.maxConcurrent) {
+        const entry = queue.dequeue();
+        if (!entry) {
+          break;
+        }
+
+        const work = tileTemplates.map((template) => prefetchTile(entry.tile, template));
+        await Promise.allSettled(work);
+      }
+    } finally {
+      draining = false;
+      if (!disposed && queue.size > 0 && inflight.size < options.maxConcurrent) {
+        drainQueue();
+      }
     }
   };
 
-  const enqueueTilesForBounds = (bounds, priorityBase) => {
-    const zoom = clampZoom(map.getZoom(), minZoom, maxZoom);
+  const enqueueTilesForBounds = (bounds, priorityBase, zoomOverride = null) => {
+    const zoom = zoomOverride ?? clampZoom(map.getZoom(), minZoom, maxZoom);
+    let ringBounds = bounds;
 
     for (let ring = 0; ring <= options.prefetchRings; ring += 1) {
       const ringPriority = priorityBase + ring;
-      const tiles = enumerateTilesForBounds(bounds, zoom);
+      const tiles = enumerateTilesForBounds(ringBounds, zoom);
 
       tiles.forEach((tile) => {
         queue.enqueue(tile, ringPriority);
       });
 
       if (ring < options.prefetchRings) {
-        const [west, south, east, north] = bounds;
+        const [west, south, east, north] = ringBounds;
         const width = east - west;
         const height = north - south;
         const ringFactor = 0.35 * (ring + 1);
-        bounds = [
+        ringBounds = clampBoundsToSweden([
           west - width * ringFactor,
           south - height * ringFactor,
           east + width * ringFactor,
           north + height * ringFactor
-        ];
-        bounds = clampBoundsToSweden(bounds);
+        ]);
       }
     }
 
@@ -217,24 +331,32 @@ export const createViewportPrefetcher = (map, userOptions = {}) => {
       const center = map.getCenter();
       const zoom = map.getZoom();
       const visibleBounds = clampBoundsToSweden(boundsFromLngLatBounds(map.getBounds()));
-
-      const bearing = Math.atan2(
+      const zoomDelta = Math.abs(zoom - previousZoom);
+      const panDistance = Math.hypot(
         center.lng - previousCenter.lng,
         center.lat - previousCenter.lat
       );
-      const direction = normalizeDirection(bearing);
-      const lookaheadBounds = clampBoundsToSweden(
-        expandBoundsInDirection(visibleBounds, direction, 1.1)
-      );
-      const prefetchBounds = clampBoundsToSweden(
-        mergeBounds(visibleBounds, lookaheadBounds)
-      );
+      const hasMeaningfulMotion = panDistance > 0.0008 || zoomDelta >= 0.05;
 
-      queue.items.length = 0;
-      queue.keys.clear();
+      let prefetchBounds = visibleBounds;
+      if (hasMeaningfulMotion) {
+        const bearing = Math.atan2(
+          center.lng - previousCenter.lng,
+          center.lat - previousCenter.lat
+        );
+        const direction = normalizeDirection(bearing);
+        const lookaheadBounds = clampBoundsToSweden(
+          expandBoundsInDirection(visibleBounds, direction, 1.1)
+        );
+        prefetchBounds = clampBoundsToSweden(mergeBounds(visibleBounds, lookaheadBounds));
+      }
+
+      queue.clear();
 
       enqueueTilesForBounds(visibleBounds, 0);
-      enqueueTilesForBounds(prefetchBounds, 10);
+      if (prefetchBounds !== visibleBounds) {
+        enqueueTilesForBounds(prefetchBounds, 10);
+      }
 
       previousCenter = center;
       previousZoom = zoom;
@@ -245,17 +367,21 @@ export const createViewportPrefetcher = (map, userOptions = {}) => {
 
   const onMoveEnd = () => schedulePrefetch();
   const onZoomEnd = () => schedulePrefetch();
+  const onLoad = () => schedulePrefetch();
 
   map.on("moveend", onMoveEnd);
   map.on("zoomend", onZoomEnd);
-
-  map.once("load", () => {
-    schedulePrefetch();
-  });
+  map.on("load", onLoad);
 
   return {
     flush: () => {
       schedulePrefetch();
+    },
+    setTileTemplates: (nextTemplates) => {
+      if (!Array.isArray(nextTemplates) || nextTemplates.length === 0) {
+        return;
+      }
+      tileTemplates = nextTemplates;
     },
     destroy: () => {
       disposed = true;
@@ -263,10 +389,12 @@ export const createViewportPrefetcher = (map, userOptions = {}) => {
         clearTimeout(idleTimer);
         idleTimer = null;
       }
+      abortController.abort();
+      abortController = new AbortController();
       map.off("moveend", onMoveEnd);
       map.off("zoomend", onZoomEnd);
-      queue.items.length = 0;
-      queue.keys.clear();
+      map.off("load", onLoad);
+      queue.clear();
       inflight.clear();
     },
     getStats: () => ({

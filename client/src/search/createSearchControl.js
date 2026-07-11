@@ -14,9 +14,31 @@ const RESULT_LABEL_CLASS = "map-search-control__result-label";
 const RESULT_SUBTITLE_CLASS = "map-search-control__result-subtitle";
 
 const SEARCH_DEBOUNCE_MS = 300;
-const SEARCH_FLY_DURATION_MS = 1600;
+const SEARCH_FLY_MIN_DURATION_MS = 700;
+const SEARCH_FLY_MAX_DURATION_MS = 2200;
 const DEFAULT_RESULT_ZOOM = 14;
 const MIN_QUERY_LENGTH = 2;
+
+const prefersReducedMotion = () =>
+  window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
+
+const getFlyDurationMs = (fromCenter, toCenter) => {
+  if (prefersReducedMotion()) {
+    return 0;
+  }
+
+  const [fromLon, fromLat] = fromCenter;
+  const [toLon, toLat] = toCenter;
+  const lonDelta = toLon - fromLon;
+  const latDelta = toLat - fromLat;
+  const distance = Math.hypot(lonDelta, latDelta);
+  return Math.round(
+    Math.min(
+      SEARCH_FLY_MAX_DURATION_MS,
+      Math.max(SEARCH_FLY_MIN_DURATION_MS, 500 + distance * 4200)
+    )
+  );
+};
 
 const releaseListeners = (listeners) => {
   while (listeners.length > 0) {
@@ -49,23 +71,53 @@ export const createSearchControl = ({ map, mapConfig, onPlaceSelect }) => {
   const listeners = [];
   let debouncedSearch = null;
 
-  const setDropdownOpen = (isOpen) => {
+  const setPanelOpen = (isOpen) => {
     isDropdownOpen = isOpen;
-    if (!listbox) {
-      return;
-    }
-
-    listbox.hidden = !isOpen;
     input?.setAttribute("aria-expanded", String(isOpen));
   };
 
-  const setStatusMessage = (message) => {
-    if (!statusElement) {
+  const showStatusPanel = (message, { isLoading = false } = {}) => {
+    if (!statusElement || !listbox) {
       return;
     }
 
+    listbox.hidden = true;
+    listbox.replaceChildren();
+    results = [];
+    activeIndex = -1;
+    input?.removeAttribute("aria-activedescendant");
+
     statusElement.textContent = message;
     statusElement.hidden = !message;
+    statusElement.dataset.state = isLoading ? "loading" : "";
+    setPanelOpen(Boolean(message));
+    input?.setAttribute("aria-busy", String(isLoading));
+  };
+
+  const showResultsPanel = () => {
+    if (!statusElement || !listbox) {
+      return;
+    }
+
+    statusElement.hidden = true;
+    statusElement.textContent = "";
+    statusElement.dataset.state = "";
+    listbox.hidden = false;
+    input?.setAttribute("aria-busy", "false");
+    setPanelOpen(true);
+  };
+
+  const closePanel = () => {
+    if (!statusElement || !listbox) {
+      return;
+    }
+
+    statusElement.hidden = true;
+    statusElement.textContent = "";
+    statusElement.dataset.state = "";
+    listbox.hidden = true;
+    input?.setAttribute("aria-busy", "false");
+    setPanelOpen(false);
   };
 
   const updateClearButton = () => {
@@ -101,19 +153,20 @@ export const createSearchControl = ({ map, mapConfig, onPlaceSelect }) => {
   const closeDropdown = ({ clearActive = true } = {}) => {
     if (clearActive) {
       activeIndex = -1;
+      input?.removeAttribute("aria-activedescendant");
     }
-    setDropdownOpen(false);
-    setStatusMessage("");
+    closePanel();
   };
 
   const flyToResult = (result) => {
+    const targetCenter = [result.lon, result.lat];
     map.stop();
     map.flyTo({
-      center: [result.lon, result.lat],
+      center: targetCenter,
       zoom: getResultZoom(result, map),
       pitch: mapConfig.pitch,
       bearing: mapConfig.bearing,
-      duration: SEARCH_FLY_DURATION_MS,
+      duration: getFlyDurationMs(map.getCenter().toArray(), targetCenter),
       essential: true
     });
   };
@@ -128,7 +181,7 @@ export const createSearchControl = ({ map, mapConfig, onPlaceSelect }) => {
     closeDropdown();
     input.blur();
     flyToResult(result);
-    onPlaceSelect?.(result);
+    onPlaceSelect?.(result, { trigger: input });
   };
 
   const renderResults = (nextResults, { statusMessage = "" } = {}) => {
@@ -142,18 +195,21 @@ export const createSearchControl = ({ map, mapConfig, onPlaceSelect }) => {
     listbox.replaceChildren();
 
     if (nextResults.length === 0) {
-      setDropdownOpen(Boolean(statusMessage));
-      setStatusMessage(statusMessage);
+      if (statusMessage) {
+        showStatusPanel(statusMessage);
+      } else {
+        closePanel();
+      }
       return;
     }
 
     nextResults.forEach((result, index) => {
-      const option = document.createElement("button");
-      option.type = "button";
+      const option = document.createElement("div");
       option.className = RESULT_CLASS;
       option.id = `map-search-result-${index}`;
       option.setAttribute("role", "option");
       option.setAttribute("aria-selected", String(index === activeIndex));
+      option.tabIndex = -1;
 
       const label = document.createElement("span");
       label.className = RESULT_LABEL_CLASS;
@@ -168,18 +224,23 @@ export const createSearchControl = ({ map, mapConfig, onPlaceSelect }) => {
         option.appendChild(subtitle);
       }
 
-      const onClick = (event) => {
+      const onMouseDown = (event) => {
         event.preventDefault();
+      };
+      const onClick = () => {
         selectResult(result);
       };
+      option.addEventListener("mousedown", onMouseDown);
       option.addEventListener("click", onClick);
-      listeners.push(() => option.removeEventListener("click", onClick));
+      listeners.push(() => {
+        option.removeEventListener("mousedown", onMouseDown);
+        option.removeEventListener("click", onClick);
+      });
 
       listbox.appendChild(option);
     });
 
-    setStatusMessage("");
-    setDropdownOpen(true);
+    showResultsPanel();
     renderActiveResult();
   };
 
@@ -196,8 +257,7 @@ export const createSearchControl = ({ map, mapConfig, onPlaceSelect }) => {
     abortController = new AbortController();
     const requestId = ++activeRequestId;
 
-    setDropdownOpen(true);
-    setStatusMessage("Söker…");
+    showStatusPanel("Söker…", { isLoading: true });
 
     try {
       const nextResults = await searchPlaces(normalizedQuery, {
@@ -252,8 +312,16 @@ export const createSearchControl = ({ map, mapConfig, onPlaceSelect }) => {
     listeners.push(() => input.removeEventListener("input", onInput));
 
     const onFocus = () => {
-      if (results.length > 0 || statusElement?.textContent) {
-        setDropdownOpen(true);
+      if (results.length > 0) {
+        showResultsPanel();
+        renderActiveResult();
+        return;
+      }
+
+      if (statusElement?.textContent) {
+        statusElement.hidden = false;
+        listbox.hidden = true;
+        setPanelOpen(true);
       }
     };
     input.addEventListener("focus", onFocus);
@@ -264,13 +332,35 @@ export const createSearchControl = ({ map, mapConfig, onPlaceSelect }) => {
         case "ArrowDown":
           event.preventDefault();
           if (!isDropdownOpen && results.length > 0) {
-            setDropdownOpen(true);
+            showResultsPanel();
           }
           moveActiveIndex(1);
           break;
         case "ArrowUp":
           event.preventDefault();
+          if (activeIndex <= 0) {
+            activeIndex = -1;
+            renderActiveResult();
+            break;
+          }
           moveActiveIndex(-1);
+          break;
+        case "Home":
+          if (isDropdownOpen && results.length > 0) {
+            event.preventDefault();
+            activeIndex = 0;
+            renderActiveResult();
+          }
+          break;
+        case "End":
+          if (isDropdownOpen && results.length > 0) {
+            event.preventDefault();
+            activeIndex = results.length - 1;
+            renderActiveResult();
+          }
+          break;
+        case "Tab":
+          closeDropdown({ clearActive: false });
           break;
         case "Enter":
           if (isDropdownOpen && activeIndex >= 0 && results[activeIndex]) {
@@ -289,6 +379,15 @@ export const createSearchControl = ({ map, mapConfig, onPlaceSelect }) => {
     };
     input.addEventListener("keydown", onKeyDown);
     listeners.push(() => input.removeEventListener("keydown", onKeyDown));
+
+    const onBlur = (event) => {
+      if (container?.contains(event.relatedTarget)) {
+        return;
+      }
+      closeDropdown({ clearActive: false });
+    };
+    input.addEventListener("blur", onBlur);
+    listeners.push(() => input.removeEventListener("blur", onBlur));
   };
 
   const bindFormEvents = () => {
@@ -352,16 +451,19 @@ export const createSearchControl = ({ map, mapConfig, onPlaceSelect }) => {
       const icon = document.createElement("span");
       icon.className = ICON_CLASS;
       icon.setAttribute("aria-hidden", "true");
-      icon.textContent = "⌕";
+      icon.innerHTML =
+        '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16.2 16.2 20.5 20.5"/></svg>';
 
       input = document.createElement("input");
       input.type = "search";
       input.className = INPUT_CLASS;
       input.name = "q";
       input.placeholder = "Sök adress, ort eller plats...";
+      input.setAttribute("role", "combobox");
       input.setAttribute("aria-label", "Sök adress, ort eller plats");
       input.setAttribute("aria-autocomplete", "list");
-      input.setAttribute("aria-controls", "map-search-results");
+      input.setAttribute("aria-haspopup", "listbox");
+      input.setAttribute("aria-controls", "map-search-results map-search-status");
       input.setAttribute("aria-expanded", "false");
       input.setAttribute("autocomplete", "off");
       input.setAttribute("enterkeyhint", "search");
@@ -371,7 +473,8 @@ export const createSearchControl = ({ map, mapConfig, onPlaceSelect }) => {
       clearButton.type = "button";
       clearButton.className = CLEAR_CLASS;
       clearButton.hidden = true;
-      clearButton.textContent = "×";
+      clearButton.innerHTML =
+        '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
       clearButton.title = "Rensa sökning";
       clearButton.setAttribute("aria-label", "Rensa sökning");
 
@@ -383,9 +486,11 @@ export const createSearchControl = ({ map, mapConfig, onPlaceSelect }) => {
       listbox.hidden = true;
 
       statusElement = document.createElement("p");
+      statusElement.id = "map-search-status";
       statusElement.className = STATUS_CLASS;
       statusElement.setAttribute("role", "status");
       statusElement.setAttribute("aria-live", "polite");
+      statusElement.setAttribute("aria-atomic", "true");
       statusElement.hidden = true;
 
       form.append(icon, input, clearButton);

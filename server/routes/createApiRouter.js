@@ -1,7 +1,14 @@
 import { Router } from "express";
-import { parseBoolean, parseFloatInRange, parseIntegerInRange } from "../lib/parseQuery.js";
+import {
+  parseBoolean,
+  parseFloatInRange,
+  parseFloatInRangeOrReject,
+  parseIntegerInRange,
+  parseIntegerInRangeOrReject
+} from "../lib/parseQuery.js";
 import { getCityById, getCityWeather, listCities, toCityDto } from "../services/cityWeatherService.js";
-import { reverseGeocode, searchPlaces } from "../services/geocodingService.js";
+import { GeocodeNotFoundError, reverseGeocode, searchPlaces } from "../services/geocodingService.js";
+import { POI_CATEGORY_BY_ID } from "../data/poiCategories.js";
 import { getPoiById, getPoisNearPoint, listPois, toPoiDto } from "../services/poiService.js";
 import { fetchWeatherByPoint } from "../services/smhiWeatherService.js";
 import { createTileProxyService } from "../services/tileProxyService.js";
@@ -15,6 +22,7 @@ const DEFAULT_POI_RADIUS_KM = 5;
 const DEFAULT_NEAR_POI_LIMIT = 20;
 const MAX_SEARCH_LIMIT = 20;
 const DEFAULT_SEARCH_LIMIT = 8;
+const MAX_SEARCH_QUERY_LENGTH = 200;
 const SWEDEN_BOUNDS = {
   minLon: 9.5,
   minLat: 54.8,
@@ -22,12 +30,29 @@ const SWEDEN_BOUNDS = {
   maxLat: 69.7
 };
 
-const parsePageQuery = (request) => {
-  const limit = parseIntegerInRange(request.query.limit, { min: 1, max: MAX_PAGE_SIZE });
-  const offset = parseIntegerInRange(request.query.offset, { min: 0 });
+const parsePageQuery = (request, response) => {
+  const limitResult = parseIntegerInRangeOrReject(request.query.limit, {
+    min: 1,
+    max: MAX_PAGE_SIZE
+  });
+  if (!limitResult.ok) {
+    response.status(400).json({
+      error: `Ogiltig limit. Ange ett heltal mellan 1 och ${MAX_PAGE_SIZE}.`
+    });
+    return null;
+  }
+
+  const offsetResult = parseIntegerInRangeOrReject(request.query.offset, { min: 0 });
+  if (!offsetResult.ok) {
+    response.status(400).json({
+      error: "Ogiltig offset. Ange ett heltal >= 0."
+    });
+    return null;
+  }
+
   return {
-    limit: limit ?? undefined,
-    offset: offset ?? 0
+    limit: limitResult.value ?? undefined,
+    offset: offsetResult.value ?? 0
   };
 };
 
@@ -37,11 +62,20 @@ const parseForecastHours = (request) =>
     max: MAX_FORECAST_HOURS
   }) ?? 24;
 
-const parseSearchLimit = (request) =>
-  parseIntegerInRange(request.query.limit, {
+const parseSearchLimit = (request, response) => {
+  const limitResult = parseIntegerInRangeOrReject(request.query.limit, {
     min: 1,
     max: MAX_SEARCH_LIMIT
-  }) ?? DEFAULT_SEARCH_LIMIT;
+  });
+  if (!limitResult.ok) {
+    response.status(400).json({
+      error: `Ogiltig limit. Ange ett heltal mellan 1 och ${MAX_SEARCH_LIMIT}.`
+    });
+    return null;
+  }
+
+  return limitResult.value ?? DEFAULT_SEARCH_LIMIT;
+};
 
 const parseSearchQuery = (request) => String(request.query.q ?? "").trim();
 
@@ -88,11 +122,21 @@ export const createApiRouter = () => {
 
   router.get("/search", async (request, response) => {
     const query = parseSearchQuery(request);
-    const limit = parseSearchLimit(request);
+    const limit = parseSearchLimit(request, response);
+    if (limit == null) {
+      return;
+    }
 
     if (!query) {
       response.status(400).json({
         error: "Ogiltig sökfråga. Ange query-parameter q."
+      });
+      return;
+    }
+
+    if (query.length > MAX_SEARCH_QUERY_LENGTH) {
+      response.status(400).json({
+        error: `Sökfrågan får vara högst ${MAX_SEARCH_QUERY_LENGTH} tecken.`
       });
       return;
     }
@@ -121,14 +165,20 @@ export const createApiRouter = () => {
       const result = await reverseGeocode({ lon, lat });
       response.status(200).json(result);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Kunde inte geokoda koordinaterna.";
-      const status = message.includes("Ingen plats hittades") ? 404 : 502;
-      response.status(status).json({ error: message });
+      const status = error instanceof GeocodeNotFoundError ? 404 : 502;
+      response.status(status).json({
+        error: error instanceof Error ? error.message : "Kunde inte geokoda koordinaterna."
+      });
     }
   });
 
   router.get("/cities", (request, response) => {
-    const { limit, offset } = parsePageQuery(request);
+    const pageQuery = parsePageQuery(request, response);
+    if (!pageQuery) {
+      return;
+    }
+
+    const { limit, offset } = pageQuery;
     const search = String(request.query.search ?? "").trim();
 
     response.status(200).json(listCities({ search, limit, offset }));
@@ -167,7 +217,12 @@ export const createApiRouter = () => {
   });
 
   router.get("/weather/cities", async (request, response) => {
-    const { limit, offset } = parsePageQuery(request);
+    const pageQuery = parsePageQuery(request, response);
+    if (!pageQuery) {
+      return;
+    }
+
+    const { limit, offset } = pageQuery;
     const forecastHours = parseForecastHours(request);
     const forceRefresh = parseBoolean(request.query.refresh, false);
 
@@ -188,26 +243,53 @@ export const createApiRouter = () => {
   });
 
   router.get("/pois", (request, response) => {
-    const { limit, offset } = parsePageQuery(request);
+    const pageQuery = parsePageQuery(request, response);
+    if (!pageQuery) {
+      return;
+    }
+
+    const { limit, offset } = pageQuery;
     const search = String(request.query.search ?? "").trim();
-    const category = String(request.query.category ?? "").trim();
+    const category = String(request.query.category ?? "").trim().toLowerCase();
+
+    if (category && !POI_CATEGORY_BY_ID[category]) {
+      response.status(400).json({ error: `Okänd POI-kategori: ${category}` });
+      return;
+    }
 
     response.status(200).json(listPois({ search, category, limit, offset }));
   });
 
   router.get("/pois/near", (request, response) => {
-    const lon = parseFloatInRange(request.query.lon, { min: -180, max: 180 });
-    const lat = parseFloatInRange(request.query.lat, { min: -90, max: 90 });
-    const radiusKm =
-      parseFloatInRange(request.query.radiusKm, { min: 0.1, max: MAX_POI_RADIUS_KM }) ??
-      DEFAULT_POI_RADIUS_KM;
-    const limit =
-      parseIntegerInRange(request.query.limit, { min: 1, max: MAX_PAGE_SIZE }) ??
-      DEFAULT_NEAR_POI_LIMIT;
+    const { lon, lat } = parseSwedenCoordinates(request);
+    const radiusResult = parseFloatInRangeOrReject(request.query.radiusKm, {
+      min: 0.1,
+      max: MAX_POI_RADIUS_KM
+    });
+    if (!radiusResult.ok) {
+      response.status(400).json({
+        error: `Ogiltig radiusKm. Ange ett värde mellan 0.1 och ${MAX_POI_RADIUS_KM}.`
+      });
+      return;
+    }
+
+    const limitResult = parseIntegerInRangeOrReject(request.query.limit, {
+      min: 1,
+      max: MAX_PAGE_SIZE
+    });
+    if (!limitResult.ok) {
+      response.status(400).json({
+        error: `Ogiltig limit. Ange ett heltal mellan 1 och ${MAX_PAGE_SIZE}.`
+      });
+      return;
+    }
+
+    const radiusKm = radiusResult.value ?? DEFAULT_POI_RADIUS_KM;
+    const limit = limitResult.value ?? DEFAULT_NEAR_POI_LIMIT;
 
     if (lon == null || lat == null) {
       response.status(400).json({
-        error: "Ogiltiga koordinater. Ange query-parametrar lon och lat."
+        error: "Ogiltiga koordinater. Ange query-parametrar lon och lat inom Sveriges gränser."
       });
       return;
     }

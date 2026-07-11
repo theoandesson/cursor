@@ -4,6 +4,8 @@ import { getWeatherSymbol, getWindDirection } from "./weatherSymbols.js";
 const SOURCE_ID = "city-weather-source";
 const CIRCLE_LAYER_ID = "city-weather-circles";
 const LABEL_LAYER_ID = "city-weather-labels";
+
+export const WEATHER_LAYER_IDS = [CIRCLE_LAYER_ID, LABEL_LAYER_ID];
 const REFRESH_INTERVAL_MS = 10 * 60 * 1000;
 const CITY_MARKER_MAX_ZOOM = 13.8;
 
@@ -113,19 +115,33 @@ export const createCityWeatherLayer = ({ map, maplibregl }) => {
     offset: 20
   });
 
-  map.on("mouseenter", LABEL_LAYER_ID, (e) => {
+  const onMouseEnter = (event) => {
     map.getCanvas().style.cursor = "pointer";
-    const f = e.features?.[0];
-    if (!f) return;
+    const feature = event.features?.[0];
+    if (!feature) {
+      return;
+    }
     hoverPopup
-      .setLngLat(f.geometry.coordinates)
-      .setHTML(buildHoverHtml(f.properties))
+      .setLngLat(feature.geometry.coordinates)
+      .setHTML(buildHoverHtml(feature.properties))
       .addTo(map);
-  });
+  };
 
-  map.on("mouseleave", LABEL_LAYER_ID, () => {
+  const onMouseLeave = (event) => {
+    const features = map.queryRenderedFeatures(event.point, {
+      layers: WEATHER_LAYER_IDS
+    });
+    if (features.length > 0) {
+      return;
+    }
+
     map.getCanvas().style.cursor = "";
     hoverPopup.remove();
+  };
+
+  WEATHER_LAYER_IDS.forEach((layerId) => {
+    map.on("mouseenter", layerId, onMouseEnter);
+    map.on("mouseleave", layerId, onMouseLeave);
   });
 
   const updateFeature = (idx, weather) => {
@@ -201,7 +217,23 @@ export const createCityWeatherLayer = ({ map, maplibregl }) => {
 
   return () => {
     isDisposed = true;
-    if (intervalId) clearInterval(intervalId);
+    if (intervalId) {
+      clearInterval(intervalId);
+      intervalId = null;
+    }
     hoverPopup.remove();
+    WEATHER_LAYER_IDS.forEach((layerId) => {
+      map.off("mouseenter", layerId, onMouseEnter);
+      map.off("mouseleave", layerId, onMouseLeave);
+    });
+    if (map.getLayer(LABEL_LAYER_ID)) {
+      map.removeLayer(LABEL_LAYER_ID);
+    }
+    if (map.getLayer(CIRCLE_LAYER_ID)) {
+      map.removeLayer(CIRCLE_LAYER_ID);
+    }
+    if (map.getSource(SOURCE_ID)) {
+      map.removeSource(SOURCE_ID);
+    }
   };
 };
