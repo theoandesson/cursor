@@ -1,27 +1,48 @@
 const SMHI_BASE_URL =
-  "https://opendata-download-metfcst.smhi.se/api/category/pmp3g/version/2";
+  "https://opendata-download-metfcst.smhi.se/api/category/snow1g/version/1";
+
+const MISSING_VALUE = 9999;
 
 const roundCoord = (value) => Math.round(value * 1e6) / 1e6;
 
-const extractParameter = (entry, name) => {
-  const parameter = entry.parameters?.find((item) => item.name === name);
-  return parameter?.values?.[0] ?? null;
+const cleanValue = (value) => {
+  if (value == null || value === MISSING_VALUE || value < -9000) {
+    return null;
+  }
+  return value;
 };
 
-const mapTimeSeriesEntry = (entry) => ({
-  time: entry.validTime,
-  temp: extractParameter(entry, "t"),
-  windSpeed: extractParameter(entry, "ws"),
-  windDir: extractParameter(entry, "wd"),
-  humidity: extractParameter(entry, "r"),
-  pressure: extractParameter(entry, "msl"),
-  symbol: extractParameter(entry, "Wsymb2"),
-  thunder: extractParameter(entry, "tstm"),
-  gust: extractParameter(entry, "gust"),
-  visibility: extractParameter(entry, "vis"),
-  precipCategory: extractParameter(entry, "pcat"),
-  precipMean: extractParameter(entry, "pmean")
-});
+const mapTimeSeriesEntry = (entry) => {
+  const data = entry.data ?? {};
+
+  return {
+    time: entry.time,
+    temp: cleanValue(data.air_temperature),
+    windSpeed: cleanValue(data.wind_speed),
+    windDir: cleanValue(data.wind_from_direction),
+    humidity: cleanValue(data.relative_humidity),
+    pressure: cleanValue(data.air_pressure_at_mean_sea_level),
+    symbol: cleanValue(data.symbol_code),
+    thunder: cleanValue(data.thunderstorm_probability),
+    gust: cleanValue(data.wind_speed_of_gust),
+    visibility: cleanValue(data.visibility_in_air),
+    precipCategory: cleanValue(data.predominant_precipitation_type_at_surface),
+    precipMean: cleanValue(data.precipitation_amount_mean)
+  };
+};
+
+const readCoordinates = (geometry, fallbackLon, fallbackLat) => {
+  const coords = geometry?.coordinates;
+  if (!Array.isArray(coords)) {
+    return { lon: fallbackLon, lat: fallbackLat };
+  }
+
+  if (Array.isArray(coords[0])) {
+    return { lon: coords[0][0], lat: coords[0][1] };
+  }
+
+  return { lon: coords[0], lat: coords[1] };
+};
 
 export const fetchWeatherByPoint = async ({ lon, lat, forecastHours = 24 }) => {
   const url =
@@ -34,12 +55,13 @@ export const fetchWeatherByPoint = async ({ lon, lat, forecastHours = 24 }) => {
 
   const payload = await response.json();
   const series = (payload.timeSeries ?? []).map(mapTimeSeriesEntry);
+  const { lon: resolvedLon, lat: resolvedLat } = readCoordinates(payload.geometry, lon, lat);
 
   return {
-    approvedTime: payload.approvedTime,
+    approvedTime: payload.createdTime ?? payload.referenceTime,
     referenceTime: payload.referenceTime,
-    lon: payload.geometry?.coordinates?.[0]?.[0] ?? lon,
-    lat: payload.geometry?.coordinates?.[0]?.[1] ?? lat,
+    lon: resolvedLon,
+    lat: resolvedLat,
     current: series[0] ?? null,
     forecast: series.slice(0, Math.max(1, forecastHours))
   };

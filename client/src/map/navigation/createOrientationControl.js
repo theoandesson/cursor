@@ -4,6 +4,8 @@ const ROOT_CLASS = "map-navigation-panel maplibregl-ctrl";
 const HEADER_CLASS = "map-navigation-panel__header";
 const TITLE_CLASS = "map-navigation-panel__title";
 const TOGGLE_CLASS = "map-navigation-panel__toggle";
+const COLLAPSE_CLASS = "map-navigation-panel__collapse";
+const BODY_CLASS = "map-navigation-panel__body";
 const HINT_CLASS = "map-navigation-panel__hint";
 const SECTION_CLASS = "map-navigation-panel__section";
 const SECTION_LABEL_CLASS = "map-navigation-panel__section-label";
@@ -146,6 +148,16 @@ const releaseListeners = (listeners) => {
   }
 };
 
+const setPanelState = ({ container, button, isExpanded }) => {
+  container.dataset.panelState = isExpanded ? "expanded" : "collapsed";
+  button.setAttribute("aria-expanded", String(isExpanded));
+  button.setAttribute(
+    "aria-label",
+    isExpanded ? "Dölj navigering" : "Visa navigering"
+  );
+  button.textContent = isExpanded ? "✕" : "⌖";
+};
+
 export const createOrientationControl = ({
   map,
   mapConfig,
@@ -166,6 +178,7 @@ export const createOrientationControl = ({
 
       container = document.createElement("section");
       container.className = ROOT_CLASS;
+      container.dataset.panelState = "collapsed";
       container.setAttribute("role", "group");
       container.setAttribute("aria-label", "Navigering och förflyttning");
 
@@ -175,6 +188,30 @@ export const createOrientationControl = ({
       const title = document.createElement("p");
       title.className = TITLE_CLASS;
       title.textContent = "Navigering";
+
+      const collapseButton = document.createElement("button");
+      collapseButton.type = "button";
+      collapseButton.className = COLLAPSE_CLASS;
+      collapseButton.title = "Visa navigering";
+      setPanelState({
+        container,
+        button: collapseButton,
+        isExpanded: false
+      });
+
+      const onCollapseClick = (event) => {
+        event.preventDefault();
+        const isExpanded = container.dataset.panelState === "expanded";
+        setPanelState({
+          container,
+          button: collapseButton,
+          isExpanded: !isExpanded
+        });
+      };
+      collapseButton.addEventListener("click", onCollapseClick);
+      listeners.push(() =>
+        collapseButton.removeEventListener("click", onCollapseClick)
+      );
 
       const inversionToggle = document.createElement("button");
       inversionToggle.type = "button";
@@ -193,7 +230,10 @@ export const createOrientationControl = ({
         inversionToggle.removeEventListener("click", onToggleClick)
       );
 
-      header.append(title, inversionToggle);
+      header.append(title, inversionToggle, collapseButton);
+
+      const body = document.createElement("div");
+      body.className = BODY_CLASS;
 
       const hint = document.createElement("p");
       hint.className = HINT_CLASS;
@@ -225,7 +265,8 @@ export const createOrientationControl = ({
       });
       orientationSection.append(rotateRow, tiltRow);
 
-      container.append(header, hint, movementSection, orientationSection);
+      body.append(hint, movementSection, orientationSection);
+      container.append(header, body);
       return container;
     },
     onRemove: () => {

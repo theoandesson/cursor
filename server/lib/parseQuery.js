@@ -3,6 +3,8 @@ const toNumber = (value) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+export const isQueryParamProvided = (value) => value != null && value !== "";
+
 export const parseFloatInRange = (value, { min, max } = {}) => {
   const parsed = toNumber(value);
   if (parsed == null) {
@@ -33,6 +35,32 @@ export const parseIntegerInRange = (value, { min, max } = {}) => {
     return null;
   }
   return parsed;
+};
+
+export const parseIntegerInRangeOrReject = (value, { min, max } = {}) => {
+  if (!isQueryParamProvided(value)) {
+    return { ok: true, value: null, provided: false };
+  }
+
+  const parsed = parseIntegerInRange(value, { min, max });
+  if (parsed == null) {
+    return { ok: false, provided: true };
+  }
+
+  return { ok: true, value: parsed, provided: true };
+};
+
+export const parseFloatInRangeOrReject = (value, { min, max } = {}) => {
+  if (!isQueryParamProvided(value)) {
+    return { ok: true, value: null, provided: false };
+  }
+
+  const parsed = parseFloatInRange(value, { min, max });
+  if (parsed == null) {
+    return { ok: false, provided: true };
+  }
+
+  return { ok: true, value: parsed, provided: true };
 };
 
 export const parseBoolean = (value, fallback = false) => {

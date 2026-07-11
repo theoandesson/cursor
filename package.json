@@ -8,7 +8,9 @@
   },
   "scripts": {
     "start": "node server/index.js",
-    "smoke": "node scripts/smoke-test.mjs"
+    "smoke": "node scripts/smoke-test.mjs",
+    "test:full": "node scripts/full-test.mjs",
+    "test:benchmark": "node scripts/benchmark-api.mjs"
   },
   "keywords": [
     "sweden",

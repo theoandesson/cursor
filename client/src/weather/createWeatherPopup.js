@@ -1,3 +1,4 @@
+import { WEATHER_LAYER_IDS } from "./createCityWeatherLayer.js";
 import { fetchWeatherAtPoint } from "./smhiWeatherService.js";
 import { getWeatherSymbol, getWindDirection } from "./weatherSymbols.js";
 
@@ -44,7 +45,7 @@ const buildForecastHtml = (forecast) => {
   return `<div class="weather-popup__forecast">${items}</div>`;
 };
 
-export const createWeatherPopup = ({ map, maplibregl }) => {
+export const createWeatherPopup = ({ map, maplibregl, perfTracker, fetchFn, onShow }) => {
   const popup = new maplibregl.Popup({
     closeButton: true,
     closeOnClick: true,
@@ -55,8 +56,15 @@ export const createWeatherPopup = ({ map, maplibregl }) => {
   let abortController = null;
 
   const showWeather = async (lngLat) => {
-    if (abortController) abortController.abort();
+    if (abortController) {
+      abortController.abort();
+    }
     abortController = new AbortController();
+    const { signal } = abortController;
+
+    onShow?.();
+
+    const endPointWeather = perfTracker?.startSpan("point-weather");
 
     popup
       .setLngLat(lngLat)
@@ -64,8 +72,10 @@ export const createWeatherPopup = ({ map, maplibregl }) => {
       .addTo(map);
 
     try {
-      const data = await fetchWeatherAtPoint(lngLat.lng, lngLat.lat);
-      if (abortController.signal.aborted) return;
+      const data = await fetchWeatherAtPoint(lngLat.lng, lngLat.lat, { signal, fetchFn });
+      if (signal.aborted) {
+        return;
+      }
 
       if (!data.current) {
         popup.setHTML(`<div class="weather-popup"><p>Ingen väderdata tillgänglig.</p></div>`);
@@ -79,16 +89,39 @@ export const createWeatherPopup = ({ map, maplibregl }) => {
           ${buildForecastHtml(data.forecast)}
         </div>`;
       popup.setHTML(html);
+      perfTracker?.recordMilestone("point-weather", {
+        cached: false,
+        lon: lngLat.lng,
+        lat: lngLat.lat
+      });
     } catch (err) {
-      if (abortController.signal.aborted) return;
+      if (signal.aborted || err?.name === "AbortError") {
+        return;
+      }
       popup.setHTML(`<div class="weather-popup"><p class="weather-popup__error">Kunde inte hämta väder.</p></div>`);
+    } finally {
+      endPointWeather?.();
     }
   };
 
-  map.on("click", (e) => {
-    if (e.originalEvent.target.closest(".maplibregl-ctrl, .weather-marker")) return;
-    showWeather(e.lngLat);
+  const onWeatherLayerClick = (event) => {
+    showWeather(event.lngLat);
+  };
+
+  WEATHER_LAYER_IDS.forEach((layerId) => {
+    map.on("click", layerId, onWeatherLayerClick);
   });
 
-  return { popup };
+  return {
+    popup,
+    showWeather,
+    destroy: () => {
+      abortController?.abort();
+      abortController = null;
+      popup.remove();
+      WEATHER_LAYER_IDS.forEach((layerId) => {
+        map.off("click", layerId, onWeatherLayerClick);
+      });
+    }
+  };
 };
