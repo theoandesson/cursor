@@ -53,17 +53,7 @@ const createTextColorBinding = (layerId, property, resolve, options = {}) => ({
   ...options
 });
 
-const createTransitRouteColorExpression = () => [
-  "match",
-  ["get", "class"],
-  ["subway", "light_rail"],
-  "#7b1fa2",
-  ["tram"],
-  "#00897b",
-  ["rail"],
-  "#1565c0",
-  "#1e88e5"
-];
+const createTransitRouteColorExpression = () => ["coalesce", ["get", "color"], "#1e88e5"];
 
 /**
  * Paint bindings consumed by createDayNightController.applyMapPalette.
@@ -134,16 +124,6 @@ export const createTrafficPaletteBindings = () => [
     layerId: SWEDISH_TRANSIT_LAYER_IDS[4],
     property: "text-halo-color",
     resolve: (palette) => palette.roadLabelHalo
-  },
-  {
-    layerId: SWEDISH_TRANSIT_LAYER_IDS[3],
-    property: "circle-color",
-    resolve: (palette) => palette.transitStop
-  },
-  {
-    layerId: SWEDISH_TRANSIT_LAYER_IDS[3],
-    property: "circle-stroke-color",
-    resolve: (palette) => palette.transitStopStroke
   }
 ];
 

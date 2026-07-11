@@ -53,6 +53,7 @@ const createOverlayState = (definition) => ({
 export const createOverlayManager = ({ map, definitions }) => {
   const plugins = new Map();
   const listeners = new Set();
+  const visibilityChains = new Map();
   const stateById = new Map(
     definitions.map((definition) => [definition.id, createOverlayState(definition)])
   );
@@ -71,7 +72,7 @@ export const createOverlayManager = ({ map, definitions }) => {
       return;
     }
 
-    definition.layerIds.forEach((layerId) => {
+    definition.layerIds?.forEach((layerId) => {
       setLayerVisibility({ map, layerId, visible: state.visible });
     });
   };
@@ -167,22 +168,30 @@ export const createOverlayManager = ({ map, definitions }) => {
   };
 
   const setVisible = async (overlayId, visible) => {
-    const state = stateById.get(overlayId);
-    if (!state) {
-      return;
-    }
+    const previous = visibilityChains.get(overlayId) ?? Promise.resolve();
+    const next = previous
+      .catch(() => {})
+      .then(async () => {
+        const state = stateById.get(overlayId);
+        if (!state) {
+          return;
+        }
 
-    state.visible = visible;
-    applyVisibility(overlayId);
+        state.visible = visible;
+        applyVisibility(overlayId);
 
-    const plugin = plugins.get(overlayId);
-    if (visible) {
-      await plugin?.onEnable?.({ map });
-    } else {
-      await plugin?.onDisable?.({ map });
-    }
+        const plugin = plugins.get(overlayId);
+        if (visible) {
+          await plugin?.onEnable?.({ map });
+        } else {
+          await plugin?.onDisable?.({ map });
+        }
 
-    notify();
+        notify();
+      });
+
+    visibilityChains.set(overlayId, next);
+    await next;
   };
 
   const toggleVisible = async (overlayId) => {
@@ -227,13 +236,16 @@ export const createOverlayManager = ({ map, definitions }) => {
   };
 
   const dispose = async () => {
-    for (const plugin of plugins.values()) {
-      await plugin.onDisable?.({ map });
-      await plugin.unmount?.({ map });
-    }
+    await Promise.all(
+      [...plugins.values()].map(async (plugin) => {
+        await plugin.onDisable?.({ map });
+        await plugin.unmount?.({ map });
+      })
+    );
 
     plugins.clear();
     listeners.clear();
+    visibilityChains.clear();
   };
 
   return {

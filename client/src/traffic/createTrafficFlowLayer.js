@@ -1,4 +1,5 @@
 import { createTrafficLegend } from "./createTrafficLegend.js";
+import { TRAFFIC_CONGESTION_COLORS } from "./trafficPalette.js";
 import { fetchTrafficSegments } from "./trafficService.js";
 
 const SOURCE_ID = "traffic-flow-segments-source";
@@ -10,12 +11,7 @@ const EMPTY_GEOJSON = { type: "FeatureCollection", features: [] };
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const MOVE_DEBOUNCE_MS = 320;
 
-const TRAFFIC_COLORS = Object.freeze({
-  free: "#34a853",
-  moderate: "#fbbc04",
-  heavy: "#fa7b17",
-  severe: "#ea4335"
-});
+const TRAFFIC_COLORS = TRAFFIC_CONGESTION_COLORS;
 
 const DASH_ANIMATION_SEQUENCE = [
   [0, 4, 3],
@@ -59,6 +55,14 @@ const createRoadWidthExpression = (scale = 1) => [
   14,
   ["*", scale, ["match", ["get", "roadClass"], "motorway", 8.2, "trunk", 6.2, 4.2]]
 ];
+
+const escapeHtml = (value) =>
+  String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 
 const segmentsToGeoJson = (segments = []) => ({
   type: "FeatureCollection",
@@ -106,7 +110,12 @@ const getViewportBbox = (map) => {
   };
 };
 
-export const createTrafficFlowLayer = ({ map, maplibregl, initialVisible = true } = {}) => {
+export const createTrafficFlowLayer = ({
+  map,
+  maplibregl,
+  initialVisible = true,
+  legend: externalLegend = null
+} = {}) => {
   let isDisposed = false;
   let visible = initialVisible;
   let refreshTimerId = null;
@@ -114,7 +123,8 @@ export const createTrafficFlowLayer = ({ map, maplibregl, initialVisible = true 
   let animationFrameId = null;
   let dashStep = 0;
   let abortController = null;
-  let legend = null;
+  let legend = externalLegend;
+  let ownsLegend = false;
 
   const layerIds = [ANIMATED_LAYER_ID, LINES_LAYER_ID, CASING_LAYER_ID];
 
@@ -126,7 +136,10 @@ export const createTrafficFlowLayer = ({ map, maplibregl, initialVisible = true 
         map.setLayoutProperty(layerId, "visibility", layoutVisibility);
       }
     }
-    legend?.setVisible(visible);
+  };
+
+  const setLegendVisible = (nextVisible) => {
+    legend?.setVisible(Boolean(nextVisible));
   };
 
   const stopAnimation = () => {
@@ -262,8 +275,10 @@ export const createTrafficFlowLayer = ({ map, maplibregl, initialVisible = true 
     beforeId
   );
 
-  legend = createTrafficLegend({ mapContainer: map.getContainer() });
-  legend.setVisible(visible);
+  if (!legend) {
+    legend = createTrafficLegend({ mapContainer: map.getContainer() });
+    ownsLegend = true;
+  }
 
   const popup = maplibregl
     ? new maplibregl.Popup({
@@ -294,13 +309,15 @@ export const createTrafficFlowLayer = ({ map, maplibregl, initialVisible = true 
     }
 
     const props = feature.properties ?? {};
+    const roadName = escapeHtml(props.roadName ?? "Väg");
+    const speedKmh = escapeHtml(props.speedKmh ?? "?");
     popup
       .setLngLat(event.lngLat)
       .setHTML(
         `<div class="traffic-flow-popup">
           <p class="traffic-flow-popup__kicker">Trafik</p>
-          <h3 class="traffic-flow-popup__title">${props.roadName ?? "Väg"}</h3>
-          <p class="traffic-flow-popup__meta">Hastighet: ${props.speedKmh ?? "?"} km/h</p>
+          <h3 class="traffic-flow-popup__title">${roadName}</h3>
+          <p class="traffic-flow-popup__meta">Hastighet: ${speedKmh} km/h</p>
         </div>`
       )
       .addTo(map);
@@ -319,6 +336,7 @@ export const createTrafficFlowLayer = ({ map, maplibregl, initialVisible = true 
     layerIds,
     legend,
     setVisible: setLayerVisibility,
+    setLegendVisible,
     isVisible: () => visible,
     refresh: loadSegments,
     destroy: () => {
@@ -342,8 +360,11 @@ export const createTrafficFlowLayer = ({ map, maplibregl, initialVisible = true 
       map.off("mouseleave", LINES_LAYER_ID, onLineLeave);
       map.off("click", LINES_LAYER_ID, onLineClick);
       map.off("moveend", scheduleLoad);
-      legend?.destroy();
-      legend = null;
+
+      if (ownsLegend) {
+        legend?.destroy();
+        legend = null;
+      }
 
       for (const layerId of layerIds) {
         if (map.getLayer(layerId)) {
