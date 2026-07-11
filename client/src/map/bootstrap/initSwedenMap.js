@@ -18,6 +18,7 @@ import { createStagedFeatureMount } from "../loading/createStagedFeatureMount.js
 import { createOrientationControl } from "../navigation/createOrientationControl.js";
 import { createMapModeControl } from "../modes/createMapModeControl.js";
 import { getMapModeLabel } from "../modes/applyMapMode.js";
+import { createMobileFabMenu } from "../mobile/createMobileFabMenu.js";
 import { createViewportPrefetcher } from "../tiles/createViewportPrefetcher.js";
 import { getPrefetchableTileTemplatesForMode } from "../tiles/swedenTileSources.js";
 import { createSwedenStyle } from "../style/createSwedenStyle.js";
@@ -117,6 +118,8 @@ export const initSwedenMap = ({
   let disposeWeatherLayer = null;
   let disposeWeatherPopup = null;
   let dayNightController = null;
+  let mapModeControl = null;
+  let mobileFabMenu = null;
   let disposeOverlaySystem = null;
   let overlayManager = null;
   let unsubscribeOverlayStatus = null;
@@ -283,6 +286,7 @@ export const initSwedenMap = ({
             };
             unsubscribeOverlayStatus = overlaySystem.onStatusChange(({ overlays }) => {
               refreshRoadLabels?.();
+              mobileFabMenu?.refresh?.();
               publishStatus({
                 trafficFlow: overlays.find((overlay) => overlay.id === "traffic-flow")?.visible ?? false,
                 transit: overlays.find((overlay) => overlay.id === "transit")?.visible ?? false,
@@ -348,7 +352,7 @@ export const initSwedenMap = ({
   };
 
   map.addControl(
-    createMapModeControl({
+    (mapModeControl = createMapModeControl({
       map,
       onBeforeStyleChange: () => {
         if (loadingOverlay) {
@@ -377,6 +381,13 @@ export const initSwedenMap = ({
     }),
     "top-right"
   );
+
+  mobileFabMenu = createMobileFabMenu({
+    getDayNight: () => dayNightController,
+    getMapMode: () => mapModeControl,
+    getOverlayManager: () => overlayManager
+  });
+  map.addControl(mobileFabMenu, "bottom-right");
 
   map.addControl(
     new maplibregl.NavigationControl({ showZoom: true, showCompass: true, visualizePitch: true }),
@@ -409,6 +420,8 @@ export const initSwedenMap = ({
     disposeOverlaySystem = null;
     dayNightController?.destroy();
     dayNightController = null;
+    mapModeControl = null;
+    mobileFabMenu = null;
     return originalRemove();
   };
 

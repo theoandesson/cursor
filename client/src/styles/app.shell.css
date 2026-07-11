@@ -51,9 +51,7 @@ body {
   padding: var(--app-space-3) var(--app-space-4);
   border: 1px solid var(--app-panel-border);
   border-radius: var(--app-radius-xl);
-  background:
-    linear-gradient(115deg, #ffffffc2, #eef4fad4),
-    linear-gradient(180deg, #f6f9fc90, #eaf0f770);
+  background: var(--app-panel-gradient-glass);
   backdrop-filter: blur(16px) saturate(120%);
   box-shadow: var(--app-shadow-3);
   pointer-events: auto;
@@ -69,9 +67,7 @@ body {
 
 @media (prefers-color-scheme: dark) {
   .top-bar__surface {
-    background:
-      linear-gradient(115deg, #1e2732d0, #243040c8),
-      linear-gradient(180deg, #1a222c90, #141b2280);
+    background: var(--app-panel-gradient-glass);
   }
 }
 

@@ -115,6 +115,10 @@ export const createPlaceCard = ({ map, mapConfig }) => {
   let statusElement = null;
   let navigateButton = null;
   let closeButton = null;
+  let backdropElement = null;
+  let dragOffset = 0;
+  let touchStartY = 0;
+  let isDragging = false;
   let abortController = null;
   let currentPlace = null;
   let lastOpenRequest = null;
@@ -147,6 +151,16 @@ export const createPlaceCard = ({ map, mapConfig }) => {
     statusElement.textContent = message;
   };
 
+  const isMobileLayout = () =>
+    window.matchMedia?.("(max-width: 720px)")?.matches ?? false;
+
+  const resetDrag = () => {
+    dragOffset = 0;
+    isDragging = false;
+    panel?.classList.remove("place-card--dragging");
+    panel?.style.removeProperty("transform");
+  };
+
   const setOpen = (isOpen, { trigger } = {}) => {
     if (!panel) {
       return;
@@ -157,15 +171,18 @@ export const createPlaceCard = ({ map, mapConfig }) => {
       panel.inert = false;
       panel.classList.add("place-card--open");
       panel.setAttribute("aria-hidden", "false");
+      backdropElement?.classList.add("place-card__backdrop--visible");
       requestAnimationFrame(() => {
         closeButton?.focus();
       });
       return;
     }
 
+    resetDrag();
     panel.inert = true;
     panel.classList.remove("place-card--open");
     panel.setAttribute("aria-hidden", "true");
+    backdropElement?.classList.remove("place-card__backdrop--visible");
     announceStatus("");
 
     const returnFocusTo = lastFocusTrigger;
@@ -363,7 +380,61 @@ export const createPlaceCard = ({ map, mapConfig }) => {
     }
   };
 
+  const onPanelTouchStart = (event) => {
+    if (!isMobileLayout() || !panel?.classList.contains("place-card--open")) {
+      return;
+    }
+
+    const touch = event.touches[0];
+    if (!touch) {
+      return;
+    }
+
+    touchStartY = touch.clientY;
+    isDragging = true;
+    panel.classList.add("place-card--dragging");
+  };
+
+  const onPanelTouchMove = (event) => {
+    if (!isDragging || !panel) {
+      return;
+    }
+
+    const touch = event.touches[0];
+    if (!touch) {
+      return;
+    }
+
+    dragOffset = Math.max(0, touch.clientY - touchStartY);
+    panel.style.transform = `translateY(${dragOffset}px)`;
+  };
+
+  const onPanelTouchEnd = () => {
+    if (!isDragging || !panel) {
+      return;
+    }
+
+    if (dragOffset > 120) {
+      close();
+      return;
+    }
+
+    resetDrag();
+  };
+
+  const onBackdropClick = () => {
+    if (isMobileLayout()) {
+      close();
+    }
+  };
+
   const mount = () => {
+    backdropElement = document.createElement("button");
+    backdropElement.type = "button";
+    backdropElement.className = "place-card__backdrop";
+    backdropElement.setAttribute("aria-label", "Stäng platskort");
+    backdropElement.addEventListener("click", onBackdropClick);
+
     panel = document.createElement("aside");
     panel.className = "place-card";
     panel.setAttribute("role", "dialog");
@@ -373,6 +444,10 @@ export const createPlaceCard = ({ map, mapConfig }) => {
 
     const header = document.createElement("header");
     header.className = "place-card__header";
+
+    const handle = document.createElement("div");
+    handle.className = "place-card__handle";
+    handle.setAttribute("aria-hidden", "true");
 
     headerIcon = document.createElement("span");
     headerIcon.className = "place-card__category-icon";
@@ -401,7 +476,7 @@ export const createPlaceCard = ({ map, mapConfig }) => {
     closeButton.textContent = "×";
     closeButton.addEventListener("click", close);
 
-    header.append(headerIcon, titleBlock, closeButton);
+    header.append(handle, headerIcon, titleBlock, closeButton);
 
     bodyElement = document.createElement("div");
     bodyElement.className = "place-card__body";
@@ -432,7 +507,11 @@ export const createPlaceCard = ({ map, mapConfig }) => {
     panel.addEventListener("click", (event) => {
       event.stopPropagation();
     });
-    map.getContainer().append(panel);
+    panel.addEventListener("touchstart", onPanelTouchStart, { passive: true });
+    panel.addEventListener("touchmove", onPanelTouchMove, { passive: true });
+    panel.addEventListener("touchend", onPanelTouchEnd);
+    panel.addEventListener("touchcancel", onPanelTouchEnd);
+    map.getContainer().append(backdropElement, panel);
   };
 
   mount();
@@ -440,7 +519,13 @@ export const createPlaceCard = ({ map, mapConfig }) => {
   const destroy = () => {
     abortController?.abort();
     panel?.removeEventListener("keydown", onPanelKeyDown);
+    panel?.removeEventListener("touchstart", onPanelTouchStart);
+    panel?.removeEventListener("touchmove", onPanelTouchMove);
+    panel?.removeEventListener("touchend", onPanelTouchEnd);
+    panel?.removeEventListener("touchcancel", onPanelTouchEnd);
+    backdropElement?.removeEventListener("click", onBackdropClick);
     bodyElement?.removeEventListener("click", onBodyClick);
+    backdropElement?.remove();
     panel?.remove();
     panel = null;
   };

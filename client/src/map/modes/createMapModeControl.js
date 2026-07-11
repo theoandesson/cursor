@@ -108,7 +108,7 @@ export const createMapModeControl = ({ map, onModeChange, onStyleLoaded, onBefor
     }
   };
 
-  return {
+  const control = {
     onAdd: () => {
       container = document.createElement("section");
       container.className = ROOT_CLASS;
@@ -164,6 +164,9 @@ export const createMapModeControl = ({ map, onModeChange, onStyleLoaded, onBefor
       grid = null;
       buttons.length = 0;
     },
-    getMode: () => currentMode
+    getMode: () => currentMode,
+    switchMode
   };
+
+  return control;
 };
