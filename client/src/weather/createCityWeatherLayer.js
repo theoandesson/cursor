@@ -55,7 +55,8 @@ export const createCityWeatherLayer = ({
   onTiming,
   fetchFn,
   onBootstrapComplete,
-  onCitiesUpdate
+  onCitiesUpdate,
+  bootstrapPrefetch
 }) => {
   let geojson = buildGeoJsonFromCities([]);
   let intervalId = null;
@@ -241,6 +242,20 @@ export const createCityWeatherLayer = ({
 
   const bootstrap = async () => {
     try {
+      if (bootstrapPrefetch) {
+        const data = await bootstrapPrefetch.fetchPromise;
+        if (data) {
+          if (!isDisposed) {
+            applyBootstrapPayload(data, { smooth: false, cached: false });
+          }
+          onBootstrapComplete?.();
+          if (!isDisposed) {
+            intervalId = setInterval(refreshWeather, REFRESH_INTERVAL_MS);
+          }
+          return;
+        }
+      }
+
       await fetchBootstrapWithSwr({
         fetchFn,
         onTiming,
