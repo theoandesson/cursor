@@ -18,8 +18,13 @@ import { createStagedFeatureMount } from "../loading/createStagedFeatureMount.js
 import { createOrientationControl } from "../navigation/createOrientationControl.js";
 import { createMapModeControl } from "../modes/createMapModeControl.js";
 import { getMapModeLabel } from "../modes/applyMapMode.js";
+import { DEFAULT_MAP_MODE } from "../modes/mapModes.js";
 import { createViewportPrefetcher } from "../tiles/createViewportPrefetcher.js";
-import { getPrefetchableTileTemplatesForMode } from "../tiles/swedenTileSources.js";
+import {
+  getActiveVectorTileTemplate,
+  getPrefetchableTileTemplatesForMode,
+  isSelfHostedTileMode
+} from "../tiles/swedenTileSources.js";
 import { createSwedenStyle } from "../style/createSwedenStyle.js";
 
 const enableInteraction = (handler) => {
@@ -62,7 +67,7 @@ export const initSwedenMap = ({
   let latestLodStatus = null;
   let latestTileStatus = null;
   let mapIdleRecorded = false;
-  let currentMapMode = null;
+  let currentMapMode = DEFAULT_MAP_MODE;
 
   const publishStatus = (patch = {}) => {
     mergeStatusUpdate(onStatusChange, {
@@ -80,9 +85,33 @@ export const initSwedenMap = ({
     mapContainer.getAttribute("aria-label") ?? "3D-karta över Sverige"
   );
 
+  const useSelfHostedVector = isSelfHostedTileMode();
+  const activeVectorTileTemplate = getActiveVectorTileTemplate({
+    useSelfHostedVector
+  });
+  const resolvePrefetchTileTemplates = (mode = currentMapMode) =>
+    getPrefetchableTileTemplatesForMode(mode, {
+      useSelfHostedVector
+    });
+
+  if (perfTracker) {
+    console.debug("[initSwedenMap] Tile mode", {
+      mode: useSelfHostedVector ? "self-hosted" : "external",
+      vectorTemplate: activeVectorTileTemplate
+    });
+  }
+
+  const initialStyle = createSwedenStyle({ includeTerrain: false });
+  if (initialStyle?.sources?.sweden_vector) {
+    initialStyle.sources.sweden_vector = {
+      ...initialStyle.sources.sweden_vector,
+      tiles: [activeVectorTileTemplate]
+    };
+  }
+
   const map = new maplibregl.Map({
     container: mapContainer,
-    style: createSwedenStyle({ includeTerrain: false }),
+    style: initialStyle,
     center: SWEDEN_MAP_CONFIG.center,
     zoom: SWEDEN_MAP_CONFIG.zoom,
     minZoom: SWEDEN_MAP_CONFIG.minZoom,
@@ -335,9 +364,7 @@ export const initSwedenMap = ({
             if (!disposePrefetcher) {
               disposePrefetcher = createViewportPrefetcher(map, {
                 deferInitialPrefetch: true,
-                tileTemplates: currentMapMode
-                  ? getPrefetchableTileTemplatesForMode(currentMapMode)
-                  : undefined
+                tileTemplates: resolvePrefetchTileTemplates()
               });
               disposePrefetcher.start();
             }
@@ -391,14 +418,10 @@ export const initSwedenMap = ({
             if (!disposePrefetcher) {
               disposePrefetcher = createViewportPrefetcher(map, {
                 deferInitialPrefetch: true,
-                tileTemplates: currentMapMode
-                  ? getPrefetchableTileTemplatesForMode(currentMapMode)
-                  : undefined
+                tileTemplates: resolvePrefetchTileTemplates()
               });
             }
-            if (currentMapMode) {
-              disposePrefetcher.setTileTemplates(getPrefetchableTileTemplatesForMode(currentMapMode));
-            }
+            disposePrefetcher.setTileTemplates(resolvePrefetchTileTemplates());
             disposePrefetcher.start();
           }
         }
@@ -420,7 +443,7 @@ export const initSwedenMap = ({
       },
       onStyleLoaded: (mode) => {
         currentMapMode = mode;
-        disposePrefetcher?.setTileTemplates(getPrefetchableTileTemplatesForMode(mode));
+        disposePrefetcher?.setTileTemplates(resolvePrefetchTileTemplates(mode));
         mountCoreMapFeatures();
         scheduleDeferredMapFeatures();
         if (loadingOverlay) {
