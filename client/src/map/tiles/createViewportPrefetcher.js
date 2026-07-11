@@ -1,3 +1,4 @@
+import { resolveTileZoom } from "../lod/tileMath.js";
 import {
   DEM_TILE_SOURCE,
   enumerateTilesForBounds,
@@ -149,7 +150,7 @@ class BoundedFetchCache {
 }
 
 const clampZoom = (zoom, minZoom, maxZoom) =>
-  Math.max(minZoom, Math.min(maxZoom, Math.round(zoom)));
+  Math.max(minZoom, Math.min(maxZoom, resolveTileZoom(zoom)));
 
 const boundsFromLngLatBounds = (lngLatBounds) => {
   const sw = lngLatBounds.getSouthWest();
@@ -234,13 +235,13 @@ export const createViewportPrefetcher = (map, userOptions = {}) => {
     const url = resolveTileUrl(template, tile);
 
     try {
-      await fetch(url, {
+      const response = await fetch(url, {
         mode: "cors",
         credentials: "omit",
         cache: "force-cache",
         signal: abortController.signal
       });
-      if (!disposed) {
+      if (!disposed && response.ok) {
         fetched.add(key);
       }
     } catch (error) {
@@ -402,6 +403,7 @@ export const createViewportPrefetcher = (map, userOptions = {}) => {
       }
       queue.clear();
       inflight.clear();
+      fetched.clear();
     },
     getStats: () => ({
       queued: queue.size,

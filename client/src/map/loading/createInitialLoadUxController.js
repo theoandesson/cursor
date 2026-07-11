@@ -11,17 +11,22 @@ export const createInitialLoadUxController = ({ map, loadingOverlay, perfTracker
 
   let rafId = null;
   let done = false;
+  let errored = false;
   let progress = 0.06;
   let hasRendered = false;
   let hideTimeoutId = null;
   let maxWaitTimeoutId = null;
-  let readySince = null;
+  let finalizeDelayId = null;
+  let maxWaitRemainingMs = maxWaitMs;
+  let maxWaitPausedAt = null;
+  let maxWaitVisibleStartedAt = performance.now();
+  let maxWaitAccumulatedVisibleMs = 0;
   const startedAt = performance.now();
   const recordedStages = new Set();
 
   const recordStageIfNeeded = (sourceProgress) => {
     LOADING_STEPS.forEach((step) => {
-      if (sourceProgress > step.threshold || recordedStages.has(step.milestone)) {
+      if (sourceProgress < step.threshold || recordedStages.has(step.milestone)) {
         return;
       }
       recordedStages.add(step.milestone);
@@ -32,6 +37,24 @@ export const createInitialLoadUxController = ({ map, loadingOverlay, perfTracker
     });
   };
 
+  const clearMaxWaitTimeout = () => {
+    if (maxWaitTimeoutId) {
+      clearTimeout(maxWaitTimeoutId);
+      maxWaitTimeoutId = null;
+    }
+  };
+
+  const scheduleMaxWaitTimeout = (delayMs) => {
+    clearMaxWaitTimeout();
+    if (done || errored || delayMs <= 0) {
+      return;
+    }
+    maxWaitTimeoutId = setTimeout(() => {
+      maxWaitTimeoutId = null;
+      finalize("timeout");
+    }, delayMs);
+  };
+
   const finalize = (reason = "ready") => {
     if (done) {
       return;
@@ -39,20 +62,24 @@ export const createInitialLoadUxController = ({ map, loadingOverlay, perfTracker
 
     const elapsed = performance.now() - startedAt;
     if (elapsed < minVisibleMs) {
-      setTimeout(() => finalize(reason), minVisibleMs - elapsed);
+      finalizeDelayId = setTimeout(() => {
+        finalizeDelayId = null;
+        finalize(reason);
+      }, minVisibleMs - elapsed);
       return;
     }
 
     done = true;
-    loadingOverlay.setProgress(1);
-    loadingOverlay.setMessage(
+    clearMaxWaitTimeout();
+    loadingOverlay?.setProgress(1);
+    loadingOverlay?.setMessage(
       reason === "timeout"
         ? "Kartan är redo — detaljer laddas fortsatt i bakgrunden."
         : "Kartan är redo."
     );
 
     hideTimeoutId = setTimeout(() => {
-      loadingOverlay.hide();
+      loadingOverlay?.hide();
       perfTracker?.recordMilestone("map-overlay-hidden", {
         progress: 1,
         reason,
@@ -62,7 +89,7 @@ export const createInitialLoadUxController = ({ map, loadingOverlay, perfTracker
   };
 
   const maybeFinalize = (reason = "ready") => {
-    if (done) {
+    if (done || errored) {
       return;
     }
 
@@ -70,15 +97,11 @@ export const createInitialLoadUxController = ({ map, loadingOverlay, perfTracker
       return;
     }
 
-    if (readySince == null) {
-      readySince = performance.now();
-    }
-
     finalize(reason);
   };
 
   const update = () => {
-    if (done) {
+    if (done || errored) {
       return;
     }
 
@@ -88,14 +111,14 @@ export const createInitialLoadUxController = ({ map, loadingOverlay, perfTracker
     const raw = vectorProgress * 0.7 + renderBoost + timeBoost;
     progress = Math.max(progress, Math.min(raw, 0.96));
 
-    loadingOverlay.setProgress(progress);
-    loadingOverlay.setMessage(getStepMessage(vectorProgress));
+    loadingOverlay?.setProgress(progress);
+    loadingOverlay?.setMessage(getStepMessage(vectorProgress));
     recordStageIfNeeded(vectorProgress);
     maybeFinalize("ready");
   };
 
   const scheduleUpdate = () => {
-    if (rafId || done) {
+    if (rafId || done || errored) {
       return;
     }
 
@@ -117,23 +140,83 @@ export const createInitialLoadUxController = ({ map, loadingOverlay, perfTracker
   events.forEach((eventName) => map.on(eventName, scheduleUpdate));
   map.on("render", onRender);
 
-  maxWaitTimeoutId = setTimeout(() => {
-    finalize("timeout");
-  }, maxWaitMs);
-
+  scheduleMaxWaitTimeout(maxWaitRemainingMs);
   scheduleUpdate();
 
-  return () => {
+  const pauseMaxWait = () => {
+    if (done || errored || maxWaitPausedAt != null) {
+      return;
+    }
+
+    clearMaxWaitTimeout();
+    maxWaitAccumulatedVisibleMs += performance.now() - maxWaitVisibleStartedAt;
+    maxWaitPausedAt = performance.now();
+    maxWaitRemainingMs = Math.max(0, maxWaitMs - maxWaitAccumulatedVisibleMs);
+  };
+
+  const resumeMaxWait = () => {
+    if (done || errored || maxWaitPausedAt == null) {
+      return;
+    }
+
+    maxWaitPausedAt = null;
+    maxWaitVisibleStartedAt = performance.now();
+    scheduleMaxWaitTimeout(maxWaitRemainingMs);
+  };
+
+  const finalizeWithError = (message) => {
+    if (done || errored) {
+      return;
+    }
+
+    errored = true;
+    done = true;
+
     if (rafId) {
       cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+    if (finalizeDelayId) {
+      clearTimeout(finalizeDelayId);
+      finalizeDelayId = null;
+    }
+    clearMaxWaitTimeout();
+
+    loadingOverlay?.setProgress(1);
+    loadingOverlay?.setMessage(`Fel vid kartladdning: ${message}`);
+
+    hideTimeoutId = setTimeout(() => {
+      loadingOverlay?.hide();
+      perfTracker?.recordMilestone("map-load-error", {
+        message,
+        elapsedMs: Math.round(performance.now() - startedAt)
+      });
+    }, hideDelayMs);
+  };
+
+  const dispose = () => {
+    if (rafId) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
     }
     if (hideTimeoutId) {
       clearTimeout(hideTimeoutId);
+      hideTimeoutId = null;
     }
-    if (maxWaitTimeoutId) {
-      clearTimeout(maxWaitTimeoutId);
+    if (finalizeDelayId) {
+      clearTimeout(finalizeDelayId);
+      finalizeDelayId = null;
     }
+    clearMaxWaitTimeout();
     events.forEach((eventName) => map.off(eventName, scheduleUpdate));
     map.off("render", onRender);
+  };
+
+  return {
+    dispose,
+    isDone: () => done,
+    finalizeWithError,
+    pauseMaxWait,
+    resumeMaxWait
   };
 };

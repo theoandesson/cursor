@@ -1,13 +1,16 @@
+import { resolveTileZoom } from "./tileMath.js";
+
 const TILE_COORDINATE_RANGE = 32;
 
 export const lngLatToTile = (lng, lat, zoom) => {
-  const scale = 2 ** zoom;
+  const z = resolveTileZoom(zoom);
+  const scale = 2 ** z;
   const x = Math.floor(((lng + 180) / 360) * scale);
   const latRad = (lat * Math.PI) / 180;
   const y = Math.floor(
     ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * scale
   );
-  return { z: zoom, x, y };
+  return { z, x, y };
 };
 
 export const tileToKey = ({ z, x, y }) => `${z}/${x}/${y}`;
@@ -23,7 +26,7 @@ const clampTileY = (y, z) => {
 };
 
 export const enumerateTilesInBounds = ({ west, south, east, north, zoom }) => {
-  const z = Math.max(0, Math.floor(zoom));
+  const z = resolveTileZoom(zoom);
   const northWest = lngLatToTile(west, north, z);
   const southEast = lngLatToTile(east, south, z);
   const minX = Math.min(northWest.x, southEast.x);
@@ -56,8 +59,9 @@ export const prioritizeViewportTiles = (tiles, centerTile) => {
 };
 
 export const buildViewportTileSchedule = ({ west, south, east, north, zoom, centerLng, centerLat }) => {
-  const visibleTiles = enumerateTilesInBounds({ west, south, east, north, zoom });
-  const centerTile = lngLatToTile(centerLng, centerLat, Math.floor(zoom));
+  const tileZoom = resolveTileZoom(zoom);
+  const visibleTiles = enumerateTilesInBounds({ west, south, east, north, zoom: tileZoom });
+  const centerTile = lngLatToTile(centerLng, centerLat, tileZoom);
   const prioritizedTiles = prioritizeViewportTiles(visibleTiles, centerTile).map(tileToKey);
 
   return {
@@ -68,6 +72,7 @@ export const buildViewportTileSchedule = ({ west, south, east, north, zoom, cent
 
 const createInlineSchedulerWorker = () => {
   const workerSource = `
+    const resolveTileZoom = ${resolveTileZoom.toString()};
     const lngLatToTile = ${lngLatToTile.toString()};
     const enumerateTilesInBounds = ${enumerateTilesInBounds.toString()};
     const prioritizeViewportTiles = ${prioritizeViewportTiles.toString()};
@@ -121,6 +126,36 @@ export const createViewportTileScheduler = ({ map, onStatusChange }) => {
     reportStatus(schedule.visibleTileCount, schedule.prioritizedTiles);
   };
 
+  const onWorkerMessage = (event) => {
+    const payload = event.data;
+    if (!payload || payload.type !== "scheduled" || payload.requestId !== pendingRequestId) {
+      return;
+    }
+    applySchedule({
+      visibleTileCount: payload.visibleTileCount,
+      prioritizedTiles: payload.prioritizedTiles
+    });
+  };
+
+  const disableWorker = () => {
+    if (!worker) {
+      return;
+    }
+    worker.removeEventListener("message", onWorkerMessage);
+    worker.removeEventListener("error", onWorkerError);
+    worker.terminate();
+    worker = null;
+    if (workerUrl) {
+      URL.revokeObjectURL(workerUrl);
+      workerUrl = null;
+    }
+  };
+
+  const onWorkerError = () => {
+    disableWorker();
+    scheduleOnMainThread();
+  };
+
   const scheduleOnMainThread = () => {
     const bounds = map.getBounds();
     const center = map.getCenter();
@@ -170,22 +205,12 @@ export const createViewportTileScheduler = ({ map, onStatusChange }) => {
     });
   };
 
-  const onWorkerMessage = (event) => {
-    const payload = event.data;
-    if (!payload || payload.type !== "scheduled" || payload.requestId !== pendingRequestId) {
-      return;
-    }
-    applySchedule({
-      visibleTileCount: payload.visibleTileCount,
-      prioritizedTiles: payload.prioritizedTiles
-    });
-  };
-
   try {
     const workerHandle = createInlineSchedulerWorker();
     worker = workerHandle.worker;
     workerUrl = workerHandle.workerUrl;
     worker.addEventListener("message", onWorkerMessage);
+    worker.addEventListener("error", onWorkerError);
   } catch {
     worker = null;
     workerUrl = null;
@@ -204,14 +229,6 @@ export const createViewportTileScheduler = ({ map, onStatusChange }) => {
     map.off("moveend", queueSchedule);
     map.off("zoomend", queueSchedule);
     map.off("resize", queueSchedule);
-    if (worker) {
-      worker.removeEventListener("message", onWorkerMessage);
-      worker.terminate();
-      worker = null;
-    }
-    if (workerUrl) {
-      URL.revokeObjectURL(workerUrl);
-      workerUrl = null;
-    }
+    disableWorker();
   };
 };

@@ -21,7 +21,21 @@ const createHillshadeLayer = () => ({
 
 const createTerrainStyle = () => {
   const baseStyle = createSwedenStyle();
-  const [backgroundLayer, ...remainingLayers] = baseStyle.layers;
+  const layers = Array.isArray(baseStyle.layers) ? baseStyle.layers : [];
+
+  if (layers.length === 0) {
+    return {
+      ...baseStyle,
+      name: "sweden-terrain",
+      layers: [createHillshadeLayer()],
+      terrain: {
+        ...baseStyle.terrain,
+        exaggeration: TERRAIN_MODE_CONFIG.exaggeration
+      }
+    };
+  }
+
+  const [backgroundLayer, ...remainingLayers] = layers;
 
   return {
     ...baseStyle,
@@ -64,7 +78,13 @@ const getStyleForMode = (mode) => {
 
 let activeStyleSwitchId = 0;
 
-export const applyMapMode = ({ map, mode, onStyleLoaded, onBeforeStyleChange }) => {
+export const applyMapMode = ({
+  map,
+  mode,
+  onStyleLoaded,
+  onStyleError,
+  onBeforeStyleChange
+}) => {
   const nextMode = STYLE_BUILDERS[mode] ? mode : MAP_MODES.STANDARD;
   const switchId = ++activeStyleSwitchId;
   const camera = captureCamera(map);
@@ -72,21 +92,44 @@ export const applyMapMode = ({ map, mode, onStyleLoaded, onBeforeStyleChange }) 
 
   onBeforeStyleChange?.();
 
+  let cleanedUp = false;
+
+  const cleanupListeners = () => {
+    if (cleanedUp) {
+      return;
+    }
+    cleanedUp = true;
+    map.off("style.load", handleStyleLoad);
+    map.off("error", handleStyleError);
+  };
+
   const handleStyleLoad = () => {
     if (switchId !== activeStyleSwitchId) {
+      cleanupListeners();
       return;
     }
 
+    cleanupListeners();
     restoreCamera(map, camera);
     onStyleLoaded?.({ mode: nextMode });
   };
 
+  const handleStyleError = (event) => {
+    if (switchId !== activeStyleSwitchId) {
+      return;
+    }
+
+    cleanupListeners();
+    onStyleError?.(event);
+  };
+
   const applyStyle = () => {
     map.once("style.load", handleStyleLoad);
+    map.once("error", handleStyleError);
     map.setStyle(nextStyle);
   };
 
-  if (map.isStyleLoaded()) {
+  if (map.loaded()) {
     applyStyle();
   } else {
     map.once("load", applyStyle);

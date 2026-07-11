@@ -5,7 +5,14 @@ export const createDebouncedAction = (action, delayMs) => {
     if (timeoutId) {
       clearTimeout(timeoutId);
     }
-    timeoutId = setTimeout(action, delayMs);
+    timeoutId = setTimeout(() => {
+      timeoutId = null;
+      try {
+        action();
+      } catch (error) {
+        console.error("[debounced-action] Callback failed:", error);
+      }
+    }, delayMs);
   };
 
   run.cancel = () => {

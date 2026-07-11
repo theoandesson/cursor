@@ -27,6 +27,10 @@ const buildPopupHtml = ({ name, city, description, icon }) => `
   </div>`;
 
 export const createLandmarkLayer = ({ map, maplibregl, landmarks = SWEDISH_LANDMARKS }) => {
+  if (map.getSource(SOURCE_ID)) {
+    return () => {};
+  }
+
   const geojson = buildLandmarksGeoJson(landmarks);
 
   map.addSource(SOURCE_ID, {
@@ -109,15 +113,16 @@ export const createLandmarkLayer = ({ map, maplibregl, landmarks = SWEDISH_LANDM
       .addTo(map);
   };
 
-  const onMarkerEnter = () => {
+  const onLandmarkEnter = () => {
     map.getCanvas().style.cursor = "pointer";
   };
 
-  const onMarkerLeave = () => {
+  const onLandmarkLeave = () => {
     map.getCanvas().style.cursor = "";
   };
 
-  const onMarkerClick = (event) => {
+  const onLandmarkClick = (event) => {
+    event.preventDefault();
     const feature = event.features?.[0];
     if (!feature) {
       return;
@@ -131,15 +136,21 @@ export const createLandmarkLayer = ({ map, maplibregl, landmarks = SWEDISH_LANDM
     });
   };
 
-  map.on("mouseenter", MARKER_LAYER_ID, onMarkerEnter);
-  map.on("mouseleave", MARKER_LAYER_ID, onMarkerLeave);
-  map.on("click", MARKER_LAYER_ID, onMarkerClick);
+  const interactiveLayerIds = [HALO_LAYER_ID, MARKER_LAYER_ID, LABEL_LAYER_ID];
+
+  interactiveLayerIds.forEach((layerId) => {
+    map.on("mouseenter", layerId, onLandmarkEnter);
+    map.on("mouseleave", layerId, onLandmarkLeave);
+    map.on("click", layerId, onLandmarkClick);
+  });
 
   return () => {
     popup.remove();
-    map.off("mouseenter", MARKER_LAYER_ID, onMarkerEnter);
-    map.off("mouseleave", MARKER_LAYER_ID, onMarkerLeave);
-    map.off("click", MARKER_LAYER_ID, onMarkerClick);
+    interactiveLayerIds.forEach((layerId) => {
+      map.off("mouseenter", layerId, onLandmarkEnter);
+      map.off("mouseleave", layerId, onLandmarkLeave);
+      map.off("click", layerId, onLandmarkClick);
+    });
     if (map.getLayer(LABEL_LAYER_ID)) {
       map.removeLayer(LABEL_LAYER_ID);
     }

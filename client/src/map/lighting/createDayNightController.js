@@ -7,6 +7,10 @@ const CONTROL_CLASS = "map-daynight-control maplibregl-ctrl";
 const BUTTON_CLASS = "map-daynight-control__button";
 
 const SATELLITE_RASTER_LAYER_IDS = ["satellite-imagery", "satellite-base"];
+const SKIP_DAYNIGHT_LAYER_IDS = new Set([
+  "hybrid-road-labels",
+  "hybrid-place-labels"
+]);
 
 const createLandcoverColorExpression = (palette) => [
   "match",
@@ -16,16 +20,6 @@ const createLandcoverColorExpression = (palette) => [
   ["grass", "park"],
   palette.landcoverPark,
   palette.landcoverBase
-];
-
-const createRoadColorExpression = (palette) => [
-  "match",
-  ["get", "class"],
-  ["motorway", "trunk"],
-  palette.roadsMotorway,
-  ["primary", "secondary"],
-  palette.roadsPrimary,
-  palette.roadsLocal
 ];
 
 const LAYER_PAINT_BINDINGS = [
@@ -54,31 +48,6 @@ const LAYER_PAINT_BINDINGS = [
     layerId: "hybrid-roads-casing",
     property: "line-color",
     resolve: (palette) => palette.roadsCasing
-  },
-  {
-    layerId: "hybrid-roads",
-    property: "line-color",
-    resolve: (palette) => createRoadColorExpression(palette)
-  },
-  {
-    layerId: "hybrid-road-labels",
-    property: "text-color",
-    resolve: (palette) => palette.roadLabel
-  },
-  {
-    layerId: "hybrid-road-labels",
-    property: "text-halo-color",
-    resolve: (palette) => palette.roadLabelHalo
-  },
-  {
-    layerId: "hybrid-place-labels",
-    property: "text-color",
-    resolve: (palette) => palette.placeLabel
-  },
-  {
-    layerId: "hybrid-place-labels",
-    property: "text-halo-color",
-    resolve: (palette) => palette.placeLabelHalo
   },
   { layerId: "sweden-border", property: "line-color", resolve: (palette) => palette.swedenBorder },
   {
@@ -129,14 +98,21 @@ const applyRasterPalette = (map, palette) => {
   }
 };
 
+const isSatelliteStyle = (map) =>
+  SATELLITE_RASTER_LAYER_IDS.some((layerId) => map.getLayer(layerId));
+
 export const applyMapPalette = (map, mode) => {
   const paletteKey = mode === "night" ? "night" : "day";
   const palette = MAP_PALETTES[paletteKey];
   const trafficPalette = TRAFFIC_PALETTES[paletteKey];
+  const satelliteStyle = isSatelliteStyle(map);
   map.getContainer()?.setAttribute("data-daynight", mode);
 
   for (const binding of LAYER_PAINT_BINDINGS) {
-    if (!map.getLayer(binding.layerId)) {
+    if (!map.getLayer(binding.layerId) || SKIP_DAYNIGHT_LAYER_IDS.has(binding.layerId)) {
+      continue;
+    }
+    if (binding.layerId === "sweden-border" && satelliteStyle) {
       continue;
     }
     const resolvePalette = binding.useTrafficPalette ? trafficPalette : palette;
