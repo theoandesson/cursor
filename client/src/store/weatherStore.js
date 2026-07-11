@@ -1,9 +1,22 @@
+import { isValidBootstrapData } from "../api/bootstrapSchema.js";
 import { openDatabase, withStore } from "./idb.js";
 
 const DB_NAME = "sweden-map";
 const DB_VERSION = 1;
 const STORE_NAME = "weather";
 const BOOTSTRAP_KEY = "bootstrap-latest";
+
+const isValidCachedRecord = (record) => {
+  if (!record || typeof record !== "object") {
+    return false;
+  }
+
+  if (typeof record.savedAt !== "number" || record.savedAt <= 0) {
+    return false;
+  }
+
+  return isValidBootstrapData(record.data);
+};
 
 const ensureDatabase = () =>
   openDatabase(DB_NAME, DB_VERSION, (db) => {
@@ -13,6 +26,11 @@ const ensureDatabase = () =>
   });
 
 export const saveBootstrapSnapshot = async (data) => {
+  if (!isValidBootstrapData(data)) {
+    console.warn("Refusing to save invalid bootstrap snapshot to IndexedDB");
+    return null;
+  }
+
   try {
     await ensureDatabase();
     const savedAt = Date.now();
@@ -37,11 +55,11 @@ export const getLatestBootstrapSnapshot = async () => {
       })
     );
 
-    if (!record?.data) {
+    if (!isValidCachedRecord(record)) {
       return null;
     }
 
-    const savedAt = record.savedAt ?? 0;
+    const savedAt = record.savedAt;
     return {
       data: record.data,
       savedAt,

@@ -39,6 +39,16 @@ const captureNavigationTiming = () => {
   return null;
 };
 
+const safeJsonReplacer = (_key, value) => {
+  if (typeof value === "bigint") {
+    return value.toString();
+  }
+  if (value instanceof Error) {
+    return { name: value.name, message: value.message };
+  }
+  return value;
+};
+
 export const createPerfTracker = () => {
   const marks = [];
   const measures = [];
@@ -46,36 +56,41 @@ export const createPerfTracker = () => {
   const milestones = [];
   const navigationTiming = captureNavigationTiming();
   const originTime = performance.now();
+  let markCounter = 0;
+
+  const uniqueMarkName = (name) => `${name}#${++markCounter}`;
 
   const pushMark = (name, detail = null) => {
     const time = performance.now();
+    const performanceMarkName = uniqueMarkName(name);
     try {
-      performance.mark(name);
+      performance.mark(performanceMarkName);
     } catch {
       /* ignore duplicate mark names */
     }
-    marks.push({ type: "mark", name, detail, time });
-    return time;
+    marks.push({ type: "mark", name, detail, time, performanceMarkName });
+    return { time, performanceMarkName };
   };
 
   pushMark("tracker-init");
 
-  const mark = (name, detail = null) => pushMark(name, detail);
+  const mark = (name, detail = null) => pushMark(name, detail).performanceMarkName;
 
   const measure = (name, startMark, endMark = null, detail = null) => {
     let durationMs = 0;
+    const measureName = uniqueMarkName(name);
     try {
       if (endMark) {
-        performance.measure(name, startMark, endMark);
+        performance.measure(measureName, startMark, endMark);
       } else {
-        performance.measure(name, startMark);
+        performance.measure(measureName, startMark);
       }
-      const [entry] = performance.getEntriesByName(name, "measure").slice(-1);
+      const [entry] = performance.getEntriesByName(measureName, "measure").slice(-1);
       durationMs = entry?.duration ?? 0;
     } catch {
-      const start = marks.find((entry) => entry.name === startMark)?.time;
+      const start = marks.find((entry) => entry.performanceMarkName === startMark || entry.name === startMark)?.time;
       const end = endMark
-        ? marks.find((entry) => entry.name === endMark)?.time
+        ? marks.find((entry) => entry.performanceMarkName === endMark || entry.name === endMark)?.time
         : performance.now();
       if (start != null && end != null) {
         durationMs = end - start;
@@ -95,7 +110,15 @@ export const createPerfTracker = () => {
     return entry;
   };
 
-  const recordApiCall = ({ url, durationMs, status, cacheStatus, sizeBytes }) => {
+  const recordApiCall = ({
+    url,
+    durationMs,
+    status,
+    cacheStatus,
+    sizeBytes,
+    serverTiming,
+    responseTime
+  }) => {
     apiCalls.push({
       type: "api",
       url,
@@ -103,6 +126,8 @@ export const createPerfTracker = () => {
       status,
       cacheStatus,
       sizeBytes: sizeBytes ?? null,
+      serverTiming: serverTiming ?? null,
+      responseTime: responseTime ?? null,
       time: performance.now()
     });
   };
@@ -115,14 +140,15 @@ export const createPerfTracker = () => {
   };
 
   const startSpan = (name) => {
-    const spanId = `${name}-${performance.now()}`;
+    const spanId = `${name}-${performance.now()}-${++markCounter}`;
     const startMark = `${spanId}-start`;
     const endMark = `${spanId}-end`;
+    const measureName = `${spanId}-measure`;
     const startedAt = performance.now();
-    mark(startMark);
+    const startPerformanceMark = mark(startMark);
 
     return (detail = null) => {
-      mark(endMark, detail);
+      const endPerformanceMark = mark(endMark, detail);
       const durationMs = performance.now() - startedAt;
       measures.push({
         type: "measure",
@@ -131,10 +157,11 @@ export const createPerfTracker = () => {
         detail,
         time: performance.now(),
         startMark,
-        endMark
+        endMark,
+        spanId
       });
       try {
-        performance.measure(name, startMark, endMark);
+        performance.measure(measureName, startPerformanceMark, endPerformanceMark);
       } catch {
         /* ignore measure errors */
       }
@@ -182,6 +209,17 @@ export const createPerfTracker = () => {
         p95Ms: percentile(durations, 95),
         cacheHitRate: apiCalls.length ? cacheHits / apiCalls.length : 0
       },
+      apiCallDetails: apiCalls.map(
+        ({ url, durationMs, status, cacheStatus, sizeBytes, serverTiming, responseTime }) => ({
+          url,
+          durationMs,
+          status,
+          cacheStatus,
+          sizeBytes,
+          serverTiming,
+          responseTime
+        })
+      ),
       measures: measures.map(({ name, durationMs }) => ({ name, durationMs })),
       totalBootMs: getBootEndTime() - getBootStartTime(),
       navigationTiming
@@ -196,23 +234,37 @@ export const createPerfTracker = () => {
     navigationTiming
   });
 
-  const exportJson = () =>
-    JSON.stringify(
-      {
-        exportedAt: new Date().toISOString(),
-        summary: getSummary(),
-        timeline: getTimeline(),
-        entries: getEntries()
-      },
-      null,
-      2
-    );
+  const exportJson = () => {
+    try {
+      return JSON.stringify(
+        {
+          exportedAt: new Date().toISOString(),
+          summary: getSummary(),
+          timeline: getTimeline(),
+          entries: getEntries()
+        },
+        safeJsonReplacer,
+        2
+      );
+    } catch (error) {
+      return JSON.stringify(
+        {
+          exportedAt: new Date().toISOString(),
+          error: "Failed to export performance data",
+          message: error instanceof Error ? error.message : String(error)
+        },
+        safeJsonReplacer,
+        2
+      );
+    }
+  };
 
   const reset = () => {
     marks.length = 0;
     measures.length = 0;
     apiCalls.length = 0;
     milestones.length = 0;
+    markCounter = 0;
     try {
       performance.clearMarks();
       performance.clearMeasures();

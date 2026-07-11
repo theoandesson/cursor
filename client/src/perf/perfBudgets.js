@@ -14,9 +14,23 @@ const resolveBudget = (budget, isCached) => {
   return isCached ? budget.cached : budget.network;
 };
 
+const findLastMilestone = (milestones, name) => {
+  if (typeof milestones.findLast === "function") {
+    return milestones.findLast((entry) => entry.name === name);
+  }
+
+  for (let index = milestones.length - 1; index >= 0; index -= 1) {
+    if (milestones[index].name === name) {
+      return milestones[index];
+    }
+  }
+
+  return undefined;
+};
+
 const findMilestoneDelta = (milestones, startName, endName) => {
-  const start = milestones.find((entry) => entry.name === startName);
-  const end = milestones.find((entry) => entry.name === endName);
+  const start = findLastMilestone(milestones, startName);
+  const end = findLastMilestone(milestones, endName);
   if (!start || !end) {
     return null;
   }
@@ -26,30 +40,67 @@ const findMilestoneDelta = (milestones, startName, endName) => {
 const findMeasure = (measures, name) =>
   measures.find((entry) => entry.name === name)?.durationMs ?? null;
 
+const findBootstrapApiCall = (apiCallDetails = []) => {
+  if (typeof apiCallDetails.findLast === "function") {
+    return apiCallDetails.findLast(
+      (call) => call.url === "/api/bootstrap" || call.url?.startsWith("/api/bootstrap")
+    );
+  }
+
+  for (let index = apiCallDetails.length - 1; index >= 0; index -= 1) {
+    const call = apiCallDetails[index];
+    if (call.url === "/api/bootstrap" || call.url?.startsWith("/api/bootstrap")) {
+      return call;
+    }
+  }
+
+  return undefined;
+};
+
+const hasWarmCache = ({ milestones = [], apiCallDetails = [] }) => {
+  if (milestones.some((entry) => entry.detail?.cached)) {
+    return true;
+  }
+
+  return apiCallDetails.some((call) => call.cacheStatus === "HIT");
+};
+
 export const checkBudgets = (summary) => {
-  const { milestones = [], measures = [], apiCalls = {} } = summary;
+  const {
+    milestones = [],
+    measures = [],
+    apiCalls = {},
+    apiCallDetails = [],
+    navigationTiming = null
+  } = summary;
   const results = [];
 
   const bootToMapVisible = findMilestoneDelta(milestones, "main-start", "map-overlay-hidden")
     ?? findMilestoneDelta(milestones, "main-start", "map-idle")
     ?? summary.totalBootMs;
 
+  const isColdNavigate =
+    navigationTiming?.type === "navigate" && !hasWarmCache({ milestones, apiCallDetails });
+  const bootBudget = isColdNavigate
+    ? PERF_BUDGETS.bootToMapVisibleCold
+    : PERF_BUDGETS.bootToMapVisible;
+
   results.push({
     name: "bootToMapVisible",
     actual: bootToMapVisible,
-    budget: PERF_BUDGETS.bootToMapVisible,
-    passed: bootToMapVisible <= PERF_BUDGETS.bootToMapVisible,
+    budget: bootBudget,
+    passed: bootToMapVisible <= bootBudget,
     severity:
-      bootToMapVisible <= PERF_BUDGETS.bootToMapVisible
+      bootToMapVisible <= bootBudget
         ? "pass"
-        : bootToMapVisible >= PERF_BUDGETS.bootToMapVisible * 2
+        : bootToMapVisible >= bootBudget * 2
           ? "error"
           : "warn"
   });
 
   const weatherVisible = findMilestoneDelta(milestones, "main-start", "weather-visible");
   if (weatherVisible != null) {
-    const weatherCached = milestones.find((entry) => entry.name === "weather-visible")?.detail?.cached;
+    const weatherCached = findLastMilestone(milestones, "weather-visible")?.detail?.cached;
     const budget = resolveBudget(PERF_BUDGETS.bootToWeatherVisible, Boolean(weatherCached));
     results.push({
       name: "bootToWeatherVisible",
@@ -63,7 +114,8 @@ export const checkBudgets = (summary) => {
 
   const bootstrapApi = measures.find((entry) => entry.name === "api-bootstrap");
   if (bootstrapApi) {
-    const cached = apiCalls.cacheHitRate > 0.5;
+    const bootstrapCall = findBootstrapApiCall(apiCallDetails);
+    const cached = bootstrapCall?.cacheStatus === "HIT";
     const budget = resolveBudget(PERF_BUDGETS.apiBootstrap, cached);
     results.push({
       name: "apiBootstrap",
@@ -97,7 +149,7 @@ export const checkBudgets = (summary) => {
 
   const pointWeather = findMeasure(measures, "point-weather");
   if (pointWeather != null) {
-    const cached = milestones.find((entry) => entry.name === "point-weather")?.detail?.cached;
+    const cached = findLastMilestone(milestones, "point-weather")?.detail?.cached;
     const budget = resolveBudget(PERF_BUDGETS.pointWeather, Boolean(cached));
     results.push({
       name: "pointWeather",
