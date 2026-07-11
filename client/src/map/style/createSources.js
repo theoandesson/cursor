@@ -1,8 +1,5 @@
-import { SWEDEN_TILE_MODE } from "../../config/swedenMapConfig.js";
 import { SWEDEN_BOUNDARY_FEATURE } from "../../data/swedenBoundary.js";
-import { createSwedenTileSources } from "../tiles/swedenTileSources.js";
-
-const SELF_HOSTED_TILE_MODE = "self-hosted";
+import { createSwedenTileSources, isSelfHostedTileMode } from "../tiles/swedenTileSources.js";
 
 export const createSources = ({ mode } = {}) => ({
   sweden_boundary: {
@@ -11,6 +8,6 @@ export const createSources = ({ mode } = {}) => ({
   },
   ...createSwedenTileSources({
     mode,
-    useSelfHostedVector: SWEDEN_TILE_MODE === SELF_HOSTED_TILE_MODE
+    useSelfHostedVector: isSelfHostedTileMode()
   })
 });

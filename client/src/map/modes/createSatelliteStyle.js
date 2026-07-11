@@ -1,8 +1,9 @@
 import {
   DEFAULT_SATELLITE_SOURCE,
-  GLYPHS_URL,
   SWEDEN_TILE_BOUNDS,
-  VECTOR_TILE_SOURCE
+  VECTOR_TILE_SOURCE,
+  getActiveGlyphsUrl,
+  getActiveVectorTileTemplate
 } from "../tiles/swedenTileSources.js";
 import { SWEDEN_BOUNDARY_FEATURE } from "../../data/swedenBoundary.js";
 import { SWEDEN_MAP_PALETTE } from "../style/palette/swedenPalette.js";
@@ -26,7 +27,7 @@ const createSatelliteSources = ({ includeVector = false } = {}) => ({
     ? {
         [VECTOR_TILE_SOURCE.id]: {
           type: VECTOR_TILE_SOURCE.type,
-          tiles: [VECTOR_TILE_SOURCE.tileUrlTemplate],
+          tiles: [getActiveVectorTileTemplate()],
           bounds: SWEDEN_TILE_BOUNDS,
           minzoom: VECTOR_TILE_SOURCE.minzoom,
           maxzoom: VECTOR_TILE_SOURCE.maxzoom
@@ -95,7 +96,7 @@ const createHybridOverlayLayers = () => [
 export const createSatelliteStyle = () => ({
   version: 8,
   name: "sweden-satellite",
-  glyphs: GLYPHS_URL,
+  glyphs: getActiveGlyphsUrl(),
   sources: createSatelliteSources(),
   layers: [createSatelliteRasterLayer(), createSwedenBorderLayer()],
   sky: createSky()
@@ -104,7 +105,7 @@ export const createSatelliteStyle = () => ({
 export const createHybridStyle = () => ({
   version: 8,
   name: "sweden-hybrid",
-  glyphs: GLYPHS_URL,
+  glyphs: getActiveGlyphsUrl(),
   sources: createSatelliteSources({ includeVector: true }),
   layers: [
     createSatelliteRasterLayer(),

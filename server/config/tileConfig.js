@@ -34,7 +34,11 @@ export const tileConfig = Object.freeze({
   SWEDEN_TILE_BOUNDS,
   vectorTileLimits: VECTOR_TILE_LIMITS,
   demTileLimits: DEM_TILE_LIMITS,
-  tilesDataDirectory: path.join(workspaceRoot, "data", "tiles"),
-  useSelfHostedTiles: parseBoolean(process.env.SELF_HOSTED_TILES, true),
-  fallbackToUpstream: parseBoolean(process.env.TILE_FALLBACK_UPSTREAM, true)
+  tilesDataDirectory: path.resolve(
+    workspaceRoot,
+    process.env.TILES_DATA_DIRECTORY ?? "data/tiles"
+  ),
+  useSelfHostedTiles: parseBoolean(process.env.SELF_HOSTED_TILES, false),
+  fallbackToUpstream: parseBoolean(process.env.TILE_FALLBACK_UPSTREAM, true),
+  glyphsUpstreamUrl: "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf"
 });

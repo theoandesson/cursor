@@ -1,26 +1,25 @@
 import {
   DEM_TILE_SOURCE,
-  GLYPHS_URL,
   SWEDEN_TILE_BOUNDS,
-  VECTOR_TILE_SOURCE
+  VECTOR_TILE_SOURCE,
+  getActiveGlyphsUrl,
+  isSelfHostedTileMode
 } from "../map/tiles/swedenTileSources.js";
 
-const SELF_HOSTED_TILE_MODE = "self-hosted";
-const DEFAULT_TILE_MODE = "open-data";
-const SELF_HOSTED_GLYPHS_URL = "/tiles/fonts/{fontstack}/{range}.pbf";
 const SELF_HOSTED_DEM_TILES = Object.freeze(["/tiles/dem/{z}/{x}/{y}.png"]);
 
-const resolveTileMode = () => {
-  if (typeof window === "undefined") {
-    return DEFAULT_TILE_MODE;
-  }
-  return window.__SWEDEN_MAP_TILE_MODE__ === SELF_HOSTED_TILE_MODE
-    ? SELF_HOSTED_TILE_MODE
-    : DEFAULT_TILE_MODE;
-};
+export const getSwedenDataSources = () => {
+  const useSelfHostedTiles = isSelfHostedTileMode();
 
-export const SWEDEN_TILE_MODE = resolveTileMode();
-const useSelfHostedTiles = SWEDEN_TILE_MODE === SELF_HOSTED_TILE_MODE;
+  return Object.freeze({
+    tileMode: useSelfHostedTiles ? "self-hosted" : "external",
+    vectorTileJsonUrl: useSelfHostedTiles
+      ? VECTOR_TILE_SOURCE.selfHostedTileJsonUrl
+      : VECTOR_TILE_SOURCE.tileJsonUrl,
+    glyphs: getActiveGlyphsUrl(),
+    terrainTiles: useSelfHostedTiles ? SELF_HOSTED_DEM_TILES : DEM_TILE_SOURCE.tiles
+  });
+};
 
 export const SWEDEN_SOURCE_BOUNDS = SWEDEN_TILE_BOUNDS;
 
@@ -46,15 +45,6 @@ export const NAVIGATION_CONTROL_CONFIG = Object.freeze({
   nearZoomPanFactor: 0.46,
   animationMs: 170,
   defaultInverted: true
-});
-
-export const SWEDEN_DATA_SOURCES = Object.freeze({
-  tileMode: SWEDEN_TILE_MODE,
-  vectorTileJsonUrl: useSelfHostedTiles
-    ? VECTOR_TILE_SOURCE.selfHostedTileJsonUrl
-    : VECTOR_TILE_SOURCE.tileJsonUrl,
-  glyphs: useSelfHostedTiles ? SELF_HOSTED_GLYPHS_URL : GLYPHS_URL,
-  terrainTiles: useSelfHostedTiles ? SELF_HOSTED_DEM_TILES : DEM_TILE_SOURCE.tiles
 });
 
 export const TERRAIN_CONFIG = Object.freeze({

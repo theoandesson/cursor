@@ -1,6 +1,11 @@
 import { Router } from "express";
 import { tileConfig } from "../config/tileConfig.js";
+import { fetchWithTimeout } from "../lib/fetchWithTimeout.js";
 import { createSelfHostedTileService } from "../services/selfHostedTileService.js";
+
+const GLYPH_FETCH_TIMEOUT_MS = 12_000;
+const FONTSTACK_PATTERN = /^[A-Za-z0-9_, -]+$/;
+const GLYPH_RANGE_PATTERN = /^\d+-\d+$/;
 
 const TILE_SOURCE_VALUES = new Set(["local", "upstream"]);
 
@@ -236,6 +241,40 @@ export const createTilesRouter = () => {
     } catch (error) {
       response.status(502).json({
         error: getErrorMessage("Kunde inte hämta DEM-tile.", error)
+      });
+    }
+  });
+
+  router.get("/fonts/:fontstack/:range.pbf", async (request, response) => {
+    const { fontstack, range } = request.params;
+    if (!FONTSTACK_PATTERN.test(fontstack) || !GLYPH_RANGE_PATTERN.test(range)) {
+      response.status(400).json({ error: "Ogiltig fontstack eller glyph-range." });
+      return;
+    }
+
+    const upstreamUrl = tileConfig.glyphsUpstreamUrl
+      .replace("{fontstack}", encodeURIComponent(fontstack))
+      .replace("{range}", encodeURIComponent(range));
+
+    try {
+      const upstreamResponse = await fetchWithTimeout(upstreamUrl, {
+        timeoutMs: GLYPH_FETCH_TIMEOUT_MS
+      });
+      if (!upstreamResponse.ok) {
+        response.status(upstreamResponse.status).json({
+          error: "Kunde inte hämta glyphs från upstream."
+        });
+        return;
+      }
+
+      const buffer = Buffer.from(await upstreamResponse.arrayBuffer());
+      response.setHeader("Content-Type", "application/x-protobuf");
+      response.setHeader("Cache-Control", "public, max-age=86400, immutable");
+      response.setHeader("X-Tile-Source", "upstream");
+      response.status(200).send(buffer);
+    } catch (error) {
+      response.status(502).json({
+        error: getErrorMessage("Kunde inte hämta glyphs.", error)
       });
     }
   });

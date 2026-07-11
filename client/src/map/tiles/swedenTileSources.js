@@ -36,6 +36,7 @@ export const VECTOR_TILE_SOURCE = Object.freeze({
 export const GLYPHS_URL =
   "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf";
 
+const SELF_HOSTED_GLYPHS_URL = "/tiles/fonts/{fontstack}/{range}.pbf";
 const SELF_HOSTED_DEM_TILE_URL_TEMPLATE = "/tiles/dem/{z}/{x}/{y}.png";
 
 const TILE_MODES = Object.freeze({
@@ -49,11 +50,14 @@ const resolveTileMode = () => {
     typeof window.__SWEDEN_MAP_TILE_MODE__ === "string"
       ? window.__SWEDEN_MAP_TILE_MODE__.trim().toLowerCase()
       : null;
-  return mode === TILE_MODES.external ? TILE_MODES.external : TILE_MODES.selfHosted;
+  return mode === TILE_MODES.selfHosted ? TILE_MODES.selfHosted : TILE_MODES.external;
 };
 
 export const isSelfHostedTileMode = (tileMode = resolveTileMode()) =>
-  tileMode !== TILE_MODES.external;
+  tileMode === TILE_MODES.selfHosted;
+
+export const getActiveGlyphsUrl = (tileMode = resolveTileMode()) =>
+  isSelfHostedTileMode(tileMode) ? SELF_HOSTED_GLYPHS_URL : GLYPHS_URL;
 
 export const getActiveVectorTileTemplate = ({
   tileMode = resolveTileMode(),

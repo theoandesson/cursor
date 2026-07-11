@@ -290,7 +290,7 @@ export const initSwedenMap = ({
     disposeLazyLayers = lazyLayerController.destroy;
     unsubscribeLazyLayerUpdates = lazyLayerController.subscribe(() => {
       dayNightController?.reapplyMode();
-      trafficControl?.applyState();
+      refreshRoadLabels?.();
     });
     disposeDeferredTerrain = enableDeferredTerrain(map);
     mapCoreMounted = true;
@@ -433,7 +433,7 @@ export const initSwedenMap = ({
           message: `Kartläge: ${getMapModeLabel(mode)}.`
         });
       }
-    }),
+    })),
     "top-right"
   );
 
