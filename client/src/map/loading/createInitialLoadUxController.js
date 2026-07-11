@@ -1,33 +1,10 @@
 import { INITIAL_LOAD_CONFIG } from "./initialLoadConfig.js";
-
-const LOADING_STEPS = Object.freeze([
-  { threshold: 0.25, message: "Ansluter till kartserver…", milestone: "load-stage-25" },
-  { threshold: 0.5, message: "Laddar markresurser…", milestone: "load-stage-50" },
-  { threshold: 0.75, message: "Ritar kartan…", milestone: "load-stage-75" },
-  { threshold: 1, message: "Snart redo…", milestone: "load-stage-100" }
-]);
-
-const getStepMessage = (progress) =>
-  LOADING_STEPS.find((step) => progress <= step.threshold)?.message ?? "Laddar data…";
-
-const calculateVectorProgress = (map, primarySourceId) => {
-  if (!map.getSource(primarySourceId)) {
-    return 0.08;
-  }
-
-  if (!map.isSourceLoaded(primarySourceId)) {
-    return 0.34;
-  }
-
-  if (!map.areTilesLoaded()) {
-    return 0.72;
-  }
-
-  return 1;
-};
-
-const isInteractiveReady = (map, primarySourceId, hasRendered) =>
-  map.loaded() && map.isSourceLoaded(primarySourceId) && hasRendered;
+import {
+  LOADING_STEPS,
+  calculateVectorProgress,
+  getStepMessage,
+  isInteractiveReady
+} from "./vectorLoadProgress.js";
 
 export const createInitialLoadUxController = ({ map, loadingOverlay, perfTracker }) => {
   const { primarySourceId, maxWaitMs, minVisibleMs, hideDelayMs } = INITIAL_LOAD_CONFIG;
