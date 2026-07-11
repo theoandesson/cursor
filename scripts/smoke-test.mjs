@@ -25,6 +25,9 @@ const EXPECTED_ENDPOINT_PATHS = [
   "/api/radar/frames/:frameKey.png",
   "/tiles/vector/tilejson.json",
   "/tiles/vector/:z/:x/:y.pbf",
+  "/api/pressure/metadata",
+  "/api/pressure/frames?hours=&limit=&offset=",
+  "/api/pressure/frames/:frameKey.geojson",
   "/api/tiles/proxy?url=",
   "/api/tiles/proxy/stats",
   "/api/search?q=&limit=",
@@ -62,7 +65,9 @@ const NEW_CLIENT_ASSETS = [
   "/src/store/weatherStore.js",
   "/src/api/bootstrapClient.js",
   "/src/overlays/bootstrap/createOverlaySystem.js",
-  "/src/overlays/layers/createSmhiRadarPlugin.js"
+  "/src/overlays/layers/createSmhiRadarPlugin.js",
+  "/src/overlays/layers/createPressureSystemsPlugin.js",
+  "/src/overlays/api/pressureApiClient.js"
 ];
 
 const assert = (condition, message) => {
@@ -77,7 +82,7 @@ const request = async (baseUrl, pathOrUrl, { method = "GET" } = {}) => {
   const contentType = response.headers.get("content-type") ?? "";
   let body = null;
 
-  if (contentType.includes("application/json")) {
+  if (contentType.includes("application/json") || contentType.includes("application/geo+json")) {
     body = await response.json();
   } else {
     body = await response.text();
@@ -429,6 +434,33 @@ const testRadarEndpoints = async (baseUrl) => {
   assert(contentType.includes("image/png"), "Radar PNG returnerade felaktigt content-type.");
 };
 
+const testPressureEndpoints = async (baseUrl) => {
+  const { response: metaResponse, body: metaPayload } = await request(baseUrl, "/api/pressure/metadata");
+  assert(metaResponse.ok, `/api/pressure/metadata svarade ${metaResponse.status}`);
+  assert(metaPayload.legend?.high?.color, "/api/pressure/metadata saknar legend.");
+
+  const { response: framesResponse, body: framesPayload } = await request(
+    baseUrl,
+    "/api/pressure/frames?hours=3&limit=3"
+  );
+  assert(framesResponse.ok, `/api/pressure/frames svarade ${framesResponse.status}`);
+  assert(
+    Array.isArray(framesPayload.frames) && framesPayload.frames.length >= 1,
+    "/api/pressure/frames returnerade inga prognossteg."
+  );
+
+  const frameKey = framesPayload.frames[0].key;
+  const { response: geoResponse, body: geoPayload } = await request(
+    baseUrl,
+    `/api/pressure/frames/${frameKey}.geojson`
+  );
+  assert(geoResponse.ok, `/api/pressure/frames/${frameKey}.geojson svarade ${geoResponse.status}`);
+  assert(
+    geoPayload.type === "FeatureCollection" && Array.isArray(geoPayload.features),
+    "Tryckframe saknar GeoJSON-features."
+  );
+};
+
 const run = async () => {
   const host = "127.0.0.1";
   const port = 4199;
@@ -452,8 +484,9 @@ const run = async () => {
     await testExistingApis(baseUrl);
     await testBootstrapAndPerf(baseUrl);
     await testRadarEndpoints(baseUrl);
+    await testPressureEndpoints(baseUrl);
 
-    console.log("Smoke-test klar: server, API, bootstrap, radar, prestanda, säkerhet och klientfiler fungerar.");
+    console.log("Smoke-test klar: server, API, bootstrap, radar, tryck, prestanda, säkerhet och klientfiler fungerar.");
   } finally {
     await new Promise((resolve, reject) => {
       if (!server.listening) {

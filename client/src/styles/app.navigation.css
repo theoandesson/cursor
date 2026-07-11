@@ -10,13 +10,11 @@
   align-items: center;
   gap: 0.25rem;
   padding: 0.2rem;
-  border-radius: 999px;
+  border-radius: var(--app-radius-pill);
   border: 1px solid var(--app-panel-border);
-  background:
-    linear-gradient(115deg, #ffffffc2, #eef4fad4),
-    linear-gradient(180deg, #f6f9fc90, #eaf0f770);
+  background: var(--app-panel-gradient-glass);
   backdrop-filter: blur(16px) saturate(120%);
-  box-shadow: 0 4px 20px -8px var(--app-panel-shadow);
+  box-shadow: var(--app-shadow-2);
 }
 
 .app-tab-bar__tab {
@@ -40,7 +38,7 @@
 
 .app-tab-bar__tab:hover {
   color: var(--app-text-primary);
-  background: #ffffff66;
+  background: color-mix(in srgb, var(--app-surface) 40%, transparent);
 }
 
 .app-tab-bar__tab:focus-visible {
@@ -49,9 +47,9 @@
 }
 
 .app-tab-bar__tab[data-active="true"] {
-  color: #ffffff;
+  color: var(--app-text-on-accent);
   background: linear-gradient(180deg, var(--app-accent), var(--app-accent-strong));
-  box-shadow: 0 2px 10px -4px #2a7bc066;
+  box-shadow: 0 2px 10px -4px var(--app-accent-glow);
 }
 
 .app-tab-bar__tab[data-active="true"]::after {
@@ -92,11 +90,9 @@
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--app-panel-border);
-  background:
-    linear-gradient(145deg, #ffffffd9, #eef4fae6),
-    var(--app-panel-bg);
+  background: var(--app-panel-gradient-glass);
   backdrop-filter: blur(18px) saturate(125%);
-  box-shadow: 0 10px 36px -14px var(--app-panel-shadow);
+  box-shadow: var(--app-shadow-4);
 }
 
 .app-panel__inner,
@@ -136,8 +132,8 @@
   width: 100%;
   padding: 0.55rem 0.75rem;
   border: 1px solid var(--app-panel-border);
-  border-radius: 0.65rem;
-  background: #ffffffb8;
+  border-radius: var(--app-radius-md);
+  background: color-mix(in srgb, var(--app-surface) 72%, transparent);
   color: var(--app-text-primary);
   font: inherit;
   font-size: 0.84rem;
@@ -149,7 +145,7 @@
 .cities-panel__search:focus {
   outline: none;
   border-color: var(--app-accent);
-  box-shadow: 0 0 0 3px #3a8fd633;
+  box-shadow: var(--app-shadow-focus);
 }
 
 .cities-panel__list {
@@ -168,8 +164,8 @@
   margin: 0 0 0.35rem;
   padding: 0.72rem 0.85rem;
   border: 1px solid transparent;
-  border-radius: 0.7rem;
-  background: #ffffff80;
+  border-radius: var(--app-radius-md);
+  background: color-mix(in srgb, var(--app-surface) 50%, transparent);
   color: var(--app-text-primary);
   font: inherit;
   text-align: left;
@@ -181,7 +177,7 @@
 }
 
 .cities-panel__item:hover {
-  background: #ffffffd1;
+  background: color-mix(in srgb, var(--app-surface) 82%, transparent);
   border-color: var(--app-panel-border);
 }
 

@@ -3,6 +3,7 @@
 @import "./app.navigation.css";
 @import "./app.map-controls.css";
 @import "./app.layer-panel.css";
+@import "./mobile-controls.css";
 @import "./app.loading.css";
 @import "./app.perf.css";
 @import "./app.landmarks.css";

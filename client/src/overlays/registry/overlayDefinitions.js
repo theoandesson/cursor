@@ -1,4 +1,5 @@
 import {
+  PRESSURE_LAYER_IDS,
   ROAD_NAME_LABEL_LAYER_IDS,
   STYLE_LAYER_IDS,
   TRAFFIC_FLOW_LAYER_IDS,
@@ -24,6 +25,25 @@ export const createOverlayDefinitions = () => [
     defaultVisible: false,
     defaultOpacity: 0.78,
     minOpacity: 0.2,
+    maxOpacity: 1
+  },
+  {
+    id: "pressure-systems",
+    label: "Tryck & åska",
+    section: "Väder",
+    description:
+      "Animerad karta över hög- och lågtrycksområden samt åskrisk (CAPE) som rör sig över Sverige.",
+    controlType: OVERLAY_CONTROL_TYPES.RADAR,
+    layerIds: PRESSURE_LAYER_IDS,
+    opacityBindings: [
+      { layerId: STYLE_LAYER_IDS.PRESSURE_HIGH_FILL, property: "fill-opacity" },
+      { layerId: STYLE_LAYER_IDS.PRESSURE_LOW_FILL, property: "fill-opacity" },
+      { layerId: STYLE_LAYER_IDS.PRESSURE_STORM_FILL, property: "fill-opacity" },
+      { layerId: STYLE_LAYER_IDS.PRESSURE_LABELS, property: "text-opacity" }
+    ],
+    defaultVisible: false,
+    defaultOpacity: 0.85,
+    minOpacity: 0.15,
     maxOpacity: 1
   },
   {
