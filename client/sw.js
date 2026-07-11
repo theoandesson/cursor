@@ -7,8 +7,50 @@ import {
   isTileCacheableRequest
 } from "./src/cache/tileCachePolicy.js";
 
+const API_CACHE_NAME = "sweden-map-api-v1";
+const API_SWR_PATHS = new Set(["/api/bootstrap", "/api/weather/cities"]);
+
 const cacheableResponse = (response) =>
   response && (response.ok || response.type === "opaque");
+
+const isApiCacheableRequest = (request) => {
+  if (!request || request.method !== "GET") {
+    return false;
+  }
+
+  try {
+    const url = new URL(request.url);
+    return url.origin === self.location.origin && API_SWR_PATHS.has(url.pathname);
+  } catch {
+    return false;
+  }
+};
+
+const staleWhileRevalidateApi = async (request) => {
+  const cache = await caches.open(API_CACHE_NAME);
+  const cached = await cache.match(request);
+
+  const networkPromise = fetch(request)
+    .then((response) => {
+      if (cacheableResponse(response)) {
+        cache.put(request, response.clone());
+      }
+      return response;
+    })
+    .catch((error) => {
+      if (cached) {
+        return cached;
+      }
+      throw error;
+    });
+
+  if (cached) {
+    networkPromise.catch(() => undefined);
+    return cached;
+  }
+
+  return networkPromise;
+};
 
 const getTileCacheNamesByFreshness = async () => {
   const cacheNames = await caches.keys();
@@ -113,6 +155,11 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
+  if (isApiCacheableRequest(event.request)) {
+    event.respondWith(staleWhileRevalidateApi(event.request));
+    return;
+  }
+
   if (!isTileCacheableRequest(event.request)) {
     return;
   }

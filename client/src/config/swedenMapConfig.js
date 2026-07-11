@@ -15,7 +15,7 @@ export const SWEDEN_MAP_CONFIG = Object.freeze({
   maxPitch: 85,
   pitch: 55,
   bearing: 0,
-  hash: true
+  hash: false
 });
 
 export const NAVIGATION_CONTROL_CONFIG = Object.freeze({

@@ -48,10 +48,18 @@ export const initSwedenMap = ({
   maplibregl,
   container,
   onStatusChange,
-  loadingOverlay
+  loadingOverlay,
+  perfTracker,
+  onTiming,
+  fetchFn,
+  onBootstrapComplete,
+  onCitiesUpdate
 }) => {
+  perfTracker?.mark("map-construct-start");
+
   let latestLodStatus = null;
   let latestTileStatus = null;
+  let mapIdleRecorded = false;
 
   const publishStatus = (patch = {}) => {
     mergeStatusUpdate(onStatusChange, {
@@ -115,7 +123,7 @@ export const initSwedenMap = ({
   let mapFeaturesMounted = false;
 
   if (loadingOverlay) {
-    disposeLoadUx = createInitialLoadUxController({ map, loadingOverlay });
+    disposeLoadUx = createInitialLoadUxController({ map, loadingOverlay, perfTracker });
   }
 
   map.addControl(
@@ -219,7 +227,18 @@ export const initSwedenMap = ({
       return;
     }
 
-    disposeWeatherLayer = createCityWeatherLayer({ map, maplibregl });
+    perfTracker?.recordMilestone("map-load");
+    perfTracker?.measure("map-construct", "map-construct-start", "milestone:map-load");
+
+    disposeWeatherLayer = createCityWeatherLayer({
+      map,
+      maplibregl,
+      perfTracker,
+      onTiming,
+      fetchFn,
+      onBootstrapComplete,
+      onCitiesUpdate
+    });
 
     if (!placeCard) {
       placeCard = createPlaceCard({ map, mapConfig: SWEDEN_MAP_CONFIG });
@@ -228,6 +247,8 @@ export const initSwedenMap = ({
     const weatherPopup = createWeatherPopup({
       map,
       maplibregl,
+      perfTracker,
+      fetchFn,
       onShow: () => placeCard?.close()
     });
     disposeWeatherPopup = weatherPopup.destroy;
@@ -312,6 +333,15 @@ export const initSwedenMap = ({
   map.addControl(new maplibregl.ScaleControl({ maxWidth: 180, unit: "metric" }), "bottom-left");
 
   map.once("load", mountMapFeatures);
+
+  map.once("idle", () => {
+    if (mapIdleRecorded) {
+      return;
+    }
+    mapIdleRecorded = true;
+    perfTracker?.recordMilestone("map-idle");
+    perfTracker?.measure("map-load-to-idle", "milestone:map-load", "milestone:map-idle");
+  });
 
   const originalRemove = map.remove.bind(map);
   map.remove = () => {

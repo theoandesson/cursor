@@ -45,7 +45,7 @@ const buildForecastHtml = (forecast) => {
   return `<div class="weather-popup__forecast">${items}</div>`;
 };
 
-export const createWeatherPopup = ({ map, maplibregl, onShow }) => {
+export const createWeatherPopup = ({ map, maplibregl, perfTracker, fetchFn, onShow }) => {
   const popup = new maplibregl.Popup({
     closeButton: true,
     closeOnClick: true,
@@ -64,13 +64,15 @@ export const createWeatherPopup = ({ map, maplibregl, onShow }) => {
 
     onShow?.();
 
+    const endPointWeather = perfTracker?.startSpan("point-weather");
+
     popup
       .setLngLat(lngLat)
       .setHTML(`<div class="weather-popup"><p class="weather-popup__loading">Hämtar väder…</p></div>`)
       .addTo(map);
 
     try {
-      const data = await fetchWeatherAtPoint(lngLat.lng, lngLat.lat, { signal });
+      const data = await fetchWeatherAtPoint(lngLat.lng, lngLat.lat, { signal, fetchFn });
       if (signal.aborted) {
         return;
       }
@@ -87,11 +89,18 @@ export const createWeatherPopup = ({ map, maplibregl, onShow }) => {
           ${buildForecastHtml(data.forecast)}
         </div>`;
       popup.setHTML(html);
+      perfTracker?.recordMilestone("point-weather", {
+        cached: false,
+        lon: lngLat.lng,
+        lat: lngLat.lat
+      });
     } catch (err) {
       if (signal.aborted || err?.name === "AbortError") {
         return;
       }
       popup.setHTML(`<div class="weather-popup"><p class="weather-popup__error">Kunde inte hämta väder.</p></div>`);
+    } finally {
+      endPointWeather?.();
     }
   };
 

@@ -1,6 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { startServer } from "../server/startServer.js";
+import { warmWeatherCache } from "../server/services/weatherWarmer.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -10,6 +11,10 @@ const staticDirectory = path.join(workspaceRoot, "client");
 const EXPECTED_ENDPOINT_PATHS = [
   "/api/healthz",
   "/api/endpoints",
+  "/api/bootstrap",
+  "/api/perf",
+  "/api/perf/summary",
+  "/api/perf/reset",
   "/api/cities",
   "/api/cities/:cityId",
   "/api/weather/point?lon=&lat=&hours=",
@@ -45,7 +50,11 @@ const NEW_CLIENT_ASSETS = [
   "/src/traffic/createTrafficFlowLayer.js",
   "/src/traffic/createTransitLayer.js",
   "/src/traffic/trafficService.js",
-  "/src/traffic/createTrafficControl.js"
+  "/src/traffic/createTrafficControl.js",
+  "/src/perf/perfTracker.js",
+  "/src/navigation/routes.js",
+  "/src/store/weatherStore.js",
+  "/src/api/bootstrapClient.js"
 ];
 
 const assert = (condition, message) => {
@@ -340,6 +349,40 @@ const testExistingApis = async (baseUrl) => {
   );
 };
 
+const testBootstrapAndPerf = async (baseUrl) => {
+  const { response: htmlResponse, body: html } = await request(baseUrl, "/");
+  assert(html.includes('id="app-nav"'), "index.html saknar navigationspanelen.");
+
+  const { response: perfSummaryResponse, body: perfSummary } = await request(
+    baseUrl,
+    "/api/perf/summary"
+  );
+  assert(perfSummaryResponse.ok, `/api/perf/summary svarade ${perfSummaryResponse.status}`);
+  assert(
+    typeof perfSummary.totalRequests === "number",
+    "/api/perf/summary returnerade inte förväntad struktur."
+  );
+
+  await warmWeatherCache({ forecastHours: 24 });
+
+  const { response: bootstrapResponse, body: bootstrapPayload } = await request(
+    baseUrl,
+    "/api/bootstrap"
+  );
+  assert(bootstrapResponse.ok, `/api/bootstrap svarade ${bootstrapResponse.status}`);
+  assert(
+    bootstrapPayload.cities && bootstrapPayload.weather && bootstrapPayload.version === "1",
+    "/api/bootstrap returnerade inte förväntad struktur."
+  );
+  assert(
+    bootstrapResponse.headers.get("x-response-time"),
+    "/api/bootstrap saknar X-Response-Time header."
+  );
+
+  const { response: perfTrackerResponse } = await request(baseUrl, "/src/perf/perfTracker.js");
+  assert(perfTrackerResponse.ok, `/src/perf/perfTracker.js svarade ${perfTrackerResponse.status}`);
+};
+
 const run = async () => {
   const host = "127.0.0.1";
   const port = 4199;
@@ -361,8 +404,9 @@ const run = async () => {
     await testTileProxySecurity(baseUrl);
     await testClientAssets(baseUrl);
     await testExistingApis(baseUrl);
+    await testBootstrapAndPerf(baseUrl);
 
-    console.log("Smoke-test klar: server, API, säkerhet och klientfiler fungerar.");
+    console.log("Smoke-test klar: server, API, bootstrap, prestanda, säkerhet och klientfiler fungerar.");
   } finally {
     await new Promise((resolve, reject) => {
       if (!server.listening) {
