@@ -1,12 +1,16 @@
+import { fetchBootstrapWithSwr } from "../api/bootstrapClient.js";
 import { registerTileCacheServiceWorker } from "../cache/registerTileCacheServiceWorker.js";
 import { initSwedenMap } from "../map/bootstrap/initSwedenMap.js";
-import { createPerfPanel } from "../panels/createPerfPanel.js";
+import { createPerfDebugPanel } from "../perf/createPerfDebugPanel.js";
 import { createFetchWithTiming } from "../perf/fetchWithTiming.js";
 import { createCacheStatusPresenter } from "../ui/createCacheStatusPresenter.js";
 import { createLoadingOverlayPresenter } from "../ui/createLoadingOverlayPresenter.js";
 import { createMapStatusPresenter } from "../ui/createMapStatusPresenter.js";
+import { extractBootstrapParts } from "../weather/applyCityWeather.js";
+import { createAppShell } from "./createAppShell.js";
 
 const MAP_ROOT_ID = "map-root";
+const CITY_FLY_ZOOM = 11;
 
 const createBootstrapOnTiming = (perfTracker) => {
   if (!perfTracker) {
@@ -17,10 +21,21 @@ const createBootstrapOnTiming = (perfTracker) => {
     perfTracker.recordApiCall({
       url: `/api/bootstrap#${phase}`,
       durationMs,
-      status: 200,
-      cacheStatus: cacheStatus ?? "NETWORK"
+      status: phase === "network-error" ? 0 : 200,
+      cacheStatus: cacheStatus?.toUpperCase?.() ?? "NETWORK"
     });
   };
+};
+
+const buildWeatherMap = (weatherEntries) => {
+  const weatherMap = new Map();
+  weatherEntries.forEach((entry) => {
+    const cityId = entry.city?.id;
+    if (cityId && entry.current) {
+      weatherMap.set(cityId, entry.current);
+    }
+  });
+  return weatherMap;
 };
 
 export const bootstrapSwedenMapApp = ({ maplibregl, perfTracker }) => {
@@ -35,11 +50,16 @@ export const bootstrapSwedenMapApp = ({ maplibregl, perfTracker }) => {
   const endBootstrapApi = perfTracker?.startSpan("api-bootstrap");
   const onTiming = createBootstrapOnTiming(perfTracker);
 
+  const appShell = createAppShell({
+    mapRootElement,
+    onBootstrapTiming: onTiming,
+    perfTracker
+  });
+  perfTracker?.recordMilestone("app-shell-ready");
+
   const setStatus = createMapStatusPresenter({ mapRootElement });
   const setCacheStatus = createCacheStatusPresenter();
   const loadingOverlay = createLoadingOverlayPresenter({ mapRootElement });
-
-  perfTracker?.recordMilestone("app-shell-ready");
 
   setStatus({
     profile: "settled",
@@ -59,21 +79,51 @@ export const bootstrapSwedenMapApp = ({ maplibregl, perfTracker }) => {
 
   perfTracker?.recordMilestone("map-init-start");
 
-  initSwedenMap({
+  const map = initSwedenMap({
     maplibregl,
     container: mapRootElement,
     onStatusChange: setStatus,
     loadingOverlay,
     perfTracker,
     onTiming,
-    fetchFn: fetchWithTiming
+    fetchFn: fetchWithTiming,
+    onBootstrapComplete: () => endBootstrapApi?.()
   });
 
-  endBootstrapApi?.();
+  mapRootElement.addEventListener("city:select", (event) => {
+    const city = event.detail?.city;
+    if (!city || city.lon == null || city.lat == null) {
+      return;
+    }
+
+    map.flyTo({
+      center: [city.lon, city.lat],
+      zoom: CITY_FLY_ZOOM,
+      pitch: 55,
+      duration: 1700,
+      essential: true
+    });
+  });
+
+  appShell.setPerfContent((mountTarget) =>
+    createPerfDebugPanel({ perfTracker, container: mountTarget })
+  );
+
+  fetchBootstrapWithSwr({
+    onTiming,
+    onCached: (cachedData) => {
+      const { cities, weatherEntries } = extractBootstrapParts(cachedData);
+      appShell.setCitiesData(cities, buildWeatherMap(weatherEntries));
+    },
+    onFresh: (freshData) => {
+      const { cities, weatherEntries } = extractBootstrapParts(freshData);
+      appShell.setCitiesData(cities, buildWeatherMap(weatherEntries));
+    }
+  }).catch(() => {
+    /* panelen visar tomt tillstånd vid fel */
+  });
+
   perfTracker?.recordMilestone("shell-ready");
 
-  createPerfPanel({
-    perfTracker,
-    container: mapRootElement
-  });
+  return { map, appShell };
 };
