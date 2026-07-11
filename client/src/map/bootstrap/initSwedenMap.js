@@ -34,8 +34,11 @@ export const initSwedenMap = ({
   container,
   onStatusChange,
   loadingOverlay,
-  perfTracker
+  perfTracker,
+  fetchFn
 }) => {
+  perfTracker?.mark("map-construct-start");
+
   const map = new maplibregl.Map({
     container,
     style: createSwedenStyle(),
@@ -77,18 +80,28 @@ export const initSwedenMap = ({
   );
   map.addControl(new maplibregl.ScaleControl({ maxWidth: 180, unit: "metric" }));
 
+  let mapIdleRecorded = false;
+
   if (loadingOverlay) {
-    createInitialLoadUxController({ map, loadingOverlay });
+    createInitialLoadUxController({ map, loadingOverlay, perfTracker });
   }
 
   map.on("load", () => {
-    createCityWeatherLayer({
-      map,
-      maplibregl,
-      onTiming: perfTracker?.onTiming
-    });
-    createWeatherPopup({ map, maplibregl });
+    perfTracker?.recordMilestone("map-load");
+    perfTracker?.measure("map-construct", "map-construct-start", "milestone:map-load");
+
+    createCityWeatherLayer({ map, maplibregl, perfTracker, fetchFn });
+    createWeatherPopup({ map, maplibregl, perfTracker, fetchFn });
     createAdaptiveLodController({ map, lodConfig: LOD_CONFIG, onStatusChange });
+  });
+
+  map.once("idle", () => {
+    if (mapIdleRecorded) {
+      return;
+    }
+    mapIdleRecorded = true;
+    perfTracker?.recordMilestone("map-idle");
+    perfTracker?.measure("map-load-to-idle", "milestone:map-load", "milestone:map-idle");
   });
 
   return map;

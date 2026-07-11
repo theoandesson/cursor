@@ -78,9 +78,12 @@ export const extractBootstrapParts = (bootstrapData) => {
     bootstrapData?.cityWeather?.cities ??
     [];
 
-  const cities =
-    bootstrapData?.cities ??
-    weatherEntries.map((entry) => entry.city).filter(Boolean);
+  const rawCities = bootstrapData?.cities;
+  const cities = Array.isArray(rawCities)
+    ? rawCities
+    : Array.isArray(rawCities?.cities)
+      ? rawCities.cities
+      : weatherEntries.map((entry) => entry.city).filter(Boolean);
 
   return { cities, weatherEntries };
 };
