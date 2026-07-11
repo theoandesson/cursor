@@ -6,9 +6,5 @@ export const createSources = ({ mode } = {}) => ({
     type: "geojson",
     data: SWEDEN_BOUNDARY_FEATURE
   },
-  ...createSwedenTileSources({ mode }),
-  traffic_flow: {
-    type: "geojson",
-    data: { type: "FeatureCollection", features: [] }
-  }
+  ...createSwedenTileSources({ mode })
 });

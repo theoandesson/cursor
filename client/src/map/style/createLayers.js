@@ -1,8 +1,6 @@
 import { SWEDEN_MAP_PALETTE } from "./palette/swedenPalette.js";
 import { LOD_CONFIG } from "../../config/swedenMapConfig.js";
 import { createRoadLayers } from "../../traffic/createRoadLayers.js";
-import { createTrafficFlowLayer } from "../../traffic/createTrafficLayers.js";
-import { TRAFFIC_PALETTE } from "../../traffic/trafficPalette.js";
 import {
   DEFAULT_SATELLITE_SOURCE,
   SWEDEN_MAP_MODES
@@ -109,7 +107,6 @@ export const createLayers = ({ mode = SWEDEN_MAP_MODES.vector } = {}) => {
       }
     },
     ...createRoadLayers({ palette: SWEDEN_MAP_PALETTE }),
-    createTrafficFlowLayer({ palette: TRAFFIC_PALETTE, visible: false }),
     {
       id: "sweden-border",
       source: "sweden_boundary",

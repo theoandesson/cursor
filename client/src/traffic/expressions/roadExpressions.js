@@ -92,7 +92,10 @@ export const createTunnelLineOpacityExpression = (palette) => palette.roads.tunn
  */
 export const createTrafficFlowColorExpression = (palette) => [
   "match",
-  ["downcase", ["coalesce", ["get", "congestion"], ["get", "level"], ""]],
+  [
+    "downcase",
+    ["coalesce", ["get", "congestion"], ["get", "trafficLevel"], ["get", "level"], ""]
+  ],
   "free",
   palette.congestion.free,
   "moderate",
