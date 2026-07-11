@@ -36,14 +36,14 @@ export const VECTOR_TILE_SOURCE = Object.freeze({
 export const GLYPHS_URL =
   "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf";
 
-export const SELF_HOSTED_DEM_TILE_URL_TEMPLATE = "/tiles/dem/{z}/{x}/{y}.png";
+const SELF_HOSTED_DEM_TILE_URL_TEMPLATE = "/tiles/dem/{z}/{x}/{y}.png";
 
 const TILE_MODES = Object.freeze({
   external: "external",
   selfHosted: "self-hosted"
 });
 
-export const resolveTileMode = () => {
+const resolveTileMode = () => {
   const mode =
     typeof window !== "undefined" &&
     typeof window.__SWEDEN_MAP_TILE_MODE__ === "string"
@@ -63,7 +63,7 @@ export const getActiveVectorTileTemplate = ({
     ? VECTOR_TILE_SOURCE.selfHostedTileUrlTemplate
     : VECTOR_TILE_SOURCE.tileUrlTemplate;
 
-export const getActiveDemTileTemplates = ({
+const getActiveDemTileTemplates = ({
   tileMode = resolveTileMode(),
   useSelfHostedVector
 } = {}) => {
