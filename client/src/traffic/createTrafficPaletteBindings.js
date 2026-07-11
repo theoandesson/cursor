@@ -1,9 +1,7 @@
 import {
-  STYLE_LAYER_IDS,
   TRAFFIC_FLOW_LAYER_IDS,
   TRANSIT_LAYER_IDS
 } from "../overlays/constants/styleLayerIds.js";
-import { SWEDISH_TRANSIT_LAYER_IDS } from "./createTransitLayer.js";
 import {
   createBridgeCasingColorExpression,
   createOnewayArrowColorExpression,
@@ -13,7 +11,7 @@ import {
   createTunnelCasingColorExpression,
   createTunnelFillColorExpression
 } from "./roadExpressions.js";
-import { createTrafficFlowColorExpression } from "./expressions/roadExpressions.js";
+import { createTrafficFlowColorExpression } from "./trafficFlowExpressions.js";
 
 const ROAD_LINE_COLOR_BINDINGS = [
   ["roads-tunnel-casing", createTunnelCasingColorExpression],
@@ -102,10 +100,3 @@ export const createTrafficPaletteBindings = () => [
   }
 ];
 
-export const TRAFFIC_LABEL_LAYER_IDS = Object.freeze([
-  STYLE_LAYER_IDS.ROAD_LABELS,
-  STYLE_LAYER_IDS.HYBRID_ROAD_LABELS,
-  STYLE_LAYER_IDS.TRANSIT_STOP_LABELS
-]);
-
-export { SWEDISH_TRANSIT_LAYER_IDS };

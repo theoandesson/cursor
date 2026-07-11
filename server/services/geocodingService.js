@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from "../lib/fetchWithTimeout.js";
+
 const NOMINATIM_BASE_URL = "https://nominatim.openstreetmap.org";
 const USER_AGENT = "sweden-3d-map-fidelity/1.0.0 (https://github.com/sverige-3d-karta)";
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -75,21 +77,6 @@ const setCached = (key, data) => {
   });
 };
 
-const fetchWithTimeout = async (url, options = {}) => {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  try {
-    return await fetch(url, { ...options, signal: controller.signal });
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new Error("Tidsgräns överskreds vid hämtning av platsdata.");
-    }
-    throw error;
-  } finally {
-    clearTimeout(timer);
-  }
-};
-
 const nominatimFetch = async (path, searchParams) => {
   const url = new URL(path, NOMINATIM_BASE_URL);
   for (const [key, value] of Object.entries(searchParams)) {
@@ -97,6 +84,7 @@ const nominatimFetch = async (path, searchParams) => {
   }
 
   const response = await fetchWithTimeout(url, {
+    timeoutMs: FETCH_TIMEOUT_MS,
     headers: {
       "User-Agent": USER_AGENT,
       Accept: "application/json"
