@@ -1,4 +1,5 @@
-import { registerTileCacheServiceWorker } from "../cache/registerTileCacheServiceWorker.js";
+import { waitForTileCacheServiceWorker } from "../cache/registerTileCacheServiceWorker.js";
+import { startBootstrapPrefetch } from "../map/loading/createBootstrapPrefetch.js";
 import { initSwedenMap } from "../map/bootstrap/initSwedenMap.js";
 import { createFetchWithTiming } from "../perf/fetchWithTiming.js";
 import { createCacheStatusPresenter } from "../ui/createCacheStatusPresenter.js";
@@ -35,7 +36,7 @@ const buildWeatherMap = (weatherEntries) => {
   return weatherMap;
 };
 
-export const bootstrapSwedenMapApp = ({ maplibregl, perfTracker }) => {
+export const bootstrapSwedenMapApp = async ({ maplibregl, perfTracker }) => {
   perfTracker?.recordMilestone("bootstrap-start");
 
   const mapRootElement = document.getElementById(MAP_ROOT_ID);
@@ -46,6 +47,12 @@ export const bootstrapSwedenMapApp = ({ maplibregl, perfTracker }) => {
   const fetchWithTiming = perfTracker ? createFetchWithTiming(perfTracker) : fetch;
   const endBootstrapApi = perfTracker?.startSpan("api-bootstrap");
   const onTiming = createBootstrapOnTiming(perfTracker);
+
+  const bootstrapPrefetch = startBootstrapPrefetch({
+    fetchFn: fetchWithTiming,
+    onTiming
+  });
+  perfTracker?.recordMilestone("bootstrap-prefetch-start");
 
   const appShell = createAppShell({ mapRootElement, perfTracker, fetchFn: fetchWithTiming });
   perfTracker?.recordMilestone("app-shell-ready");
@@ -63,7 +70,7 @@ export const bootstrapSwedenMapApp = ({ maplibregl, perfTracker }) => {
   perfTracker?.recordMilestone("sw-register-start");
 
   const endSwRegister = perfTracker?.startSpan("sw-register");
-  registerTileCacheServiceWorker({
+  await waitForTileCacheServiceWorker({
     onStatusChange: setCacheStatus
   }).finally(() => {
     endSwRegister?.();
@@ -80,6 +87,7 @@ export const bootstrapSwedenMapApp = ({ maplibregl, perfTracker }) => {
     perfTracker,
     onTiming,
     fetchFn: fetchWithTiming,
+    bootstrapPrefetch,
     onBootstrapComplete: () => endBootstrapApi?.(),
     onCitiesUpdate: ({ cities, weatherEntries }) => {
       appShell.setCitiesData(cities, buildWeatherMap(weatherEntries));
