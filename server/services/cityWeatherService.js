@@ -9,7 +9,9 @@ const MAX_PARALLEL_FETCHES = 16;
 
 const cityWeatherCacheByHours = new Map();
 const refreshPromisesByHours = new Map();
+const staleRefreshCursorByHours = new Map();
 const fileCache = createFileCache({ directory: ".cache/city-weather" });
+const CITY_INDEX_BY_ID = new Map(SWEDISH_CITIES.map((city, index) => [city.id, index]));
 
 export const toCityDto = ({ id, name, lon, lat, county }) => ({
   id,
@@ -64,44 +66,198 @@ const withCityWeather = async (city, { forecastHours }) => {
 
 const getCacheEntry = (forecastHours) => cityWeatherCacheByHours.get(forecastHours) ?? null;
 
-const refreshCityWeather = async (forecastHours, forceRefresh = false) => {
-  const now = Date.now();
-  const fileCacheKey = cityWeatherCacheKey(forecastHours);
+const createEmptyCacheEntry = () => ({
+  items: [],
+  expiresAt: 0,
+  populatedAt: null,
+  fetchedAtByCityId: new Map()
+});
 
-  if (!forceRefresh) {
-    const fileCachedItems = await fileCache.get(fileCacheKey);
-    if (fileCachedItems) {
-      cityWeatherCacheByHours.set(forecastHours, {
-        items: fileCachedItems,
-        expiresAt: now + CITY_WEATHER_CACHE_TTL_MS,
-        populatedAt: now
-      });
-      return { cacheHit: true, source: "file" };
+const normalizeItemsByCityOrder = (items) => {
+  const itemByCityId = new Map(
+    (items ?? [])
+      .filter((item) => item?.city?.id)
+      .map((item) => [item.city.id, item])
+  );
+  return SWEDISH_CITIES.map((city) => itemByCityId.get(city.id)).filter(Boolean);
+};
+
+const normalizeFetchedAtByCityId = ({ items, fetchedAtByCityId, fallbackFetchedAt }) => {
+  const normalized = new Map();
+  if (fetchedAtByCityId && typeof fetchedAtByCityId === "object") {
+    for (const [cityId, timestamp] of Object.entries(fetchedAtByCityId)) {
+      if (Number.isFinite(timestamp)) {
+        normalized.set(cityId, timestamp);
+      }
     }
   }
 
-  const workers = SWEDISH_CITIES.map((city) => () => withCityWeather(city, { forecastHours }));
-  const items = await runWithConcurrency(workers);
+  for (const item of items) {
+    const cityId = item.city.id;
+    if (!normalized.has(cityId)) {
+      normalized.set(cityId, fallbackFetchedAt);
+    }
+  }
 
-  await fileCache.set(fileCacheKey, items, FILE_CACHE_TTL_MS);
+  return normalized;
+};
 
-  cityWeatherCacheByHours.set(forecastHours, {
+const normalizeFileCacheEntry = (rawValue, now) => {
+  if (!rawValue) {
+    return null;
+  }
+
+  if (Array.isArray(rawValue)) {
+    const items = normalizeItemsByCityOrder(rawValue);
+    const fetchedAtByCityId = normalizeFetchedAtByCityId({
+      items,
+      fetchedAtByCityId: null,
+      fallbackFetchedAt: now
+    });
+    return {
+      items,
+      expiresAt: now + CITY_WEATHER_CACHE_TTL_MS,
+      populatedAt: now,
+      fetchedAtByCityId
+    };
+  }
+
+  if (!Array.isArray(rawValue.items)) {
+    return null;
+  }
+
+  const fallbackFetchedAt = Number.isFinite(rawValue.populatedAt) ? rawValue.populatedAt : now;
+  const items = normalizeItemsByCityOrder(rawValue.items);
+  const fetchedAtByCityId = normalizeFetchedAtByCityId({
+    items,
+    fetchedAtByCityId: rawValue.fetchedAtByCityId,
+    fallbackFetchedAt
+  });
+
+  return {
     items,
     expiresAt: now + CITY_WEATHER_CACHE_TTL_MS,
-    populatedAt: now
+    populatedAt: fallbackFetchedAt,
+    fetchedAtByCityId
+  };
+};
+
+const serializeCacheEntry = (entry) => ({
+  items: entry.items,
+  populatedAt: entry.populatedAt,
+  fetchedAtByCityId: Object.fromEntries(entry.fetchedAtByCityId)
+});
+
+const listStaleCities = (entry, now) => {
+  if (!entry || entry.items.length === 0) {
+    return [...SWEDISH_CITIES];
+  }
+
+  const cachedCityIds = new Set(entry.items.map((item) => item.city.id));
+  return SWEDISH_CITIES.filter((city) => {
+    if (!cachedCityIds.has(city.id)) {
+      return true;
+    }
+
+    const fetchedAt = entry.fetchedAtByCityId.get(city.id);
+    return !Number.isFinite(fetchedAt) || now - fetchedAt >= CITY_WEATHER_CACHE_TTL_MS;
   });
+};
+
+const pickStaleRefreshBatch = ({ forecastHours, staleCities, refreshLimit }) => {
+  if (!Number.isFinite(refreshLimit) || refreshLimit <= 0 || refreshLimit >= staleCities.length) {
+    return staleCities;
+  }
+
+  const cursor = staleRefreshCursorByHours.get(forecastHours) ?? 0;
+  const staleAfterCursor = [];
+  const staleBeforeCursor = [];
+
+  for (const city of staleCities) {
+    const cityIndex = CITY_INDEX_BY_ID.get(city.id) ?? 0;
+    if (cityIndex >= cursor) {
+      staleAfterCursor.push(city);
+    } else {
+      staleBeforeCursor.push(city);
+    }
+  }
+
+  const selectedCities = [...staleAfterCursor, ...staleBeforeCursor].slice(0, refreshLimit);
+  if (selectedCities.length > 0) {
+    const lastCity = selectedCities[selectedCities.length - 1];
+    const nextCursor = ((CITY_INDEX_BY_ID.get(lastCity.id) ?? 0) + 1) % SWEDISH_CITIES.length;
+    staleRefreshCursorByHours.set(forecastHours, nextCursor);
+  }
+
+  return selectedCities;
+};
+
+const refreshCityWeather = async (
+  forecastHours,
+  { forceRefresh = false, refreshStaleOnly = false, refreshLimit } = {}
+) => {
+  const now = Date.now();
+  const fileCacheKey = cityWeatherCacheKey(forecastHours);
+  let entry = getCacheEntry(forecastHours);
+  let cacheSource = entry ? "memory" : null;
+
+  if (!entry && !forceRefresh) {
+    const fileCachedPayload = await fileCache.get(fileCacheKey);
+    const normalizedEntry = normalizeFileCacheEntry(fileCachedPayload, now);
+    if (normalizedEntry) {
+      entry = normalizedEntry;
+      cacheSource = "file";
+      cityWeatherCacheByHours.set(forecastHours, normalizedEntry);
+    }
+  }
+
+  entry ??= createEmptyCacheEntry();
+
+  const staleCities = forceRefresh ? [...SWEDISH_CITIES] : listStaleCities(entry, now);
+  const citiesToRefresh = forceRefresh
+    ? staleCities
+    : refreshStaleOnly
+      ? pickStaleRefreshBatch({ forecastHours, staleCities, refreshLimit })
+      : staleCities;
+
+  if (citiesToRefresh.length === 0) {
+    return { cacheHit: true, source: cacheSource ?? "memory" };
+  }
+
+  const workers = citiesToRefresh.map((city) => () => withCityWeather(city, { forecastHours }));
+  const refreshedItems = await runWithConcurrency(workers);
+  const refreshedAt = Date.now();
+
+  const mergedItemsByCityId = new Map(entry.items.map((item) => [item.city.id, item]));
+  for (const refreshedItem of refreshedItems) {
+    const cityId = refreshedItem.city.id;
+    mergedItemsByCityId.set(cityId, refreshedItem);
+    entry.fetchedAtByCityId.set(cityId, refreshedAt);
+  }
+
+  entry.items = SWEDISH_CITIES.map((city) => mergedItemsByCityId.get(city.id)).filter(Boolean);
+  entry.expiresAt = refreshedAt + CITY_WEATHER_CACHE_TTL_MS;
+  entry.populatedAt = refreshedAt;
+
+  await fileCache.set(fileCacheKey, serializeCacheEntry(entry), FILE_CACHE_TTL_MS);
+
+  cityWeatherCacheByHours.set(forecastHours, entry);
 
   return { cacheHit: false, source: "network" };
 };
 
-const ensureCityWeather = async (forecastHours, forceRefresh) => {
+const ensureCityWeather = async (
+  forecastHours,
+  { forceRefresh = false, refreshStaleOnly = false, refreshLimit } = {}
+) => {
   const now = Date.now();
   const cached = getCacheEntry(forecastHours);
+  const staleCities = listStaleCities(cached, now);
   const canUseMemoryCache =
     !forceRefresh &&
     cached &&
     cached.items.length > 0 &&
-    cached.expiresAt > now;
+    staleCities.length === 0;
 
   if (canUseMemoryCache) {
     return { cacheHit: true, source: "memory" };
@@ -113,7 +269,11 @@ const ensureCityWeather = async (forecastHours, forceRefresh) => {
     return { cacheHit: result.cacheHit, source: result.source };
   }
 
-  const refreshPromise = refreshCityWeather(forecastHours, forceRefresh).finally(() => {
+  const refreshPromise = refreshCityWeather(forecastHours, {
+    forceRefresh,
+    refreshStaleOnly,
+    refreshLimit
+  }).finally(() => {
     refreshPromisesByHours.delete(forecastHours);
   });
 
@@ -173,6 +333,7 @@ export const getCityWeatherCacheStats = () => {
       forecastHours,
       size: entry.items.length,
       isWarm: entry.expiresAt > now && entry.items.length > 0,
+      staleCities: listStaleCities(entry, now).length,
       cacheAge: entry.populatedAt ? now - entry.populatedAt : null,
       expiresAt: new Date(entry.expiresAt).toISOString()
     });
@@ -187,10 +348,20 @@ export const getCityWeatherCacheStats = () => {
 export const getCityWeather = async ({
   forecastHours = 24,
   forceRefresh = false,
+  refreshStaleOnly = false,
+  refreshLimit,
   limit,
   offset
 } = {}) => {
-  const { cacheHit } = await ensureCityWeather(forecastHours, forceRefresh);
+  // Strategy:
+  // - Normal reads refresh only stale city entries (incremental refresh).
+  // - `forceRefresh` keeps explicit full-refresh semantics.
+  // - `refreshStaleOnly` lets background warmer update stale cities in smaller batches.
+  const { cacheHit } = await ensureCityWeather(forecastHours, {
+    forceRefresh,
+    refreshStaleOnly,
+    refreshLimit
+  });
 
   const cacheEntry = getCacheEntry(forecastHours);
   const safeOffset = Math.max(0, offset ?? 0);

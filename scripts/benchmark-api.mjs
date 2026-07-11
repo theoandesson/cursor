@@ -41,6 +41,7 @@ const run = async () => {
     // Kall cache — ingen pre-warming
     results.push(await timedFetch("healthz", `${base}/healthz`));
     results.push(await timedFetch("api/healthz", `${base}/api/healthz`));
+    results.push(await timedFetch("tiles/vector/tilejson.json", `${base}/tiles/vector/tilejson.json`));
     results.push(await timedFetch("api/endpoints", `${base}/api/endpoints`));
     results.push(await timedFetch("api/cities", `${base}/api/cities?limit=5`));
     results.push(

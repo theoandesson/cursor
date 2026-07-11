@@ -23,6 +23,8 @@ const EXPECTED_ENDPOINT_PATHS = [
   "/api/radar/metadata",
   "/api/radar/frames?hours=&limit=&offset=",
   "/api/radar/frames/:frameKey.png",
+  "/tiles/vector/tilejson.json",
+  "/tiles/vector/:z/:x/:y.pbf",
   "/api/tiles/proxy?url=",
   "/api/tiles/proxy/stats",
   "/api/search?q=&limit=",
@@ -113,6 +115,18 @@ const testCoreHealth = async (baseUrl) => {
 
   const { response: apiHealthResponse } = await request(baseUrl, "/api/healthz");
   assert(apiHealthResponse.ok, `/api/healthz svarade ${apiHealthResponse.status}`);
+
+  const { response: tileJsonResponse, body: tileJsonBody } = await request(
+    baseUrl,
+    "/tiles/vector/tilejson.json"
+  );
+  assert(tileJsonResponse.ok, `/tiles/vector/tilejson.json svarade ${tileJsonResponse.status}`);
+  assert(
+    typeof tileJsonBody === "object" &&
+      tileJsonBody !== null &&
+      Array.isArray(tileJsonBody.tiles),
+    "/tiles/vector/tilejson.json returnerade inte giltig TileJSON."
+  );
 };
 
 const testEndpointsCatalog = async (baseUrl) => {
