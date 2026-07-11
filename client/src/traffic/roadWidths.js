@@ -30,38 +30,67 @@ const buildZoomInterpolation = (widthStops) => [
 
 const buildClassWidthMatch = (widthTable, property = "class") => {
   const entries = Object.entries(widthTable);
-  const linkEntries = LINK_SUBCLASSES.flatMap((linkClass) => {
-    const parent = linkClass.replace(/_link$/, "");
-    const stops = widthTable[parent];
-    return stops ? [linkClass, buildZoomInterpolation(stops)] : [];
+  
+  // Build a flat interpolation with match expressions at each zoom level
+  const zoomLevels = ZOOM_STOPS.flatMap((zoom, index) => {
+    const widthAtZoom = [
+      "match",
+      ["get", property],
+      ...entries.flatMap(([roadClass, stops]) => [roadClass, stops[index]]),
+      ...LINK_SUBCLASSES.flatMap((linkClass) => {
+        const parent = linkClass.replace(/_link$/, "");
+        const stops = widthTable[parent];
+        return stops ? [linkClass, stops[index] * LINK_WIDTH_FACTOR] : [];
+      }),
+      widthTable.minor[index] // default
+    ];
+    return [zoom, widthAtZoom];
   });
 
   return [
-    "match",
-    ["get", property],
-    ...entries.flatMap(([roadClass, stops]) => [roadClass, buildZoomInterpolation(stops)]),
-    ...linkEntries,
-    buildZoomInterpolation(widthTable.minor)
+    "interpolate",
+    ["linear"],
+    ["zoom"],
+    ...zoomLevels
   ];
 };
 
-const applyLinkWidthScale = (widthExpression) => [
-  "*",
-  widthExpression,
-  ["case", createIsLinkRoadExpression(), LINK_WIDTH_FACTOR, 1]
-];
-
 /** Data-driven fill width for all road classes. */
 export const createRoadFillWidthExpression = () =>
-  applyLinkWidthScale(buildClassWidthMatch(ROAD_FILL_WIDTH_STOPS));
+  buildClassWidthMatch(ROAD_FILL_WIDTH_STOPS);
 
 /** Casing width = fill + padding, slightly wider for bridges. */
 export const createRoadCasingWidthExpression = ({ bridge = false } = {}) => {
-  const fillWidth = buildClassWidthMatch(ROAD_FILL_WIDTH_STOPS);
-  const padding = buildZoomInterpolation(CASING_PADDING_STOPS);
-  const base = ["+", fillWidth, padding];
-  const scaled = bridge ? ["*", base, 1.06] : base;
-  return applyLinkWidthScale(scaled);
+  const entries = Object.entries(ROAD_FILL_WIDTH_STOPS);
+  const scale = bridge ? 1.06 : 1;
+  
+  const zoomLevels = ZOOM_STOPS.flatMap((zoom, index) => {
+    const widthAtZoom = [
+      "match",
+      ["get", "class"],
+      ...entries.flatMap(([roadClass, stops]) => [
+        roadClass,
+        (stops[index] + CASING_PADDING_STOPS[index]) * scale
+      ]),
+      ...LINK_SUBCLASSES.flatMap((linkClass) => {
+        const parent = linkClass.replace(/_link$/, "");
+        const stops = ROAD_FILL_WIDTH_STOPS[parent];
+        return stops ? [
+          linkClass,
+          (stops[index] * LINK_WIDTH_FACTOR + CASING_PADDING_STOPS[index]) * scale
+        ] : [];
+      }),
+      (ROAD_FILL_WIDTH_STOPS.minor[index] + CASING_PADDING_STOPS[index]) * scale
+    ];
+    return [zoom, widthAtZoom];
+  });
+
+  return [
+    "interpolate",
+    ["linear"],
+    ["zoom"],
+    ...zoomLevels
+  ];
 };
 
 /** Center divider width for motorways and trunk roads. */

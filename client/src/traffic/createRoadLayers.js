@@ -60,11 +60,11 @@ const createBaseLineLayer = ({
   type: "line",
   minzoom,
   filter,
-  layout,
-  paint: {
-    "line-sort-key": createRoadClassSortKeyExpression(),
-    ...paint
-  }
+  layout: {
+    ...layout,
+    "line-sort-key": createRoadClassSortKeyExpression()
+  },
+  paint
 });
 
 const createTunnelLayers = ({ palette, idPrefix, roadFilter, opacity }) => [
