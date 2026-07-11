@@ -9,6 +9,7 @@
   "scripts": {
     "start": "node server/index.js",
     "smoke": "node scripts/smoke-test.mjs",
+    "test:unit": "node --test client/src/map/loading/__tests__/loadingLogic.test.js",
     "test:full": "node scripts/full-test.mjs",
     "test:benchmark": "node scripts/benchmark-api.mjs"
   },
