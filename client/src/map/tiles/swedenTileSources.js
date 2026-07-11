@@ -190,14 +190,14 @@ export const createSwedenTileSources = ({
   mode = SWEDEN_MAP_MODES.vector,
   useSelfHostedVector = false
 } = {}) => {
-  const vectorUrl = useSelfHostedVector
-    ? VECTOR_TILE_SOURCE.selfHostedTileJsonUrl
-    : VECTOR_TILE_SOURCE.tileJsonUrl;
+  const vectorTiles = useSelfHostedVector
+    ? [VECTOR_TILE_SOURCE.selfHostedTileUrlTemplate]
+    : [VECTOR_TILE_SOURCE.tileUrlTemplate];
 
   const sources = {
     [VECTOR_TILE_SOURCE.id]: {
       type: VECTOR_TILE_SOURCE.type,
-      url: vectorUrl,
+      tiles: vectorTiles,
       bounds: VECTOR_TILE_SOURCE.bounds,
       minzoom: VECTOR_TILE_SOURCE.minzoom,
       maxzoom: VECTOR_TILE_SOURCE.maxzoom

@@ -4,7 +4,6 @@ import { createNavRevealController } from "../navigation/createNavRevealControll
 import { createTabBar } from "../navigation/createTabBar.js";
 import { createCitiesPanel } from "../panels/createCitiesPanel.js";
 import { createPanelHost } from "../panels/createPanelHost.js";
-import { createPerfPanel } from "../panels/createPerfPanel.js";
 import { fetchBootstrap } from "../api/bootstrapClient.js";
 import { extractBootstrapParts } from "../weather/applyCityWeather.js";
 
@@ -23,7 +22,35 @@ const buildWeatherMap = (cityWeather) => {
 
 export const createAppShell = ({ mapRootElement, perfTracker, fetchFn = fetch }) => {
   const panelHost = createPanelHost({ mapRootElement });
-  const perfPanel = createPerfPanel({ perfTracker });
+
+  // Stub placeholder stays in DOM; real content is injected lazily on first PERF visit
+  const perfPanelStub = document.createElement("section");
+  perfPanelStub.className = "app-panel app-panel--perf";
+
+  let perfPanel = null;
+  let perfPanelModulePromise = null;
+
+  const prefetchPerfPanel = () => {
+    if (!perfPanelModulePromise) {
+      perfPanelModulePromise = import("../panels/createPerfPanel.js");
+    }
+    return perfPanelModulePromise;
+  };
+
+  const ensurePerfPanel = async () => {
+    if (perfPanel) {
+      return perfPanel;
+    }
+    const { createPerfPanel } = await prefetchPerfPanel();
+    if (!perfPanel) {
+      perfPanel = createPerfPanel({ perfTracker });
+      // Transplant content into the already-mounted stub so panelHost reference stays valid
+      while (perfPanel.element.firstChild) {
+        perfPanelStub.appendChild(perfPanel.element.firstChild);
+      }
+    }
+    return perfPanel;
+  };
 
   let citiesCache = [];
   let weatherCache = new Map();
@@ -62,7 +89,7 @@ export const createAppShell = ({ mapRootElement, perfTracker, fetchFn = fetch })
   });
 
   panelHost.mountPanel(ROUTES.CITIES, citiesPanel.element);
-  panelHost.mountPanel(ROUTES.PERF, perfPanel.element);
+  panelHost.mountPanel(ROUTES.PERF, perfPanelStub);
 
   let router;
 
@@ -74,7 +101,7 @@ export const createAppShell = ({ mapRootElement, perfTracker, fetchFn = fetch })
     navReveal.syncWithRoute(route);
 
     if (route === ROUTES.PERF) {
-      perfPanel.refresh();
+      ensurePerfPanel().then((panel) => panel.refresh());
     }
 
     if (endPanelSwitch) {
@@ -105,6 +132,9 @@ export const createAppShell = ({ mapRootElement, perfTracker, fetchFn = fetch })
       if (route === ROUTES.CITIES) {
         prefetchCitiesData();
       }
+      if (route === ROUTES.PERF) {
+        prefetchPerfPanel();
+      }
     }
   });
 
@@ -118,7 +148,6 @@ export const createAppShell = ({ mapRootElement, perfTracker, fetchFn = fetch })
     tabBar,
     navReveal,
     panelHost,
-    perfPanel,
     setCitiesData: (cities, weatherMap) => {
       citiesCache = Array.isArray(cities) ? cities : [];
       weatherCache =
@@ -126,14 +155,14 @@ export const createAppShell = ({ mapRootElement, perfTracker, fetchFn = fetch })
       citiesPanel.updateCities(citiesCache, weatherCache);
     },
     setPerfContent: () => {
-      perfPanel.mountPerfContent();
+      ensurePerfPanel();
     },
     destroy: () => {
       router.destroy();
       navReveal.destroy();
       tabBar.destroy();
       citiesPanel.destroy();
-      perfPanel.destroy();
+      perfPanel?.destroy();
     }
   };
 };

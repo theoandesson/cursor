@@ -98,3 +98,15 @@ export const registerTileCacheServiceWorker = async ({
     return null;
   }
 };
+
+/**
+ * Registers the tile-cache service worker and waits until it is active so the
+ * first tile requests can be intercepted on repeat visits.
+ */
+export const waitForTileCacheServiceWorker = async (options) => {
+  const registration = await registerTileCacheServiceWorker(options);
+  if (registration && "serviceWorker" in navigator) {
+    await navigator.serviceWorker.ready;
+  }
+  return registration;
+};

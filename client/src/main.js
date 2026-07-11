@@ -5,4 +5,6 @@ import { createPerfTracker } from "./perf/perfTracker.js";
 const perfTracker = createPerfTracker();
 perfTracker.recordMilestone("main-start");
 
-bootstrapSwedenMapApp({ maplibregl, perfTracker });
+bootstrapSwedenMapApp({ maplibregl, perfTracker }).catch((error) => {
+  console.error("Kartan kunde inte startas.", error);
+});

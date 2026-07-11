@@ -24,14 +24,16 @@ export const createPerfPanel = ({ perfTracker } = {}) => {
     return debugPanel;
   };
 
-  if (perfTracker) {
-    mountPerfContent();
-  }
+  const ensureMounted = () => mountPerfContent();
 
   return {
     element,
     mountPerfContent,
-    refresh: () => debugPanel?.refresh(),
+    ensureMounted,
+    refresh: () => {
+      ensureMounted();
+      debugPanel?.refresh();
+    },
     destroy: () => {
       debugPanel?.destroy();
       element.remove();

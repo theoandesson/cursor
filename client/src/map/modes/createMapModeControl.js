@@ -38,7 +38,6 @@ export const createMapModeControl = ({ map, onModeChange, onStyleLoaded, onBefor
 
     isSwitching = true;
     container?.classList.add("map-mode-control--switching");
-    onBeforeStyleChange?.();
 
     const appliedMode = applyMapMode({
       map,

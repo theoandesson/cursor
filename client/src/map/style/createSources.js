@@ -1,5 +1,4 @@
 import { SWEDEN_BOUNDARY_FEATURE } from "../../data/swedenBoundary.js";
-import { createTrafficFlowSource } from "../../traffic/createTrafficController.js";
 import { createSwedenTileSources } from "../tiles/swedenTileSources.js";
 
 export const createSources = ({ mode } = {}) => ({
@@ -8,5 +7,8 @@ export const createSources = ({ mode } = {}) => ({
     data: SWEDEN_BOUNDARY_FEATURE
   },
   ...createSwedenTileSources({ mode }),
-  ...createTrafficFlowSource()
+  traffic_flow: {
+    type: "geojson",
+    data: { type: "FeatureCollection", features: [] }
+  }
 });

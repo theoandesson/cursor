@@ -1,10 +1,13 @@
 import { SWEDISH_CITIES } from "../data/swedishCities.js";
 import { fetchWeatherByPoint } from "./smhiWeatherService.js";
+import { createFileCache } from "./cache/fileCache.js";
 
 const CITY_WEATHER_CACHE_TTL_MS = 5 * 60 * 1000;
-const MAX_PARALLEL_FETCHES = 8;
+const FILE_CACHE_TTL_MS = 15 * 60 * 1000;
+const MAX_PARALLEL_FETCHES = 16;
 
 const cityWeatherCacheByHours = new Map();
+const fileCache = createFileCache({ directory: ".cache/city-weather" });
 
 export const toCityDto = ({ id, name, lon, lat, county }) => ({
   id,
@@ -137,16 +140,29 @@ export const getCityWeather = async ({
     cached.expiresAt > now;
 
   if (!canUseCache) {
-    const workers = SWEDISH_CITIES.map(
-      (city) => () => withCityWeather(city, { forecastHours })
-    );
-    const items = await runWithConcurrency(workers);
+    const fileCacheKey = `forecast-${forecastHours}`;
+    const fileCachedItems = forceRefresh ? null : await fileCache.get(fileCacheKey);
 
-    cityWeatherCacheByHours.set(forecastHours, {
-      items,
-      expiresAt: now + CITY_WEATHER_CACHE_TTL_MS,
-      populatedAt: now
-    });
+    if (fileCachedItems) {
+      cityWeatherCacheByHours.set(forecastHours, {
+        items: fileCachedItems,
+        expiresAt: now + CITY_WEATHER_CACHE_TTL_MS,
+        populatedAt: now
+      });
+    } else {
+      const workers = SWEDISH_CITIES.map(
+        (city) => () => withCityWeather(city, { forecastHours })
+      );
+      const items = await runWithConcurrency(workers);
+
+      await fileCache.set(fileCacheKey, items, FILE_CACHE_TTL_MS);
+
+      cityWeatherCacheByHours.set(forecastHours, {
+        items,
+        expiresAt: now + CITY_WEATHER_CACHE_TTL_MS,
+        populatedAt: now
+      });
+    }
   }
 
   const cacheEntry = getCacheEntry(forecastHours);

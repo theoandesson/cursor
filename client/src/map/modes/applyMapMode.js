@@ -35,7 +35,7 @@ const createTerrainStyle = () => {
 };
 
 const STYLE_BUILDERS = Object.freeze({
-  [MAP_MODES.STANDARD]: createSwedenStyle,
+  [MAP_MODES.STANDARD]: () => createSwedenStyle({ includeTerrain: false }),
   [MAP_MODES.SATELLITE]: createSatelliteStyle,
   [MAP_MODES.TERRAIN]: createTerrainStyle,
   [MAP_MODES.HYBRID]: createHybridStyle

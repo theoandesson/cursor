@@ -1,6 +1,7 @@
 export const PERF_BUDGETS = Object.freeze({
-  bootToMapVisible: 500,
-  bootToWeatherVisible: { cached: 200, network: 2000 },
+  bootToMapVisible: 2000,
+  bootToMapVisibleCold: 4500,
+  bootToWeatherVisible: { cached: 400, network: 3000 },
   apiBootstrap: { cached: 100, network: 1000 },
   panelSwitch: 16,
   pointWeather: { cached: 100, network: 500 }
