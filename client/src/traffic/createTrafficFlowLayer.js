@@ -1,10 +1,15 @@
 import { createTrafficLegend } from "./createTrafficLegend.js";
 import { fetchTrafficSegments } from "./trafficService.js";
+import {
+  OVERLAY_SOURCE_IDS,
+  STYLE_LAYER_IDS,
+  TRAFFIC_FLOW_LAYER_IDS
+} from "../overlays/constants/styleLayerIds.js";
 
-const SOURCE_ID = "traffic-flow-segments-source";
-const CASING_LAYER_ID = "traffic-flow-segment-casing";
-const LINES_LAYER_ID = "traffic-flow-segment-lines";
-const ANIMATED_LAYER_ID = "traffic-flow-segment-animated";
+const SOURCE_ID = OVERLAY_SOURCE_IDS.TRAFFIC_FLOW;
+const CASING_LAYER_ID = STYLE_LAYER_IDS.TRAFFIC_FLOW_CASING;
+const LINES_LAYER_ID = STYLE_LAYER_IDS.TRAFFIC_FLOW_LINES;
+const ANIMATED_LAYER_ID = STYLE_LAYER_IDS.TRAFFIC_FLOW_ANIMATED;
 
 const EMPTY_GEOJSON = { type: "FeatureCollection", features: [] };
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
@@ -74,6 +79,7 @@ const segmentsToGeoJson = (segments = []) => ({
       roadName: segment.roadName,
       roadClass: segment.roadClass,
       trafficLevel: segment.trafficLevel,
+      congestion: segment.trafficLevel,
       speedKmh: segment.speedKmh
     }
   }))
@@ -81,9 +87,9 @@ const segmentsToGeoJson = (segments = []) => ({
 
 const resolveBeforeLayerId = (map) => {
   const candidates = [
-    "road-labels",
-    "hybrid-road-labels",
-    "sweden-buildings",
+    STYLE_LAYER_IDS.ROAD_LABELS,
+    STYLE_LAYER_IDS.HYBRID_ROAD_LABELS,
+    STYLE_LAYER_IDS.BUILDINGS,
     "swedish-landmarks-halo"
   ];
 
@@ -106,7 +112,12 @@ const getViewportBbox = (map) => {
   };
 };
 
-export const createTrafficFlowLayer = ({ map, maplibregl, initialVisible = true } = {}) => {
+export const createTrafficFlowLayer = ({
+  map,
+  maplibregl,
+  initialVisible = false,
+  autoFetch = initialVisible
+} = {}) => {
   let isDisposed = false;
   let visible = initialVisible;
   let refreshTimerId = null;
@@ -116,17 +127,48 @@ export const createTrafficFlowLayer = ({ map, maplibregl, initialVisible = true 
   let abortController = null;
   let legend = null;
 
-  const layerIds = [ANIMATED_LAYER_ID, LINES_LAYER_ID, CASING_LAYER_ID];
+  const layerIds = TRAFFIC_FLOW_LAYER_IDS;
+
+  const stopRefreshTimer = () => {
+    if (refreshTimerId) {
+      clearInterval(refreshTimerId);
+      refreshTimerId = null;
+    }
+  };
+
+  const startRefreshTimer = () => {
+    if (refreshTimerId || isDisposed) {
+      return;
+    }
+    refreshTimerId = setInterval(loadSegments, REFRESH_INTERVAL_MS);
+  };
 
   const setLayerVisibility = (nextVisible) => {
+    const wasVisible = visible;
     visible = Boolean(nextVisible);
     const layoutVisibility = visible ? "visible" : "none";
+
     for (const layerId of layerIds) {
       if (map.getLayer(layerId)) {
         map.setLayoutProperty(layerId, "visibility", layoutVisibility);
       }
     }
+
     legend?.setVisible(visible);
+
+    if (visible && !wasVisible) {
+      loadSegments();
+      startAnimation();
+      startRefreshTimer();
+      return;
+    }
+
+    if (!visible && wasVisible) {
+      abortController?.abort();
+      abortController = null;
+      stopAnimation();
+      stopRefreshTimer();
+    }
   };
 
   const stopAnimation = () => {
@@ -187,6 +229,10 @@ export const createTrafficFlowLayer = ({ map, maplibregl, initialVisible = true 
   };
 
   const scheduleLoad = () => {
+    if (!visible) {
+      return;
+    }
+
     if (moveDebounceId) {
       clearTimeout(moveDebounceId);
     }
@@ -311,9 +357,11 @@ export const createTrafficFlowLayer = ({ map, maplibregl, initialVisible = true 
   map.on("click", LINES_LAYER_ID, onLineClick);
   map.on("moveend", scheduleLoad);
 
-  loadSegments();
-  startAnimation();
-  refreshTimerId = setInterval(loadSegments, REFRESH_INTERVAL_MS);
+  if (autoFetch) {
+    loadSegments();
+    startAnimation();
+    startRefreshTimer();
+  }
 
   return {
     layerIds,

@@ -179,11 +179,18 @@ const runDemo = async () => {
 
     await step("8. Aktivera trafikflöde", async () => {
       await page.evaluate(() => {
-        const toggle = document.querySelector("#traffic-toggle-traffic-flow");
-        if (toggle && !toggle.checked) {
-          toggle.click();
+        const panel = document.querySelector(".map-layer-panel");
+        if (panel?.dataset.state === "collapsed") {
+          panel.querySelector(".map-layer-panel__collapse")?.click();
+        }
+        const trafficToggle = document.querySelector(
+          '[data-layer-id="traffic-flow"] .map-layer-panel__toggle'
+        );
+        if (trafficToggle?.textContent?.trim() === "Av") {
+          trafficToggle.click();
         }
       });
+      await sleep(2500);
     });
 
     await step("9. Aktivera SMHI-radar", async () => {

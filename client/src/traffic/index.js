@@ -49,7 +49,7 @@ export {
   TRAFFIC_ROAD_LAYER_IDS
 } from "./createTrafficLayers.js";
 
-export { createTrafficController, createTrafficFlowSource } from "./createTrafficController.js";
-export { createTrafficPaletteBindings } from "./createTrafficPaletteBindings.js";
-export { createTrafficControl, ROAD_LABEL_LAYER_IDS, TRANSIT_LAYER_IDS } from "./createTrafficControl.js";
+export { createTrafficPaletteBindings, TRAFFIC_LABEL_LAYER_IDS } from "./createTrafficPaletteBindings.js";
+export { createTrafficFlowLayer as createTrafficFlowSegmentLayer } from "./createTrafficFlowLayer.js";
+export { createTransitLayer, SWEDISH_TRANSIT_LAYER_IDS } from "./createTransitLayer.js";
 export { fetchTraffic, fetchTransit } from "./trafficService.js";
