@@ -181,6 +181,16 @@ export const createApiRouter = () => {
           path: "/api/radar/frames/:frameKey.png",
           description: "Proxad SMHI-radarbild (frameKey=latest eller radar_YYMMDDHHMM)"
         },
+        {
+          method: "GET",
+          path: "/tiles/vector/tilejson.json",
+          description: "Self-hosted vector TileJSON (kräver synkade tile-filer lokalt)"
+        },
+        {
+          method: "GET",
+          path: "/tiles/vector/:z/:x/:y.pbf",
+          description: "Self-hosted vector tile endpoint (kräver synkade tile-filer lokalt)"
+        },
         { method: "GET", path: "/api/tiles/proxy?url=", description: "CORS-säker tile-proxy med minnescache" },
         { method: "GET", path: "/api/tiles/proxy/stats", description: "Tile-proxy cachestatistik" },
         { method: "GET", path: "/api/search?q=&limit=", description: "Autocomplete-sökning av platser i Sverige" },
