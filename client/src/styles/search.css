@@ -167,11 +167,11 @@
 @media (max-width: 720px) {
   #map-root .maplibregl-ctrl-top-left:has(.map-search-control) {
     left: 50%;
-    transform: translateX(calc(-50% - 1.75rem));
+    transform: translateX(-50%);
   }
 
   #map-root .map-search-control {
-    width: min(var(--app-search-max), calc(100vw - var(--app-control-width) - var(--app-space-6)));
+    width: min(var(--app-search-max), calc(100vw - var(--app-space-6)));
   }
 
   #map-root .map-search-control__form {
@@ -192,7 +192,7 @@
   }
 
   #map-root .map-search-control {
-    width: calc(100vw - var(--app-control-width) - var(--app-space-5));
+    width: calc(100vw - var(--app-space-6));
     max-width: none;
   }
 }

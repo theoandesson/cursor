@@ -5,8 +5,12 @@ import { createTabBar } from "../navigation/createTabBar.js";
 import { createCitiesPanel } from "../panels/createCitiesPanel.js";
 import { createPanelHost } from "../panels/createPanelHost.js";
 import { extractBootstrapParts } from "../weather/applyCityWeather.js";
+import { isDevMode } from "../config/devMode.js";
 
-const ROUTE_ORDER = [ROUTES.MAP, ROUTES.CITIES, ROUTES.PERF];
+const ALL_ROUTES = [ROUTES.MAP, ROUTES.CITIES, ROUTES.PERF];
+
+const getVisibleRoutes = () =>
+  isDevMode() ? ALL_ROUTES : ALL_ROUTES.filter((route) => route !== ROUTES.PERF);
 
 const buildWeatherMap = (cityWeather) => {
   const weatherMap = new Map();
@@ -121,6 +125,11 @@ export const createAppShell = ({
   const handleRouteChange = (route, meta = {}) => {
     const endPanelSwitch = meta.initial ? null : perfTracker?.startSpan("panel-switch");
 
+    if (route === ROUTES.PERF && !isDevMode()) {
+      router.navigate(ROUTES.MAP);
+      return;
+    }
+
     panelHost.showPanel(route);
     tabBar.setActive(route);
     navReveal.syncWithRoute(route);
@@ -151,7 +160,7 @@ export const createAppShell = ({
 
   const tabBar = createTabBar({
     container: navContainer,
-    routes: ROUTE_ORDER,
+    routes: getVisibleRoutes(),
     onNavigate: (route) => {
       router.navigate(route);
     },
@@ -166,7 +175,10 @@ export const createAppShell = ({
   });
 
   router = createAppRouter({
-    initialRoute: parseHash(),
+    initialRoute: (() => {
+      const route = parseHash();
+      return route === ROUTES.PERF && !isDevMode() ? ROUTES.MAP : route;
+    })(),
     onRouteChange: handleRouteChange
   });
 
