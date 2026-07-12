@@ -419,7 +419,7 @@ export const initSwedenMap = ({
           message: `Kartläge: ${getMapModeLabel(mode)}.`
         });
       }
-    }),
+    })),
     "top-right"
   );
 
