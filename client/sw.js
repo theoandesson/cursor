@@ -11,8 +11,16 @@ import {
 const API_CACHE_NAME = "sweden-map-api-v1";
 const API_SWR_PATHS = new Set(["/api/bootstrap", "/api/weather/cities"]);
 const DELETE_OUTDATED_DEBOUNCE_MS = 60000;
-const SELF_HOSTED_TILE_CACHE_NAME = `${TILE_CACHE_PREFIX}-self-hosted-immutable-v1`;
-const SELF_HOSTED_TILEJSON_CACHE_NAME = `${TILE_CACHE_PREFIX}-self-hosted-tilejson-v1`;
+const LEGACY_SELF_HOSTED_TILE_CACHE_NAMES = Object.freeze([
+  `${TILE_CACHE_PREFIX}-self-hosted-immutable-v1`,
+  `${TILE_CACHE_PREFIX}-self-hosted-tilejson-v1`
+]);
+
+const buildSelfHostedTileCacheName = (date = new Date()) =>
+  `${TILE_CACHE_PREFIX}-self-hosted-${getDailyCacheVersion(date)}`;
+
+const buildSelfHostedTileJsonCacheName = (date = new Date()) =>
+  `${TILE_CACHE_PREFIX}-self-hosted-tilejson-${getDailyCacheVersion(date)}`;
 
 let lastDeleteOutdatedAt = 0;
 let deleteOutdatedInFlight = null;
@@ -100,20 +108,30 @@ const staleWhileRevalidateApi = (request) =>
   staleWhileRevalidate(request, API_CACHE_NAME);
 
 const staleWhileRevalidateTileJson = (request) =>
-  staleWhileRevalidate(request, SELF_HOSTED_TILEJSON_CACHE_NAME);
+  staleWhileRevalidate(request, buildSelfHostedTileJsonCacheName());
 
-const cacheFirstSelfHostedTile = async (request) => {
-  const cache = await caches.open(SELF_HOSTED_TILE_CACHE_NAME);
-  const cached = await cache.match(request);
-  if (cached) {
-    return cached;
-  }
+const staleWhileRevalidateSelfHostedTile = (request) =>
+  staleWhileRevalidate(request, buildSelfHostedTileCacheName());
 
-  const response = await fetch(request);
-  if (cacheableResponse(response)) {
-    await putInCache(cache, request, response);
-  }
-  return response;
+const isSelfHostedTileCacheName = (cacheName) =>
+  cacheName.startsWith(`${TILE_CACHE_PREFIX}-self-hosted-`) ||
+  LEGACY_SELF_HOSTED_TILE_CACHE_NAMES.includes(cacheName);
+
+const getSelfHostedCacheNamesByFreshness = async () => {
+  const cacheNames = await caches.keys();
+  return cacheNames
+    .filter((cacheName) => {
+      if (LEGACY_SELF_HOSTED_TILE_CACHE_NAMES.includes(cacheName)) {
+        return false;
+      }
+      return (
+        cacheName.startsWith(`${TILE_CACHE_PREFIX}-self-hosted-`) &&
+        /^\d{4}-\d{2}-\d{2}$/.test(
+          cacheName.slice(`${TILE_CACHE_PREFIX}-self-hosted-`.length).replace(/^tilejson-/, "")
+        )
+      );
+    })
+    .sort((left, right) => right.localeCompare(left));
 };
 
 const getTileCacheNamesByFreshness = async () => {
@@ -148,14 +166,36 @@ const getRetainedCacheNames = async (activeCacheName) => {
 
 const deleteOutdatedTileCaches = async (activeCacheName) => {
   const retainedNames = await getRetainedCacheNames(activeCacheName);
-  const retainedSet = new Set(retainedNames);
+  const activeSelfHosted = buildSelfHostedTileCacheName();
+  const activeSelfHostedTileJson = buildSelfHostedTileJsonCacheName();
+  const selfHostedByFreshness = await getSelfHostedCacheNamesByFreshness();
+  const retainedSelfHosted = [];
+
+  for (const cacheName of [activeSelfHosted, activeSelfHostedTileJson, ...selfHostedByFreshness]) {
+    if (retainedSelfHosted.includes(cacheName)) {
+      continue;
+    }
+    if (retainedSelfHosted.length >= TILE_CACHE_RETENTION_VERSIONS + 1) {
+      break;
+    }
+    retainedSelfHosted.push(cacheName);
+  }
+
+  const retainedSet = new Set([...retainedNames, ...retainedSelfHosted]);
   const cacheNames = await caches.keys();
-  const outdated = cacheNames.filter(
-    (cacheName) =>
+  const outdated = cacheNames.filter((cacheName) => {
+    if (LEGACY_SELF_HOSTED_TILE_CACHE_NAMES.includes(cacheName)) {
+      return true;
+    }
+    if (isSelfHostedTileCacheName(cacheName)) {
+      return !retainedSet.has(cacheName);
+    }
+    return (
       cacheName.startsWith(`${TILE_CACHE_PREFIX}-`) &&
       extractVersionFromCacheName(cacheName) !== null &&
       !retainedSet.has(cacheName)
-  );
+    );
+  });
   await Promise.all(outdated.map((cacheName) => caches.delete(cacheName)));
 };
 
@@ -249,7 +289,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (isSelfHostedTileRequest(event.request)) {
-    event.respondWith(cacheFirstSelfHostedTile(event.request));
+    event.respondWith(staleWhileRevalidateSelfHostedTile(event.request));
     return;
   }
 

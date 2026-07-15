@@ -1,8 +1,9 @@
 import { URL } from "node:url";
 
-const DEFAULT_CACHE_MAX_ENTRIES = 512;
+const DEFAULT_CACHE_MAX_ENTRIES = 256;
+const DEFAULT_CACHE_MAX_BYTES = 64 * 1024 * 1024;
 const DEFAULT_CACHE_TTL_MS = 15 * 60 * 1000;
-const MAX_TILE_BYTES = 10 * 1024 * 1024;
+const MAX_TILE_BYTES = 2 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 12_000;
 
 const ALLOWED_HOSTS = new Set([
@@ -24,6 +25,15 @@ const ALLOWED_PATH_PREFIXES = [
   "/bild/"
 ];
 
+const SAFE_CONTENT_TYPES = new Set([
+  "application/x-protobuf",
+  "application/octet-stream",
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif"
+]);
+
 const CONTENT_TYPE_BY_EXTENSION = {
   ".pbf": "application/x-protobuf",
   ".png": "image/png",
@@ -32,9 +42,17 @@ const CONTENT_TYPE_BY_EXTENSION = {
   ".webp": "image/webp"
 };
 
+const normalizeContentType = (value) => {
+  if (!value) {
+    return null;
+  }
+  return String(value).split(";")[0].trim().toLowerCase();
+};
+
 const inferContentType = (targetUrl, upstreamType) => {
-  if (upstreamType && upstreamType !== "application/octet-stream") {
-    return upstreamType;
+  const normalizedUpstream = normalizeContentType(upstreamType);
+  if (normalizedUpstream && SAFE_CONTENT_TYPES.has(normalizedUpstream)) {
+    return normalizedUpstream;
   }
 
   const pathname = targetUrl.pathname;
@@ -48,26 +66,75 @@ const inferContentType = (targetUrl, upstreamType) => {
   return CONTENT_TYPE_BY_EXTENSION[extension] ?? "application/octet-stream";
 };
 
-const createCacheEntry = (buffer, contentType, status) => ({
+const createCacheEntry = (buffer, contentType, status, ttlMs) => ({
   buffer,
   contentType,
   status,
-  expiresAt: Date.now() + DEFAULT_CACHE_TTL_MS
+  byteLength: buffer.byteLength,
+  expiresAt: Date.now() + ttlMs
 });
+
+const readBodyWithLimit = async (response, maxBytes) => {
+  if (!response.body || typeof response.body.getReader !== "function") {
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer.byteLength > maxBytes) {
+      const error = new Error("Tile-svaret är för stort.");
+      error.statusCode = 413;
+      throw error;
+    }
+    return buffer;
+  }
+
+  const reader = response.body.getReader();
+  const chunks = [];
+  let total = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    if (!value) {
+      continue;
+    }
+
+    total += value.byteLength;
+    if (total > maxBytes) {
+      try {
+        await reader.cancel();
+      } catch {
+        // Ignore cancel errors; size limit already enforced.
+      }
+      const error = new Error("Tile-svaret är för stort.");
+      error.statusCode = 413;
+      throw error;
+    }
+    chunks.push(Buffer.from(value));
+  }
+
+  return chunks.length === 1 ? chunks[0] : Buffer.concat(chunks, total);
+};
 
 export const createTileProxyService = ({
   cacheMaxEntries = DEFAULT_CACHE_MAX_ENTRIES,
+  cacheMaxBytes = DEFAULT_CACHE_MAX_BYTES,
   cacheTtlMs = DEFAULT_CACHE_TTL_MS,
+  maxTileBytes = MAX_TILE_BYTES,
   fetchImpl = fetch
 } = {}) => {
   const cache = new Map();
+  let cacheBytes = 0;
 
   const pruneExpired = () => {
     const now = Date.now();
     for (const [key, entry] of cache.entries()) {
       if (entry.expiresAt <= now) {
+        cacheBytes -= entry.byteLength ?? entry.buffer.byteLength;
         cache.delete(key);
       }
+    }
+    if (cacheBytes < 0) {
+      cacheBytes = 0;
     }
   };
 
@@ -76,16 +143,30 @@ export const createTileProxyService = ({
     cache.set(key, entry);
   };
 
+  const deleteCacheEntry = (key) => {
+    const existing = cache.get(key);
+    if (!existing) {
+      return;
+    }
+    cacheBytes -= existing.byteLength ?? existing.buffer.byteLength;
+    cache.delete(key);
+    if (cacheBytes < 0) {
+      cacheBytes = 0;
+    }
+  };
+
   const setCacheEntry = (key, entry) => {
     pruneExpired();
+    deleteCacheEntry(key);
     cache.set(key, entry);
+    cacheBytes += entry.byteLength ?? entry.buffer.byteLength;
 
-    while (cache.size > cacheMaxEntries) {
+    while (cache.size > cacheMaxEntries || cacheBytes > cacheMaxBytes) {
       const oldestKey = cache.keys().next().value;
       if (oldestKey == null) {
         break;
       }
-      cache.delete(oldestKey);
+      deleteCacheEntry(oldestKey);
     }
   };
 
@@ -162,14 +243,14 @@ export const createTileProxyService = ({
     }
 
     if (cached) {
-      cache.delete(cacheKey);
+      deleteCacheEntry(cacheKey);
     }
 
     try {
       const upstream = await fetchWithTimeout(targetUrl, {
         redirect: "manual",
         headers: {
-          Accept: "*/*",
+          Accept: "image/*,application/x-protobuf,application/octet-stream",
           "User-Agent": "sweden-3d-map-fidelity/1.0 tile-proxy"
         }
       });
@@ -191,7 +272,7 @@ export const createTileProxyService = ({
       }
 
       const contentLength = Number(upstream.headers.get("content-length"));
-      if (Number.isFinite(contentLength) && contentLength > MAX_TILE_BYTES) {
+      if (Number.isFinite(contentLength) && contentLength > maxTileBytes) {
         return {
           ok: false,
           status: 413,
@@ -199,20 +280,34 @@ export const createTileProxyService = ({
         };
       }
 
-      const buffer = Buffer.from(await upstream.arrayBuffer());
-      if (buffer.byteLength > MAX_TILE_BYTES) {
-        return {
-          ok: false,
-          status: 413,
-          body: { error: "Tile-svaret är för stort." }
-        };
+      let buffer;
+      try {
+        buffer = await readBodyWithLimit(upstream, maxTileBytes);
+      } catch (error) {
+        if (error?.statusCode === 413) {
+          return {
+            ok: false,
+            status: 413,
+            body: { error: "Tile-svaret är för stort." }
+          };
+        }
+        throw error;
       }
+
       const contentType = inferContentType(
         targetUrl,
         upstream.headers.get("content-type")
       );
-      const entry = createCacheEntry(buffer, contentType, upstream.status);
-      entry.expiresAt = Date.now() + cacheTtlMs;
+
+      if (!SAFE_CONTENT_TYPES.has(contentType)) {
+        return {
+          ok: false,
+          status: 502,
+          body: { error: "Upstream returnerade otillåten content-type." }
+        };
+      }
+
+      const entry = createCacheEntry(buffer, contentType, upstream.status, cacheTtlMs);
       setCacheEntry(cacheKey, entry);
 
       return {
@@ -240,11 +335,14 @@ export const createTileProxyService = ({
       return {
         entries: cache.size,
         maxEntries: cacheMaxEntries,
+        bytes: cacheBytes,
+        maxBytes: cacheMaxBytes,
         ttlMs: cacheTtlMs
       };
     },
     clearCache: () => {
       cache.clear();
+      cacheBytes = 0;
     }
   };
 };

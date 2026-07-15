@@ -1,5 +1,6 @@
 import { fetchBootstrap, fetchBootstrapWithSwr } from "../api/bootstrapClient.js";
 import { saveBootstrapSnapshot } from "../store/weatherStore.js";
+import { escapeHtml } from "../shared/escapeHtml.js";
 import { getWeatherSymbol, getWindDirection } from "./weatherSymbols.js";
 import {
   applyWeatherToGeoJson,
@@ -26,25 +27,25 @@ const buildHoverHtml = (props) => {
 
   const gustRow =
     props.gust != null
-      ? `<tr><td>Vindbyar</td><td>${props.gust} m/s</td></tr>`
+      ? `<tr><td>Vindbyar</td><td>${escapeHtml(props.gust)} m/s</td></tr>`
       : "";
 
   return `
     <div class="weather-hover">
       <div class="weather-hover__header">
-        <span class="weather-hover__icon">${props.icon}</span>
+        <span class="weather-hover__icon">${escapeHtml(props.icon)}</span>
         <div>
-          <strong class="weather-hover__city">${props.name}</strong>
-          <span class="weather-hover__temp">${props.temp}</span>
+          <strong class="weather-hover__city">${escapeHtml(props.name)}</strong>
+          <span class="weather-hover__temp">${escapeHtml(props.temp)}</span>
         </div>
       </div>
-      <p class="weather-hover__condition">${props.symbolLabel}</p>
+      <p class="weather-hover__condition">${escapeHtml(props.symbolLabel)}</p>
       <table class="weather-hover__table">
-        <tr><td>Temperatur</td><td>${props.temp}</td></tr>
-        <tr><td>Vind</td><td>${props.windSpeed ?? "?"} m/s ${props.windDirText}</td></tr>
+        <tr><td>Temperatur</td><td>${escapeHtml(props.temp)}</td></tr>
+        <tr><td>Vind</td><td>${escapeHtml(props.windSpeed ?? "?")} m/s ${escapeHtml(props.windDirText)}</td></tr>
         ${gustRow}
-        <tr><td>Luftfuktighet</td><td>${props.humidity ?? "?"}%</td></tr>
-        <tr><td>Lufttryck</td><td>${props.pressure != null ? Math.round(props.pressure) + " hPa" : "?"}</td></tr>
+        <tr><td>Luftfuktighet</td><td>${escapeHtml(props.humidity ?? "?")}%</td></tr>
+        <tr><td>Lufttryck</td><td>${props.pressure != null ? escapeHtml(Math.round(props.pressure)) + " hPa" : "?"}</td></tr>
       </table>
     </div>`;
 };

@@ -174,7 +174,10 @@ export const createTilesRouter = () => {
       }
 
       response.setHeader("Content-Type", "application/x-protobuf");
-      response.setHeader("Cache-Control", "public, max-age=86400, immutable");
+      response.setHeader(
+        "Cache-Control",
+        "public, max-age=3600, stale-while-revalidate=86400"
+      );
       setTileSourceHeader(response, getTileSource(result) ?? payload.source);
       response.status(payload.status).send(payload.buffer);
     } catch (error) {
@@ -235,7 +238,10 @@ export const createTilesRouter = () => {
       }
 
       response.setHeader("Content-Type", "image/png");
-      response.setHeader("Cache-Control", "public, max-age=86400, immutable");
+      response.setHeader(
+        "Cache-Control",
+        "public, max-age=3600, stale-while-revalidate=86400"
+      );
       setTileSourceHeader(response, getTileSource(result) ?? payload.source);
       response.status(payload.status).send(payload.buffer);
     } catch (error) {

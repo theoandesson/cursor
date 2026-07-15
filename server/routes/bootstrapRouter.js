@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { allowPerfAdmin } from "../lib/adminAuth.js";
 import { parseBoolean, parseIntegerInRange } from "../lib/parseQuery.js";
 import { setCacheHeaders } from "../middleware/cacheHeaders.js";
 import { createBootstrapPayload } from "../services/bootstrapService.js";
@@ -9,16 +10,6 @@ import {
 } from "../services/perfMetricsService.js";
 
 const MAX_FORECAST_HOURS = 48;
-const isProduction = process.env.NODE_ENV === "production";
-
-const allowPerfAdmin = (request) => {
-  if (!isProduction) {
-    return true;
-  }
-
-  const ip = request.ip ?? "";
-  return ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
-};
 
 const parseForecastHours = (request) =>
   parseIntegerInRange(request.query.hours, {
@@ -31,7 +22,9 @@ export const createBootstrapRouter = () => {
 
   router.get("/bootstrap", setCacheHeaders("bootstrap"), async (request, response) => {
     const forecastHours = parseForecastHours(request);
-    const forceRefresh = parseBoolean(request.query.refresh, false);
+    // Public clients may not force a full SMHI refresh; only the warmer / admins should.
+    const forceRefresh =
+      parseBoolean(request.query.refresh, false) && allowPerfAdmin(request);
 
     try {
       const { payload, cacheHit } = await createBootstrapPayload({ forecastHours, forceRefresh });

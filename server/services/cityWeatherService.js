@@ -8,10 +8,20 @@ const FILE_CACHE_TTL_MS = 15 * 60 * 1000;
 const MAX_PARALLEL_FETCHES = 16;
 
 const cityWeatherCacheByHours = new Map();
-const refreshPromisesByHours = new Map();
+const refreshPromisesByKey = new Map();
 const staleRefreshCursorByHours = new Map();
 const fileCache = createFileCache({ directory: ".cache/city-weather" });
 const CITY_INDEX_BY_ID = new Map(SWEDISH_CITIES.map((city, index) => [city.id, index]));
+
+const buildRefreshKey = (forecastHours, { forceRefresh = false, refreshStaleOnly = false } = {}) => {
+  if (forceRefresh) {
+    return `${forecastHours}:force`;
+  }
+  if (refreshStaleOnly) {
+    return `${forecastHours}:stale`;
+  }
+  return `${forecastHours}:read`;
+};
 
 export const toCityDto = ({ id, name, lon, lat, county }) => ({
   id,
@@ -263,10 +273,20 @@ const ensureCityWeather = async (
     return { cacheHit: true, source: "memory" };
   }
 
-  const existingRefresh = refreshPromisesByHours.get(forecastHours);
+  const refreshKey = buildRefreshKey(forecastHours, { forceRefresh, refreshStaleOnly });
+  const existingRefresh = refreshPromisesByKey.get(refreshKey);
   if (existingRefresh) {
     const result = await existingRefresh;
     return { cacheHit: result.cacheHit, source: result.source };
+  }
+
+  // Never attach a force/full refresh to an in-flight stale-only warmer batch.
+  if (forceRefresh) {
+    const staleOnlyKey = buildRefreshKey(forecastHours, { refreshStaleOnly: true });
+    const staleOnlyInFlight = refreshPromisesByKey.get(staleOnlyKey);
+    if (staleOnlyInFlight) {
+      await staleOnlyInFlight.catch(() => undefined);
+    }
   }
 
   const refreshPromise = refreshCityWeather(forecastHours, {
@@ -274,10 +294,10 @@ const ensureCityWeather = async (
     refreshStaleOnly,
     refreshLimit
   }).finally(() => {
-    refreshPromisesByHours.delete(forecastHours);
+    refreshPromisesByKey.delete(refreshKey);
   });
 
-  refreshPromisesByHours.set(forecastHours, refreshPromise);
+  refreshPromisesByKey.set(refreshKey, refreshPromise);
   return refreshPromise;
 };
 

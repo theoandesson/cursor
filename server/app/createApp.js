@@ -2,6 +2,7 @@ import express from "express";
 import path from "node:path";
 import { compressionSetup } from "../middleware/compressionSetup.js";
 import { requestTiming } from "../middleware/requestTiming.js";
+import { securityHeaders } from "../middleware/securityHeaders.js";
 import { createApiRouter } from "../routes/createApiRouter.js";
 import { createTilesRouter } from "../routes/tilesRouter.js";
 
@@ -10,6 +11,8 @@ const ASSET_EXTENSION_PATTERN = /\.[a-z0-9]+$/i;
 export const createApp = ({ staticDirectory }) => {
   const app = express();
 
+  app.disable("x-powered-by");
+  app.use(securityHeaders);
   app.use(compressionSetup);
 
   app.get("/healthz", (_request, response) => {
@@ -31,7 +34,10 @@ export const createApp = ({ staticDirectory }) => {
         }
 
         if (filePath.includes(`${path.sep}tiles${path.sep}`)) {
-          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+          res.setHeader(
+            "Cache-Control",
+            "public, max-age=3600, stale-while-revalidate=86400"
+          );
         }
       }
     })
