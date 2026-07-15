@@ -1,4 +1,5 @@
 import { getRadarMetadata } from "../data/radarMetadata.js";
+import { createSingleFlight } from "../lib/singleFlight.js";
 import {
   buildRadarImageUrl,
   extractPngFramesFromDayIndex,
@@ -11,11 +12,14 @@ import {
 
 const FRAME_LIST_CACHE_TTL_MS = 60 * 1000;
 const LATEST_IMAGE_CACHE_TTL_MS = 30 * 1000;
+const MIN_FORCE_REFRESH_INTERVAL_MS = 15_000;
 const MAX_IMAGE_CACHE_ENTRIES = 72;
 
 const frameListCacheByHours = new Map();
+const frameListFlight = createSingleFlight();
 const imageCache = new Map();
 const imageCacheOrder = [];
+const imageFlight = createSingleFlight();
 
 const utcDateParts = (date) => ({
   year: date.getUTCFullYear(),
@@ -86,8 +90,10 @@ const fetchFramesForWindow = async ({ hours }) => {
 const getFrameListCache = (hours) => frameListCacheByHours.get(hours) ?? null;
 
 const setFrameListCache = (hours, payload) => {
+  const fetchedAt = Date.now();
   frameListCacheByHours.set(hours, {
-    expiresAt: Date.now() + FRAME_LIST_CACHE_TTL_MS,
+    fetchedAt,
+    expiresAt: fetchedAt + FRAME_LIST_CACHE_TTL_MS,
     payload
   });
 };
@@ -133,15 +139,33 @@ export const listRadarFrames = async ({
 } = {}) => {
   const now = Date.now();
   const cached = getFrameListCache(hours);
-  const canUseCache = !forceRefresh && cached && cached.expiresAt > now;
+  const refreshedTooRecently =
+    cached && now - (cached.fetchedAt ?? cached.expiresAt - FRAME_LIST_CACHE_TTL_MS) < MIN_FORCE_REFRESH_INTERVAL_MS;
+  const canUseCache = (!forceRefresh || refreshedTooRecently) && cached && cached.expiresAt > now;
 
   if (!canUseCache) {
-    const frames = await fetchFramesForWindow({ hours });
-    setFrameListCache(hours, {
-      product: "comp",
-      hours,
-      total: frames.length,
-      frames: frames.map(toProxyFrame).filter(Boolean)
+    await frameListFlight.doOnce(`radar-frames:${hours}`, async () => {
+      const afterWait = Date.now();
+      const cachedAfterWait = getFrameListCache(hours);
+      if (
+        cachedAfterWait &&
+        cachedAfterWait.expiresAt > afterWait &&
+        (!forceRefresh ||
+          afterWait -
+            (cachedAfterWait.fetchedAt ??
+              cachedAfterWait.expiresAt - FRAME_LIST_CACHE_TTL_MS) <
+            MIN_FORCE_REFRESH_INTERVAL_MS)
+      ) {
+        return;
+      }
+
+      const frames = await fetchFramesForWindow({ hours });
+      setFrameListCache(hours, {
+        product: "comp",
+        hours,
+        total: frames.length,
+        frames: frames.map(toProxyFrame).filter(Boolean)
+      });
     });
   }
 
@@ -201,24 +225,33 @@ export const getRadarImage = async ({ frameKey, forceRefresh = false }) => {
     }
   }
 
-  const buffer = await fetchRadarImage({ frameKey });
-  const upstreamUrl = buildRadarImageUrl({ frameKey });
-  const expiresAt =
-    frameKey === "latest"
-      ? Date.now() + LATEST_IMAGE_CACHE_TTL_MS
-      : Date.now() + 6 * 60 * 60 * 1000;
+  return imageFlight.doOnce(`radar-image:${cacheKey}`, async () => {
+    if (!forceRefresh) {
+      const cachedAfterWait = getCachedImage(cacheKey);
+      if (cachedAfterWait) {
+        return cachedAfterWait;
+      }
+    }
 
-  const entry = {
-    buffer,
-    contentType: "image/png",
-    upstreamUrl,
-    expiresAt,
-    cacheControl:
+    const buffer = await fetchRadarImage({ frameKey });
+    const upstreamUrl = buildRadarImageUrl({ frameKey });
+    const expiresAt =
       frameKey === "latest"
-        ? "public, max-age=30, stale-while-revalidate=60"
-        : "public, max-age=21600, immutable"
-  };
+        ? Date.now() + LATEST_IMAGE_CACHE_TTL_MS
+        : Date.now() + 6 * 60 * 60 * 1000;
 
-  setCachedImage(cacheKey, entry);
-  return entry;
+    const entry = {
+      buffer,
+      contentType: "image/png",
+      upstreamUrl,
+      expiresAt,
+      cacheControl:
+        frameKey === "latest"
+          ? "public, max-age=30, stale-while-revalidate=60"
+          : "public, max-age=21600, immutable"
+    };
+
+    setCachedImage(cacheKey, entry);
+    return entry;
+  });
 };

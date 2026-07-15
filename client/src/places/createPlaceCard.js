@@ -211,7 +211,7 @@ export const createPlaceCard = ({ map, mapConfig }) => {
       : "";
 
     bodyElement.innerHTML = `
-      <p class="place-card__error">${message}</p>
+      <p class="place-card__error">${escapeHtml(message)}</p>
       ${retryButton}`;
 
     announceStatus(message);

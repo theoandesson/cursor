@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { allowPerfAdmin } from "../lib/adminAuth.js";
 import {
   parseBoolean,
   parseFloatInRange,
@@ -173,9 +174,9 @@ export const createApiRouter = () => {
         { method: "GET", path: "/api/healthz", description: "API healthcheck" },
         { method: "GET", path: "/api/endpoints", description: "Lista alla API-endpoints" },
         { method: "GET", path: "/api/bootstrap", description: "Bootstrap-payload med städer och väder" },
-        { method: "GET", path: "/api/perf", description: "Fullständiga prestandamätvärden" },
-        { method: "GET", path: "/api/perf/summary", description: "Kompakt prestandasammanfattning" },
-        { method: "POST", path: "/api/perf/reset", description: "Återställ prestandamätvärden" },
+        { method: "GET", path: "/api/perf", description: "Fullständiga prestandamätvärden (kräver admin)" },
+        { method: "GET", path: "/api/perf/summary", description: "Kompakt prestandasammanfattning (kräver admin)" },
+        { method: "POST", path: "/api/perf/reset", description: "Återställ prestandamätvärden (kräver admin)" },
         { method: "GET", path: "/api/cities", description: "Lista städer (sökbar + pagination)" },
         { method: "GET", path: "/api/cities/:cityId", description: "Hämta en stad via id" },
         { method: "GET", path: "/api/weather/point?lon=&lat=&hours=", description: "Väder för valfri punkt" },
@@ -315,13 +316,20 @@ export const createApiRouter = () => {
   });
 
   router.get("/weather/point", setCacheHeaders("weather"), async (request, response) => {
-    const lon = parseFloatInRange(request.query.lon, { min: -180, max: 180 });
-    const lat = parseFloatInRange(request.query.lat, { min: -90, max: 90 });
+    const lon = parseFloatInRange(request.query.lon, {
+      min: SWEDEN_BOUNDS.minLon,
+      max: SWEDEN_BOUNDS.maxLon
+    });
+    const lat = parseFloatInRange(request.query.lat, {
+      min: SWEDEN_BOUNDS.minLat,
+      max: SWEDEN_BOUNDS.maxLat
+    });
     const forecastHours = parseForecastHours(request);
 
     if (lon == null || lat == null) {
       response.status(400).json({
-        error: "Ogiltiga koordinater. Ange query-parametrar lon och lat."
+        error:
+          "Ogiltiga koordinater. Ange lon/lat inom Sverige (lon 9.5–24.8, lat 54.8–69.7)."
       });
       return;
     }
@@ -345,7 +353,8 @@ export const createApiRouter = () => {
 
     const { limit, offset } = pageQuery;
     const forecastHours = parseForecastHours(request);
-    const forceRefresh = parseBoolean(request.query.refresh, false);
+    const forceRefresh =
+      parseBoolean(request.query.refresh, false) && allowPerfAdmin(request);
 
     try {
       const payload = await getCityWeather({

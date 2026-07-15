@@ -1,12 +1,15 @@
 import { fetchWithTimeout } from "../lib/fetchWithTimeout.js";
+import { createSingleFlight } from "../lib/singleFlight.js";
 import { PRESSURE_GRID } from "../data/pressureMetadata.js";
 
 const OPEN_METEO_FORECAST_URL = "https://api.open-meteo.com/v1/forecast";
 const FETCH_TIMEOUT_MS = 25_000;
 const GRID_CACHE_TTL_MS = 30 * 60 * 1000;
+const MIN_FORCE_REFRESH_INTERVAL_MS = 30_000;
 const MAX_LOCATIONS_PER_REQUEST = 200;
 
 let gridCache = null;
+const gridFlight = createSingleFlight();
 
 const buildAxis = ({ min, max, step }) => {
   const values = [];
@@ -131,19 +134,36 @@ const fetchGridForecast = async ({ forecastHours = 48 } = {}) => {
 
 export const getSwedenGridForecast = async ({ forecastHours = 48, forceRefresh = false } = {}) => {
   const now = Date.now();
-  if (!forceRefresh && gridCache && gridCache.expiresAt > now) {
+  const cacheFresh = gridCache && gridCache.expiresAt > now;
+  const refreshedTooRecently =
+    gridCache && now - (gridCache.fetchedAt ?? 0) < MIN_FORCE_REFRESH_INTERVAL_MS;
+
+  if ((!forceRefresh || refreshedTooRecently) && cacheFresh) {
     return gridCache.payload;
   }
 
-  const payload = await fetchGridForecast({ forecastHours });
-  gridCache = {
-    expiresAt: now + GRID_CACHE_TTL_MS,
-    payload
-  };
+  return gridFlight.doOnce(`sweden-grid:${forecastHours}`, async () => {
+    const afterWait = Date.now();
+    if (
+      gridCache &&
+      gridCache.expiresAt > afterWait &&
+      (!forceRefresh || afterWait - (gridCache.fetchedAt ?? 0) < MIN_FORCE_REFRESH_INTERVAL_MS)
+    ) {
+      return gridCache.payload;
+    }
 
-  return payload;
+    const payload = await fetchGridForecast({ forecastHours });
+    gridCache = {
+      expiresAt: afterWait + GRID_CACHE_TTL_MS,
+      fetchedAt: afterWait,
+      payload
+    };
+
+    return payload;
+  });
 };
 
 export const clearSwedenGridForecastCache = () => {
   gridCache = null;
+  gridFlight.clear();
 };
