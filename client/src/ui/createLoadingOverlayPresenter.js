@@ -5,6 +5,7 @@ const clampProgress = (value) => Math.max(0, Math.min(1, value));
 export const createLoadingOverlayPresenter = ({ mapRootElement }) => {
   const overlay = document.createElement("section");
   overlay.id = OVERLAY_ID;
+  overlay.className = "map-loading-overlay";
   overlay.setAttribute("role", "status");
   overlay.setAttribute("aria-live", "polite");
 

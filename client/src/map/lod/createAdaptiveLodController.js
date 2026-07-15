@@ -50,6 +50,7 @@ export const createAdaptiveLodController = ({
   lodConfig,
   onStatusChange,
   isRoadLabelsEnabled = () => true,
+  isCityWeatherEnabled = () => true,
   onReady
 }) => {
   let currentProfile = null;
@@ -164,7 +165,8 @@ export const createAdaptiveLodController = ({
     applyBuildingOpacity(opacity);
   };
 
-  const setWeatherLabelVisibility = (visible) => {
+  const setWeatherLabelVisibility = (lodVisible) => {
+    const visible = lodVisible && isCityWeatherEnabled();
     if (weatherLabelsVisible === visible) {
       return;
     }
@@ -196,6 +198,20 @@ export const createAdaptiveLodController = ({
       closeRange
     });
     setRoadLabelVisibility(!tierProfile.hideRoadLabels);
+  };
+
+  const refreshWeatherLabels = () => {
+    const zoom = map.getZoom();
+    const zoomTier = resolveZoomTier(zoom, lodConfig);
+    const closeRange = isCloseRange();
+    const isMoving = currentProfile === "moving";
+    const tierProfile = resolveZoomTierProfile({
+      tier: zoomTier,
+      lodConfig,
+      isMoving,
+      closeRange
+    });
+    setWeatherLabelVisibility(!tierProfile.hideWeatherLabels);
   };
 
   const resolveStatusMessage = ({ profileName, zoomTier, closeRange }) => {
@@ -282,7 +298,7 @@ export const createAdaptiveLodController = ({
   map.on("zoom", queueProfileRefresh);
 
   applyProfile("settled");
-  onReady?.({ refreshRoadLabels });
+  onReady?.({ refreshRoadLabels, refreshWeatherLabels });
 
   return () => {
     if (rafId != null) {

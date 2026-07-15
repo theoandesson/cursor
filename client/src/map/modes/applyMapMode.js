@@ -152,11 +152,23 @@ export const applyMapMode = ({
     map.setStyle(nextStyle);
   };
 
-  if (map.loaded()) {
-    applyStyle();
-  } else {
-    map.once("load", applyStyle);
-  }
+  const beginStyleSwitch = () => {
+    if (switchId !== activeStyleSwitchId) {
+      return;
+    }
+
+    if (map.loaded()) {
+      applyStyle();
+    } else {
+      map.once("load", applyStyle);
+    }
+  };
+
+  Promise.resolve(onBeforeStyleChange?.())
+    .catch((error) => {
+      console.warn("[applyMapMode] onBeforeStyleChange failed", error);
+    })
+    .then(beginStyleSwitch);
 
   return nextMode;
 };

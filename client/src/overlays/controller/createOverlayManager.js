@@ -11,7 +11,8 @@ const applyOpacityBinding = ({ map, binding, opacity }) => {
     return;
   }
 
-  map.setPaintProperty(binding.layerId, binding.property, opacity);
+  const baseOpacity = Number.isFinite(binding.baseOpacity) ? binding.baseOpacity : 1;
+  map.setPaintProperty(binding.layerId, binding.property, baseOpacity * opacity);
 };
 
 const applyLayerOpacity = ({ map, definition, opacity }) => {
