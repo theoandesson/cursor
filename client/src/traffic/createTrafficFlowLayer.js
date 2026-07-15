@@ -7,6 +7,7 @@ import {
   STYLE_LAYER_IDS,
   TRAFFIC_FLOW_LAYER_IDS
 } from "../overlays/constants/styleLayerIds.js";
+import { resolveBeforeLayerId } from "../overlays/utils/resolveBeforeLayerId.js";
 
 const SOURCE_ID = OVERLAY_SOURCE_IDS.TRAFFIC_FLOW;
 const CASING_LAYER_ID = STYLE_LAYER_IDS.TRAFFIC_FLOW_CASING;
@@ -81,23 +82,6 @@ const segmentsToGeoJson = (segments = []) => ({
     }
   }))
 });
-
-const resolveBeforeLayerId = (map) => {
-  const candidates = [
-    STYLE_LAYER_IDS.ROAD_LABELS,
-    STYLE_LAYER_IDS.HYBRID_ROAD_LABELS,
-    STYLE_LAYER_IDS.BUILDINGS,
-    "swedish-landmarks-halo"
-  ];
-
-  for (const layerId of candidates) {
-    if (map.getLayer(layerId)) {
-      return layerId;
-    }
-  }
-
-  return undefined;
-};
 
 const getViewportBbox = (map) => {
   const bounds = map.getBounds();

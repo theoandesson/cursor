@@ -36,13 +36,13 @@ export const createOverlayDefinitions = () => [
     controlType: OVERLAY_CONTROL_TYPES.RADAR,
     layerIds: PRESSURE_LAYER_IDS,
     opacityBindings: [
-      { layerId: STYLE_LAYER_IDS.PRESSURE_HIGH_FILL, property: "fill-opacity" },
-      { layerId: STYLE_LAYER_IDS.PRESSURE_LOW_FILL, property: "fill-opacity" },
-      { layerId: STYLE_LAYER_IDS.PRESSURE_STORM_FILL, property: "fill-opacity" },
-      { layerId: STYLE_LAYER_IDS.PRESSURE_LABELS, property: "text-opacity" }
+      { layerId: STYLE_LAYER_IDS.PRESSURE_HIGH_FILL, property: "fill-opacity", baseOpacity: 0.34 },
+      { layerId: STYLE_LAYER_IDS.PRESSURE_LOW_FILL, property: "fill-opacity", baseOpacity: 0.34 },
+      { layerId: STYLE_LAYER_IDS.PRESSURE_STORM_FILL, property: "fill-opacity", baseOpacity: 0.42 },
+      { layerId: STYLE_LAYER_IDS.PRESSURE_LABELS, property: "text-opacity", baseOpacity: 1 }
     ],
     defaultVisible: false,
-    defaultOpacity: 0.85,
+    defaultOpacity: 1,
     minOpacity: 0.15,
     maxOpacity: 1
   },
@@ -70,12 +70,12 @@ export const createOverlayDefinitions = () => [
     controlType: OVERLAY_CONTROL_TYPES.TOGGLE,
     layerIds: TRAFFIC_FLOW_LAYER_IDS,
     opacityBindings: [
-      { layerId: STYLE_LAYER_IDS.TRAFFIC_FLOW_CASING, property: "line-opacity" },
-      { layerId: STYLE_LAYER_IDS.TRAFFIC_FLOW_LINES, property: "line-opacity" },
-      { layerId: STYLE_LAYER_IDS.TRAFFIC_FLOW_ANIMATED, property: "line-opacity" }
+      { layerId: STYLE_LAYER_IDS.TRAFFIC_FLOW_CASING, property: "line-opacity", baseOpacity: 0.55 },
+      { layerId: STYLE_LAYER_IDS.TRAFFIC_FLOW_LINES, property: "line-opacity", baseOpacity: 0.94 },
+      { layerId: STYLE_LAYER_IDS.TRAFFIC_FLOW_ANIMATED, property: "line-opacity", baseOpacity: 0.72 }
     ],
     defaultVisible: false,
-    defaultOpacity: 0.94,
+    defaultOpacity: 1,
     minOpacity: 0.2,
     maxOpacity: 1
   },
@@ -87,14 +87,14 @@ export const createOverlayDefinitions = () => [
     controlType: OVERLAY_CONTROL_TYPES.TOGGLE,
     layerIds: TRANSIT_LAYER_IDS,
     opacityBindings: [
-      { layerId: STYLE_LAYER_IDS.TRANSIT_LINE_CASING, property: "line-opacity" },
-      { layerId: STYLE_LAYER_IDS.TRANSIT_LINES, property: "line-opacity" },
-      { layerId: STYLE_LAYER_IDS.TRANSIT_STOP_HALO, property: "circle-opacity" },
-      { layerId: STYLE_LAYER_IDS.TRANSIT_STOPS, property: "circle-opacity" },
-      { layerId: STYLE_LAYER_IDS.TRANSIT_STOP_LABELS, property: "text-opacity" }
+      { layerId: STYLE_LAYER_IDS.TRANSIT_LINE_CASING, property: "line-opacity", baseOpacity: 0.35 },
+      { layerId: STYLE_LAYER_IDS.TRANSIT_LINES, property: "line-opacity", baseOpacity: 0.88 },
+      { layerId: STYLE_LAYER_IDS.TRANSIT_STOP_HALO, property: "circle-opacity", baseOpacity: 0.55 },
+      { layerId: STYLE_LAYER_IDS.TRANSIT_STOPS, property: "circle-opacity", baseOpacity: 0.95 },
+      { layerId: STYLE_LAYER_IDS.TRANSIT_STOP_LABELS, property: "text-opacity", baseOpacity: 1 }
     ],
     defaultVisible: false,
-    defaultOpacity: 0.95,
+    defaultOpacity: 1,
     minOpacity: 0.15,
     maxOpacity: 1
   },

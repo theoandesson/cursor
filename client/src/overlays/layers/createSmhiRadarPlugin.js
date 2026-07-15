@@ -5,6 +5,7 @@ import {
   preloadRadarImage
 } from "../api/radarApiClient.js";
 import { OVERLAY_SOURCE_IDS, STYLE_LAYER_IDS } from "../constants/styleLayerIds.js";
+import { resolveBeforeLayerId } from "../utils/resolveBeforeLayerId.js";
 
 const PLUGIN_ID = "smhi-radar";
 const SOURCE_ID = OVERLAY_SOURCE_IDS.SMHI_RADAR;
@@ -222,25 +223,46 @@ export const createSmhiRadarPlugin = () => {
             "raster-resampling": "linear"
           }
         },
-        "sweden-buildings"
+        resolveBeforeLayerId(map)
       );
 
-      await refreshFrames();
-      await preloadNearbyFrames();
+      // Frames fetch lazily on enable so startup is not blocked by heavy overlay I/O.
       state.isMounted = true;
     },
 
     async onEnable() {
       state.isEnabled = true;
       state.manager?.setOverlayStatus?.(PLUGIN_ID, {
-        status: "ready",
-        statusMessage: formatFrameTime(state.frames[state.frameIndex]?.valid ?? "")
+        status: "loading",
+        statusMessage: "Laddar radar…"
       });
       state.manager?.notify?.();
-      startPolling();
 
-      if (state.playing) {
-        scheduleNextFrame();
+      try {
+        if (!state.frames.length) {
+          await refreshFrames();
+          await preloadNearbyFrames();
+        }
+
+        state.manager?.setOverlayStatus?.(PLUGIN_ID, {
+          status: "ready",
+          statusMessage: formatFrameTime(state.frames[state.frameIndex]?.valid ?? "")
+        });
+        state.manager?.notify?.();
+        startPolling();
+
+        if (state.playing) {
+          scheduleNextFrame();
+        }
+      } catch (error) {
+        state.isEnabled = false;
+        state.manager?.setOverlayStatus?.(PLUGIN_ID, {
+          status: "error",
+          statusMessage:
+            error instanceof Error ? error.message : "Kunde inte ladda radar."
+        });
+        state.manager?.notify?.();
+        throw error;
       }
     },
 

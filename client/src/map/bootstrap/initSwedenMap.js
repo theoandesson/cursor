@@ -153,10 +153,12 @@ export const initSwedenMap = ({
   let overlayManager = null;
   let unsubscribeOverlayStatus = null;
   let refreshRoadLabels = null;
+  let refreshWeatherLabels = null;
   let disposeDeferredTerrain = null;
   let cancelDeferredMount = null;
   let mapCoreMounted = false;
   let mapFeaturesMounted = false;
+  let overlayDisposePromise = null;
 
   if (loadingOverlay) {
     disposeLoadUx = createMapLoadingOrchestrator({ map, loadingOverlay, perfTracker });
@@ -197,7 +199,7 @@ export const initSwedenMap = ({
   });
   map.addControl(dayNightController.control, "top-right");
 
-  const teardownMapFeatures = () => {
+  const teardownMapFeatures = async () => {
     cancelDeferredMount?.();
     cancelDeferredMount = null;
     disposeDeferredTerrain?.();
@@ -214,6 +216,7 @@ export const initSwedenMap = ({
     unsubscribeOverlayStatus?.();
     unsubscribeOverlayStatus = null;
     refreshRoadLabels = null;
+    refreshWeatherLabels = null;
     overlayManager = null;
     disposePrefetcher?.destroy();
     disposePrefetcher = null;
@@ -223,8 +226,19 @@ export const initSwedenMap = ({
     disposeLod = null;
     disposeLandmarks?.();
     disposeLandmarks = null;
-    disposeOverlaySystem?.();
+
+    const disposeOverlays = disposeOverlaySystem;
     disposeOverlaySystem = null;
+    if (disposeOverlays) {
+      overlayDisposePromise = Promise.resolve()
+        .then(() => disposeOverlays())
+        .catch((error) => {
+          console.warn("[initSwedenMap] Overlay dispose failed", error);
+        });
+      await overlayDisposePromise;
+      overlayDisposePromise = null;
+    }
+
     disposeMapClick?.();
     disposeMapClick = null;
     mapFeaturesMounted = false;
@@ -277,6 +291,17 @@ export const initSwedenMap = ({
     map.on("click", onMapClick);
     disposeMapClick = () => map.off("click", onMapClick);
 
+    disposeWeatherLayer = createCityWeatherLayer({
+      map,
+      maplibregl,
+      perfTracker,
+      onTiming,
+      fetchFn,
+      onBootstrapComplete,
+      onCitiesUpdate,
+      bootstrapPrefetch
+    });
+
     dayNightController.setMode(dayNightController.getMode());
     disposeDeferredTerrain = enableDeferredTerrain(map);
     mapCoreMounted = true;
@@ -288,33 +313,15 @@ export const initSwedenMap = ({
     cancelDeferredMount = createStagedFeatureMount({
       stages: [
         {
-          name: "weather",
-          priority: 1,
-          mount: () => {
-            disposeWeatherLayer = createCityWeatherLayer({
-              map,
-              maplibregl,
-              perfTracker,
-              onTiming,
-              fetchFn,
-              onBootstrapComplete,
-              onCitiesUpdate,
-              bootstrapPrefetch
-            });
-          }
-        },
-        {
           name: "overlays",
-          priority: 2,
-          mount: () => {
+          priority: 1,
+          mount: async () => {
             const overlaySystem = createOverlaySystem({ map, maplibregl });
             overlayManager = overlaySystem.overlayManager;
-            void overlaySystem.mount();
-            disposeOverlaySystem = () => {
-              void overlaySystem.dispose();
-            };
+            disposeOverlaySystem = () => overlaySystem.dispose();
             unsubscribeOverlayStatus = overlaySystem.onStatusChange(({ overlays }) => {
               refreshRoadLabels?.();
+              refreshWeatherLabels?.();
               mobileFabMenu?.refresh?.();
               publishStatus({
                 trafficFlow: overlays.find((overlay) => overlay.id === "traffic-flow")?.visible ?? false,
@@ -323,11 +330,12 @@ export const initSwedenMap = ({
                 message: resolveOverlayMessage(overlays)
               });
             });
+            await overlaySystem.mount();
           }
         },
         {
           name: "lod-and-scheduler",
-          priority: 3,
+          priority: 2,
           mount: () => {
             if (!disposePrefetcher) {
               disposePrefetcher = createViewportPrefetcher(map, {
@@ -343,13 +351,21 @@ export const initSwedenMap = ({
               isRoadLabelsEnabled: () =>
                 overlayManager?.getState().overlays.find((overlay) => overlay.id === "road-labels")
                   ?.visible ?? true,
+              isCityWeatherEnabled: () =>
+                overlayManager?.getState().overlays.find((overlay) => overlay.id === "city-weather")
+                  ?.visible ?? true,
               onStatusChange: (status) => {
                 latestLodStatus = status;
                 publishStatus(status);
               },
-              onReady: ({ refreshRoadLabels: refreshLabels }) => {
+              onReady: ({
+                refreshRoadLabels: refreshLabels,
+                refreshWeatherLabels: refreshWeather
+              }) => {
                 refreshRoadLabels = refreshLabels;
+                refreshWeatherLabels = refreshWeather;
                 refreshRoadLabels?.();
+                refreshWeatherLabels?.();
               }
             });
 
@@ -367,14 +383,14 @@ export const initSwedenMap = ({
         },
         {
           name: "landmarks",
-          priority: 4,
+          priority: 3,
           mount: () => {
             disposeLandmarks = createLandmarkLayer({ map, maplibregl });
           }
         },
         {
           name: "prefetcher",
-          priority: 5,
+          priority: 4,
           mount: () => {
             if (!disposePrefetcher) {
               disposePrefetcher = createViewportPrefetcher(map, {
@@ -386,21 +402,22 @@ export const initSwedenMap = ({
             disposePrefetcher.start();
           }
         }
-      ]
+      ],
+      onComplete: () => {
+        mapFeaturesMounted = true;
+      }
     });
-
-    mapFeaturesMounted = true;
   };
 
   map.addControl(
     (mapModeControl = createMapModeControl({
       map,
-      onBeforeStyleChange: () => {
+      onBeforeStyleChange: async () => {
         if (loadingOverlay) {
           loadingOverlay.show();
           loadingOverlay.setMessage("Byter kartläge…");
         }
-        teardownMapFeatures();
+        await teardownMapFeatures();
       },
       onStyleLoaded: (mode) => {
         currentMapMode = mode;
@@ -419,7 +436,7 @@ export const initSwedenMap = ({
           message: `Kartläge: ${getMapModeLabel(mode)}.`
         });
       }
-    }),
+    })),
     "top-right"
   );
 
@@ -452,17 +469,42 @@ export const initSwedenMap = ({
 
   const originalRemove = map.remove.bind(map);
   map.remove = () => {
-    teardownMapFeatures();
+    cancelDeferredMount?.();
+    cancelDeferredMount = null;
+    disposeDeferredTerrain?.();
+    disposeDeferredTerrain = null;
+    disposeWeatherLayer?.();
+    disposeWeatherLayer = null;
+    disposeWeatherPopup?.();
+    disposeWeatherPopup = null;
+    unsubscribeOverlayStatus?.();
+    unsubscribeOverlayStatus = null;
+    refreshRoadLabels = null;
+    refreshWeatherLabels = null;
+    overlayManager = null;
+    disposePrefetcher?.destroy();
+    disposePrefetcher = null;
+    disposeTileScheduler?.();
+    disposeTileScheduler = null;
+    disposeLod?.();
+    disposeLod = null;
+    disposeLandmarks?.();
+    disposeLandmarks = null;
+    disposeMapClick?.();
+    disposeMapClick = null;
+    const disposeOverlays = disposeOverlaySystem;
+    disposeOverlaySystem = null;
+    void disposeOverlays?.().catch?.(() => {});
     disposeLoadUx?.();
     disposeLoadUx = null;
     placeCard?.destroy();
     placeCard = null;
-    disposeOverlaySystem?.();
-    disposeOverlaySystem = null;
     dayNightController?.destroy();
     dayNightController = null;
     mapModeControl = null;
     mobileFabMenu = null;
+    mapFeaturesMounted = false;
+    mapCoreMounted = false;
     return originalRemove();
   };
 

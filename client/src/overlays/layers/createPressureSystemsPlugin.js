@@ -5,6 +5,7 @@ import {
   preloadPressureFrame
 } from "../api/pressureApiClient.js";
 import { OVERLAY_SOURCE_IDS, STYLE_LAYER_IDS } from "../constants/styleLayerIds.js";
+import { resolveBeforeLayerId } from "../utils/resolveBeforeLayerId.js";
 
 const PLUGIN_ID = "pressure-systems";
 const SOURCE_ID = OVERLAY_SOURCE_IDS.PRESSURE_SYSTEMS;
@@ -234,6 +235,8 @@ export const createPressureSystemsPlugin = () => {
       addGeoJsonSource("storm");
       addGeoJsonSource("labels");
 
+      const beforeId = resolveBeforeLayerId(map);
+
       map.addLayer(
         {
           id: HIGH_LAYER_ID,
@@ -245,7 +248,7 @@ export const createPressureSystemsPlugin = () => {
             "fill-opacity": 0.34
           }
         },
-        "sweden-buildings"
+        beforeId
       );
 
       map.addLayer(
@@ -298,7 +301,7 @@ export const createPressureSystemsPlugin = () => {
               ["to-string", ["get", "pressure"]],
               { "font-scale": 0.85 }
             ],
-            "text-font": ["Roboto Bold", "Arial Unicode MS Bold"],
+            "text-font": ["Noto Sans Bold", "Noto Sans Regular"],
             "text-size": 14,
             "text-anchor": "center",
             "text-allow-overlap": true
@@ -318,22 +321,43 @@ export const createPressureSystemsPlugin = () => {
         STORM_LAYER_ID
       );
 
-      await refreshFrames();
-      await preloadNearbyFrames();
+      // Frames fetch lazily on enable so startup is not blocked by heavy overlay I/O.
       state.isMounted = true;
     },
 
     async onEnable() {
       state.isEnabled = true;
       state.manager?.setOverlayStatus?.(PLUGIN_ID, {
-        status: "ready",
-        statusMessage: formatFrameTime(state.frames[state.frameIndex]?.valid ?? "")
+        status: "loading",
+        statusMessage: "Laddar tryckdata…"
       });
       state.manager?.notify?.();
-      startPolling();
 
-      if (state.playing) {
-        scheduleNextFrame();
+      try {
+        if (!state.frames.length) {
+          await refreshFrames();
+          await preloadNearbyFrames();
+        }
+
+        state.manager?.setOverlayStatus?.(PLUGIN_ID, {
+          status: "ready",
+          statusMessage: formatFrameTime(state.frames[state.frameIndex]?.valid ?? "")
+        });
+        state.manager?.notify?.();
+        startPolling();
+
+        if (state.playing) {
+          scheduleNextFrame();
+        }
+      } catch (error) {
+        state.isEnabled = false;
+        state.manager?.setOverlayStatus?.(PLUGIN_ID, {
+          status: "error",
+          statusMessage:
+            error instanceof Error ? error.message : "Kunde inte ladda tryckvisualisering."
+        });
+        state.manager?.notify?.();
+        throw error;
       }
     },
 
